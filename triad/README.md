@@ -111,3 +111,26 @@ The live runs found three bugs the unit tests could not (the kit drops `agentId`
 - That spawn also passes through the `Agent` reply check, which rejected every review report for not following the coder schema; the loop saw empty reports and passed the phase. Legion executor agents now skip that check, and a reviewer that returns neither a verdict nor a finding never counts as a pass (it is asked again, then the review escalates).
 
 Live `/triad:plan` (`bench/run_legion_plan.sh`, evidence in `bench/results/phase5/plan3/`): a new Phase 3 (Restock Orders, 3 requirements) added to the built fixture, then plan, build and review headless. Opus wrote 2 plans; the critique passed after one refine round; both plans built with all checks green; the panel passed with 1 deferred finding. Cost $0.83 for all three steps. It found two more bugs, both fixed with tests: a refine round (`plan_write` with `only`) rewrote CONTEXT.md from the partial plan list, and the word "json" in a Python CLI phase put a UI designer on the panel (generic format words no longer score personas, and the panel draws from the touched divisions first).
+
+## Phase 6: the rest of Legion
+
+Every Legion workflow now has a Triad equivalent (`PARITY.md`). Judgment work is a plugin command; anything deterministic (parsing, scoring, formulas, file layout, checks, git and `gh`) is mod code behind a deferred `mcp__triad__*` tool, so it costs no tokens and cannot drift. Persona agents run through `persona_run`: in parallel, at the persona's tier, with its distilled core on top of the brief, and read-only unless the command names writable files.
+
+| Command | Does (code / agents) |
+|---|---|
+| `/triad:map` | Codebase map and `rg` index in code (`.planning/CODEBASE.md`, `.planning/codebase/`); Haiku writes the narrative sections; freshness check and query in code. |
+| `/triad:advise <topic>` | Persona picked by registry scoring; one read-only advisor; follow-ups; optional memory record. |
+| `/triad:explore [idea]` | Context first, Haiku research fan-out, one decision per question, Polymath (Opus) synthesis of 2-3 approaches, design doc in `.planning/explorations/` that `/triad:start <path>` reads. |
+| `/triad:board meet <topic>` / `review` | Slate by registry score (max 2 per division); independent assessments, discussion rounds, a binding APPROVE/REJECT vote with one re-vote then ABSTAIN; the resolution formula (≥2/3 approved, majority with conditions, even tie escalated to the user) in code; `.planning/board/{date}-{slug}/` artifacts, a memory record and a commit. `review` is the assessment phase only. |
+| `/triad:spec [N]` | Gather, trigger, completeness and open-question check (PASS/CAUTION/REWORK, Blocking questions halt planning), path validation against `directory-mappings.yaml` and the complexity rating in code; research, writing and critique by personas. `.planning/specs/NN-slug-spec.md`. |
+| `/triad:design`, `/triad:marketing` | Domain detection (MKT-/DSN- ids, `workflow_type`, `--domain`; keywords only hint), teams, wave patterns, document scaffolds (`.planning/designs/`, `.planning/campaigns/`), lifecycle status, completion checks and design grades in code; brief, consultation, documents and the three-lens / marketing reviews by personas. |
+| `/triad:retro`, `/triad:learn` | Metrics and memory in code (`.planning/memory/`, four-bracket decay, archive never delete); the retrospective is written by a persona. |
+| `/triad:milestone`, `/triad:portfolio` | Milestone status, completion and archiving; cross-project registry `~/.claude/legion/portfolio.md`, dependencies and allocation, in code. |
+| `/triad:agent`, `/triad:roster` | Guided persona creation with the 8 checks in code; roster gap analysis and the agent limit. |
+| `/triad:ship [--canary]` | Six pre-ship gates and the ship report in code; PR, push or mark via `git`/`gh`; canary on the mod clock (never auto-rollback). |
+| `/triad:polish` | Scope (cap 50 files), test and type-check baseline, four passes, per-file revert on a regression, in code around the agents. |
+| `/triad:plan` flags | `--dry-run`, `--auto` (board quick-assess, spec, proposals, critique, design 7-pass review, security scan; BLOCKER halts), `--auto-refine`, `--skip-board`, `--skip-security`, `--security`, `--spec`, `--domain=`; GitHub phase issue sync. |
+| `/triad:build` flags | Intent flags validated in code (`--just-harden` ad-hoc team, `--just-document`, `--skip-frontend`, `--skip-backend` plan filters), natural-language routing, `--dry-run`, two-wave mode (Wave A build + analysis, architecture gate, Wave B execution + remediation, production verdict, manifests). |
+| `/triad:review` flags | `--security` / `--just-security` (scan in code, OWASP/STRIDE by the security persona, unresolved CRITICAL/HIGH block ship), `--dry-run`, domain reviews. |
+
+Legion inconsistencies were resolved in code and noted where they live (for example: the board follows the skill's vote, not the command's SUPPORT/OPPOSE; domain documents are flat files; the merged marketing roster ids are remapped).
