@@ -1,0 +1,31 @@
+{
+  "task": "testwrite",
+  "config": "legion",
+  "options": null,
+  "seconds": 46,
+  "exit": 0,
+  "success": true,
+  "check": "mutants caught 7 of 7: ['available_negative', 'commit_keeps_holds', 'commit_unknown_silent', 'release_unknown', 'reserve_boundary', 'reserve_replace', 'restock_zero']",
+  "cost": 0.24787579999999998,
+  "turns": 7,
+  "tokens": {
+    "inputTokens": 14,
+    "outputTokens": 5108,
+    "cacheReadInputTokens": 194674,
+    "cacheCreationInputTokens": 21345
+  },
+  "totalTokens": 221141,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 5108,
+      "cacheReadInputTokens": 194674,
+      "cacheCreationInputTokens": 21345,
+      "costUSD": 0.24787579999999998
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-legion-testwrite-ke_hsodr/repo"
+}

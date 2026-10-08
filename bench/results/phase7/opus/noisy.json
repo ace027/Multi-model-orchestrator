@@ -1,0 +1,31 @@
+{
+  "task": "noisy",
+  "config": "opus",
+  "options": null,
+  "seconds": 16,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 tests changed: [] probe 268 -13 14",
+  "cost": 0.0767174,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 10,
+    "outputTokens": 980,
+    "cacheReadInputTokens": 85387,
+    "cacheCreationInputTokens": 8000
+  },
+  "totalTokens": 94377,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 980,
+      "cacheReadInputTokens": 85387,
+      "cacheCreationInputTokens": 8000,
+      "costUSD": 0.0767174
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-noisy-fuggsjiw/repo"
+}

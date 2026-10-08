@@ -1,0 +1,31 @@
+{
+  "task": "logfix",
+  "config": "opus",
+  "options": null,
+  "seconds": 39,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 test files changed: True",
+  "cost": 0.16833079999999997,
+  "turns": 9,
+  "tokens": {
+    "inputTokens": 18,
+    "outputTokens": 3384,
+    "cacheReadInputTokens": 180194,
+    "cacheCreationInputTokens": 12908
+  },
+  "totalTokens": 196504,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 18,
+      "outputTokens": 3384,
+      "cacheReadInputTokens": 180194,
+      "cacheCreationInputTokens": 12908,
+      "costUSD": 0.16833079999999997
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-logfix-h8hp7ats/repo"
+}

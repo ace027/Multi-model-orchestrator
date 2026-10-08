@@ -9,7 +9,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 4 | Haiku prompt ceiling: no request over 100k | $0.75 |
 | 5 | Legion-format build, review and plan, no migration | $1.15 |
 | 6 | Dry-run build, intent validation, board meeting | $0.56 |
-| 7 | Opus only vs Legion vs Triad, 5 tasks (incomplete, see below) | $0.40 so far |
+| 7 | Opus only vs Legion vs Triad, 5 tasks | $3.43 |
 
 ## Phase 2 acceptance
 
@@ -98,11 +98,36 @@ The board run found a scoring bug. The everyday word "store" matched `marketing-
 
 SPEC section 7 asks for the bench tasks under (a) Opus alone, (b) Legion, (c) Triad, before Legion is removed. `bench/run_phase7.sh <legion checkout>` installs Legion with its own installer into a throwaway HOME (the real `~/.claude` is never touched) and runs `bench/run_bench.py` with the configs `opus`, `legion` and `triad`. Every run gets a fresh HOME. Legion runs through `/legion:quick`, told to take the recommended option wherever it would ask; Triad and Opus get the plain prompt.
 
-**Incomplete.** One run finished before the API key reached its usage limit (the API answered "You have reached your specified API usage limits", until 2026-11-01). The other 14 runs failed before any request was sent and cost nothing.
+All 15 runs passed their hidden checks. One run per cell; Legion's `discounts` run came first, the rest a day later on the same Claude Code build.
 
-| task | config | ok | cost | tokens | notes |
-|---|---|---|---|---|---|
-| discounts | legion | Y | $0.401 | 197.3k | 4 turns, all on Opus; it picked no subagent |
-| discounts | triad (Phase 3 run, for reference) | Y | $0.156 | 106.0k | |
+```
+task       config ok      cost    tokens    in+cw    out  secs  agents
+discounts  legion Y      0.401    197274    47981   6637    63
+discounts  opus   Y      0.154    102668    11194   4003    35
+discounts  triad  Y      0.224    124590    32921   5048    44  coder:1 orchestrator:1
+logfix     legion Y      0.484    386654    54745   7281    80
+logfix     opus   Y      0.168    196504    12926   3384    39
+logfix     triad  Y      0.196    162415    20319   4786    74  coder:1 orchestrator:1
+noisy      legion Y      0.163    177147    18936   1829    26
+noisy      opus   Y      0.077     94377     8010    980    16
+noisy      triad  Y      0.094     88596    11546   1038    19  orchestrator:1
+rename     legion Y      0.495    487599    50960   7706    85
+rename     opus   Y      0.213    224322    23769   2732    33
+rename     triad  Y      0.187    165230    21406   2587    49  compressor:1 orchestrator:1
+testwrite  legion Y      0.248    221141    21359   5108    46
+testwrite  opus   Y      0.148     79856    10023   4254    39
+testwrite  triad  Y      0.174    122569    18572   6244    52  coder:1 orchestrator:1
+```
+
+| config | passed | cost | tokens |
+|---|---|---|---|
+| Opus only | 5/5 | $0.760 | 697.7k |
+| Legion | 5/5 | $1.791 | 1,469.8k |
+| Triad 0.7.0 | 5/5 | $0.875 | 663.4k |
+
+- **Triad against Legion:** the same 5/5 for 51% less cost and 55% fewer tokens. Triad was cheaper on every task. This meets the SPEC section 6 condition for removing Legion.
+- **Legion** ran every task on Opus alone through `/legion:quick`: its single agent never became a subagent, so the persona and registry text it loads is pure overhead on tasks this size.
+- **Triad against Opus alone:** 5% fewer tokens but 15% more cost. Triad was cheaper only on `rename` (compression fired). The gap is cache writes: 104.7k against 65.9k, and the main loop writes its cache at the 1-hour rate. Since Phase 4 the orchestrator guide grew from 1.2k to 3.1k characters and gained the Legion command index, all on every main-loop request; on `noisy` Triad wrote 11.5k cache tokens where the Phase 3 run wrote 8.4k. Phase 3's Triad total on these tasks was $0.591. Trimming the guide back (moving the command index behind a deferred tool) is the obvious next step.
+- Triad spawned a coder on 3 tasks and no helper; Opus kept the small jobs itself, as in Phase 3.
 
 Setting this up found a bug in `run_bench.py`: `--allowedTools` takes several values, so the `opus` config's prompt was read as a tool name. The flag is now passed as `--allowedTools=...`. Phase 3 recorded only `p2` and `p3`, which were not affected.

@@ -1,0 +1,59 @@
+{
+  "task": "testwrite",
+  "config": "triad",
+  "options": {},
+  "seconds": 52,
+  "exit": 0,
+  "success": true,
+  "check": "mutants caught 7 of 7: ['available_negative', 'commit_keeps_holds', 'commit_unknown_silent', 'release_unknown', 'reserve_boundary', 'reserve_replace', 'restock_zero']",
+  "cost": 0.17409260000000004,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 16,
+    "outputTokens": 6244,
+    "cacheReadInputTokens": 97753,
+    "cacheCreationInputTokens": 18556
+  },
+  "totalTokens": 122569,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 1571,
+      "cacheReadInputTokens": 77341,
+      "cacheCreationInputTokens": 11980,
+      "costUSD": 0.1068282
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 6,
+      "outputTokens": 4673,
+      "cacheReadInputTokens": 20412,
+      "cacheCreationInputTokens": 6576,
+      "costUSD": 0.0672644
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 5
+    },
+    "a84c6f5d41c71da86": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-triad-testwrite-lqc2hbzh/repo"
+}
