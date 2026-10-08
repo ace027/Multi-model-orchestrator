@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 8,
+      "input": 16,
+      "output": 3729,
+      "cacheRead": 117974,
+      "cacheWrite": 21228,
+      "cost": 0.2680628
+    },
+    "haiku": {
+      "requests": 52,
+      "input": 2716,
+      "output": 80395,
+      "cacheRead": 1415466,
+      "cacheWrite": 346720,
+      "cost": 0.09796376
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 8,
+      "input": 16,
+      "output": 3729,
+      "cacheRead": 117974,
+      "cacheWrite": 21228,
+      "cost": 0.2680628,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 21230
+    },
+    "ac408ba714b1a7d14": {
+      "requests": 11,
+      "input": 22,
+      "output": 20109,
+      "cacheRead": 415386,
+      "cacheWrite": 92070,
+      "cost": 0.025719310000000002,
+      "role": "helper",
+      "depth": 1,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 92072,
+      "type": "triad:triad-helper",
+      "parent": "main",
+      "status": "partial"
+    },
+    "a20996217e02b7e3d": {
+      "requests": 10,
+      "input": 20,
+      "output": 10842,
+      "cacheRead": 312557,
+      "cacheWrite": 68343,
+      "cost": 0.017091445,
+      "role": "helper",
+      "depth": 1,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 73311,
+      "type": "triad:triad-helper",
+      "parent": "main",
+      "status": "partial"
+    },
+    "aee472e5d2c8b2a18": {
+      "requests": 4,
+      "input": 8,
+      "output": 28385,
+      "cacheRead": 90088,
+      "cacheWrite": 58538,
+      "cost": 0.022411430000000003,
+      "role": "helper",
+      "depth": 1,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 63506,
+      "type": "triad:triad-helper",
+      "parent": "main",
+      "status": "partial"
+    },
+    "adf57c1e151f402cd": {
+      "requests": 8,
+      "input": 16,
+      "output": 8619,
+      "cacheRead": 207410,
+      "cacheWrite": 56431,
+      "cost": 0.013439075,
+      "role": "helper",
+      "depth": 1,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 61399,
+      "type": "triad:triad-helper",
+      "parent": "main",
+      "status": "blocked"
+    },
+    "compressor": {
+      "requests": 1,
+      "input": 2614,
+      "output": 576,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "cost": 0.0005494000000000001,
+      "role": "compressor",
+      "depth": 0,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 2614
+    },
+    "ada13b928a5ef118c": {
+      "requests": 8,
+      "input": 16,
+      "output": 7701,
+      "cacheRead": 169043,
+      "cacheWrite": 37746,
+      "cost": 0.010260779999999999,
+      "role": "helper",
+      "depth": 1,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 42714,
+      "type": "triad:triad-helper",
+      "parent": "main",
+      "status": "done"
+    },
+    "aa09348f92861dfbd": {
+      "requests": 10,
+      "input": 20,
+      "output": 4163,
+      "cacheRead": 220982,
+      "cacheWrite": 33592,
+      "cost": 0.008492320000000001,
+      "role": "helper",
+      "depth": 1,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 38560,
+      "type": "triad:triad-helper",
+      "parent": "main",
+      "status": "done"
+    }
+  },
+  "haiku": {
+    "requests": 52,
+    "maxPrompt": 92072,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "ceiling": {
+    "wrapNotes": 1,
+    "stops": 1,
+    "trimmed": 1,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 95000,
+    "haikuWrapAt": 80000
+  },
+  "contextInjections": 1
+}

@@ -63,4 +63,22 @@ What the runs show:
 
 ## Phase 4: Haiku prompt ceiling
 
-Built and covered by `claude plugin test` (projection, wrap-up note, stop with a schema-conforming `partial`, withheld results, oversized briefs, coders never stopped). The live acceptance is `bench/ceiling/run.sh <dir> [options]`: one helper is asked to read 24 note files (~465 KB, well over 100k tokens) in full, and the orchestrator continues with a fresh helper when it returns `partial`. `bench/ceiling/check.py` passes when no Haiku request went over 100,000 prompt tokens, the ledger's Haiku usage equals the CLI's billed Haiku usage (so no request went unseen), and SUMMARY.md names every file with its headline. The control run sets `haikuCeiling` and `haikuWrapAt` to 10,000,000 to show the same job crosses the line without the ceiling. Not yet run: the API key reached its usage limit (until 2026-11-01).
+Covered by `claude plugin test` (projection, wrap-up note, stop with a schema-conforming `partial`, withheld results, oversized briefs, coders never stopped) and by a live acceptance run. `bench/ceiling/run.sh <dir> [options]` asks one helper to read 24 note files (~465 KB) in full and append a line per file to SUMMARY.md; the orchestrator continues with fresh helpers when one returns `partial`. `bench/ceiling/check.py` passes when no Haiku request went over 100,000 prompt tokens, the ledger's helper usage equals the CLI's billed Haiku usage (no request went unseen), and SUMMARY.md has every file's headline. Evidence in `bench/results/phase4/`.
+
+| | ceiling on (defaults) | control (ceiling off) |
+|---|---|---|
+| Haiku requests | 52 | 30 |
+| largest Haiku prompt | 92,072 | 248,450 |
+| requests over 100k | **0** | **15** |
+| ledger vs billed Haiku usage | equal | equal |
+| wrap-up notes / results withheld / stopped with partial | 1 / 1 / 1 | 0 / 0 / 0 |
+| helpers returning partial | 3 (the orchestrator continued each) | 0 |
+| SUMMARY.md | 24/24 headlines, 23/24 counts | 24/24 headlines, 24/24 counts |
+| cost (CLI) | $0.30 | $0.45 |
+
+With the ceiling, the first helper did weeks 1 to 7, reached 92k, took the wrap-up note and returned `partial`; the orchestrator split the rest across fresh helpers and finished. One more helper was stopped by the hook before a request that would have passed 95k, and its `partial` (done/left from the one-shot) let the orchestrator respawn on the files left. Without the ceiling, one helper read 23 files in one conversation and sent half its requests above the line at the higher rate. The capped run was also cheaper.
+
+Findings:
+- The engine refuses subagents writing standalone report files ("Subagents should return findings as text"). Helpers that tried to write part files were blocked and returned their lines as text instead. Briefs should ask helpers to return findings, and let the coder or orchestrator write report files.
+- `$.model.complete` one-shots (summaries, progress notes) are billed but are not in the CLI's `total_cost_usd` or `modelUsage`; the ledger counts them under `compressor`.
+- The first live attempt found two compression bugs, now fixed: a project under `/tmp` had every Read treated as log-like (the folder test ran on the absolute path), and reading a saved output in `.triad/out` was compressed again.
