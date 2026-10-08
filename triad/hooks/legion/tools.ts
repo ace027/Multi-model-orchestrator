@@ -266,6 +266,15 @@ export const LEGION_TOOLS = [
     description: 'Deterministic prerequisite report for plan, build, review, status, retro, ship or polish: what exists, what would run, no writes, no agents, no tokens. Exit code 0 ready, 2 not ready, 1 unknown command.',
     inputSchema: { type: 'object', properties: { command: { type: 'string', enum: ['plan', 'build', 'review', 'status', 'retro', 'ship', 'polish'] }, phase: { type: 'integer' }, target: str('polish target') }, required: ['command'] },
   },
+  {
+    name: 'board',
+    description: 'Board of directors. compose: the slate for a topic (registry score, max 2 per division). meet: full governance (independent assessments, discussion rounds, binding APPROVE/REJECT vote, resolution formula in code, artifacts under .planning/board/, memory record, commit). review: quick Phase-1-only assessment of a phase, nothing saved. decide: record the user decision on an ESCALATED (tied) board.',
+    inputSchema: { type: 'object', properties: {
+      action: { type: 'string', enum: ['compose', 'meet', 'review', 'decide'] }, topic: str('decision topic'), members: strs('explicit member ids'),
+      context: str('proposal context for the members'), allow_two: { type: 'boolean', description: 'the user opted into a board of 2' }, phase: { type: 'integer' },
+      dir: str('board meeting directory (decide)'), decision: { type: 'string', enum: ['approve', 'approve_conditions', 'reject', 'table'] }, conditions: strs('extra user conditions'),
+    }, required: ['action'] },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)

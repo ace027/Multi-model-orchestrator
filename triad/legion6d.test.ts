@@ -170,3 +170,91 @@ describe('two-wave', () => {
     expect(io.files.has('.planning/phases/01-core/01-01-SUMMARY.md')).toBe(false)
   })
 })
+
+import { boardCompose, boardDecide, boardMeet, boardReview, compose, resolveVotes } from './hooks/legion/board.ts'
+import type { Agents } from './hooks/legion/build.ts'
+
+// Members answer by label; `votes` maps a member id to its final vote text.
+function boardAgents(votes: Record<string, string>) {
+  const spawned: string[] = []
+  const agents: Agents & { spawned: string[] } = {
+    maxParallel: 8, spawned,
+    async run({ persona, label }) {
+      spawned.push(label)
+      if (label.endsWith('-board-assessment')) return { agentId: label, answer: `## Assessment: ${persona.name}\n### Verdict: CONCERNS\n### Score: 7\n### Red Flags: None\n### Concerns:\n- rollback plan is thin\n### Recommendations:\n- add a canary\n### Questions for Other Board Members: None` }
+      if (/-board-round-\d$/.test(label)) return { agentId: label, answer: `### AGREE: ${persona.name} → Board\nThe canary matters.` }
+      if (label.endsWith('-board-revote')) return { agentId: label, answer: 'still undecided' }
+      return { agentId: label, answer: votes[persona.id] ?? `### Vote: ${persona.name}\n- Verdict: APPROVE\n- Confidence: 0.8\n- Conditions: None` }
+    },
+    followUp: async () => '',
+    writesOf: () => ({ files: [], warnings: [] }),
+    usageOf: () => '1 request',
+  }
+  return agents
+}
+
+describe('board', () => {
+  test('resolution formula for N = 5, 4, 3, 2', () => {
+    const t = (n: number) => Array.from({ length: n + 1 }, (_, a) => `${a}:${resolveVotes(a, n)}`).join(' ')
+    expect(t(5)).toBe('0:REJECTED 1:REJECTED 2:REJECTED 3:APPROVED WITH CONDITIONS 4:APPROVED 5:APPROVED')
+    expect(t(4)).toBe('0:REJECTED 1:REJECTED 2:ESCALATED 3:APPROVED 4:APPROVED')
+    expect(t(3)).toBe('0:REJECTED 1:REJECTED 2:APPROVED 3:APPROVED')
+    expect(t(2)).toBe('0:REJECTED 1:ESCALATED 2:APPROVED')
+    expect(resolveVotes(0, 0)).toBe('ESCALATED')
+  })
+
+  test('composition: scored, max two per division', () => {
+    const m = compose('database schema migration and API security review', 5)
+    expect(m.length).toBeGreaterThanOrEqual(3)
+    expect(m.length).toBeLessThanOrEqual(5)
+    expect(m.every(x => x.score > 0)).toBe(true)
+    const per = new Map<string, number>()
+    for (const x of m) per.set(x.division, (per.get(x.division) ?? 0) + 1)
+    expect([...per.values()].every(c => c <= 2)).toBe(true)
+    expect(boardCompose('database schema migration', {})).toContain('| 1 |')
+  })
+
+  test('meet: assess, discuss, vote, resolve with conditions, persist and record', async () => {
+    const io = await project()
+    const ids = ['engineering-backend-architect', 'engineering-security-engineer', 'testing-api-tester', 'product-technical-writer', 'engineering-frontend-developer']
+    const agents = boardAgents({
+      'engineering-security-engineer': '### Vote: x\n- Verdict: APPROVE\n- Confidence: 0.6\n- Conditions: ship behind a feature flag',
+      'testing-api-tester': '### Vote: x\n- Verdict: REJECT\n- Confidence: 0.7\n- Conditions: None',
+      'product-technical-writer': 'no verdict here',
+    })
+    const out = await boardMeet(io, agents, { topic: 'Adopt Postgres for the API', members: ids })
+    // 3 approve, 1 reject, 1 abstain (no verdict after a re-vote): N=4 → APPROVED.
+    expect(out).toContain('Board APPROVED: Adopt Postgres for the API')
+    expect(out).toContain('3 APPROVE — 1 REJECT — 1 ABSTAIN')
+    expect(agents.spawned.filter(l => l.endsWith('-board-revote'))).toEqual(['product-technical-writer-board-revote'])
+    expect(agents.spawned.filter(l => /round-\d$/.test(l)).length).toBe(10)
+    const dir = [...io.files.keys()].find(k => k.endsWith('/MEETING.md'))!.replace('/MEETING.md', '')
+    expect(dir).toMatch(/^\.planning\/board\/\d{4}-\d\d-\d\d-adopt-postgres-for-the-api$/)
+    expect(io.files.get(`${dir}/resolution.md`)).toContain('ship behind a feature flag')
+    expect(io.files.has(`${dir}/assessments/testing-api-tester.md`)).toBe(true)
+    expect(io.files.get('.planning/memory/OUTCOMES.md')).toContain('board_decision')
+    expect(await boardMeet(io, agents, { topic: 'x', members: ['nobody-at-all'] })).toContain('Unknown board members')
+  })
+
+  test('a tie escalates to the user, who decides', async () => {
+    const io = await project()
+    const ids = ['engineering-backend-architect', 'engineering-security-engineer', 'testing-api-tester', 'product-technical-writer']
+    const no = '### Vote: x\n- Verdict: REJECT\n- Confidence: 0.9\n- Conditions: None'
+    const out = await boardMeet(io, boardAgents({ 'testing-api-tester': no, 'product-technical-writer': no }), { topic: 'Rewrite in Rust', members: ids })
+    expect(out).toContain('Board ESCALATED')
+    const dir = out.match(/decide with dir (\S+)\./)![1]!
+    expect(await boardDecide(io, { dir, decision: 'table' })).toBe('Recorded: TABLED (user decision).')
+    expect(io.files.get(`${dir}/resolution.md`)).toContain('**Verdict**: TABLED (user decision)')
+    expect(await boardDecide(io, { dir, decision: 'approve' })).toContain('has no ESCALATED resolution')
+  })
+
+  test('review: Phase 1 only, nothing persisted', async () => {
+    const io = await project()
+    const agents = boardAgents({})
+    const out = await boardReview(io, agents, { topic: 'API security hardening and database performance' })
+    expect(out).toContain('### Aggregate Score: 7.0/10')
+    expect(out).toContain('- rollback plan is thin')
+    expect(agents.spawned.every(l => l.endsWith('-board-assessment'))).toBe(true)
+    expect([...io.files.keys()].some(k => k.startsWith('.planning/board/'))).toBe(false)
+  })
+})

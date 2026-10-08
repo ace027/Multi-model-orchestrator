@@ -98,7 +98,7 @@ export function taskTypeOf(p: { division: string }): string {
   return ({ Engineering: 'implementation', Testing: 'quality-review', Design: 'design', Marketing: 'marketing', Product: 'documentation', 'Project Management': 'planning', Support: 'support', 'Spatial Computing': 'implementation', Specialized: 'implementation' } as Record<string, string>)[p.division] ?? 'general'
 }
 
-export type StoreInput = Omit<Outcome, 'id' | 'date' | 'branch' | 'importance' | 'tags'> & { tags?: string[]; cycles?: number; escalated?: boolean; blockers?: number }
+export type StoreInput = Omit<Outcome, 'id' | 'date' | 'branch' | 'importance' | 'tags'> & { tags?: string[]; cycles?: number; escalated?: boolean; blockers?: number; importance?: number }
 
 export async function storeOutcome(io: Io, settings: Settings, input: StoreInput): Promise<Outcome | undefined> {
   if (!enabled(settings)) return undefined
@@ -112,7 +112,7 @@ export async function storeOutcome(io: Io, settings: Settings, input: StoreInput
     id: nextId('O-', rows.map(r => r.id)),
     date: today(io),
     branch: await branchOf(io),
-    importance: importanceOf({ ...input, firstTime: !rows.some(r => r.agent === input.agent && r.task_type === input.task_type), crossDivision: !!(div && persona && persona.division !== div) }),
+    importance: input.importance ?? importanceOf({ ...input, firstTime: !rows.some(r => r.agent === input.agent && r.task_type === input.task_type), crossDivision: !!(div && persona && persona.division !== div) }),
     tags: input.tags ?? [],
   }
   await io.write(OUTCOMES, text.replace(/\n*$/, '\n') + outcomeRow(o) + '\n')

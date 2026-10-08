@@ -14,8 +14,9 @@ import { securitySave, securityScan } from './security.ts'
 import { retroGather, retroSave } from './retro.ts'
 import { filterPlans, loadIntentConfig, parseIntentFlags, parseNaturalLanguage, renderNl, renderValidation, resolveTeam, validateFlagCombination } from './intents.ts'
 import { dryRunReport, renderDryRun } from './dryrun.ts'
+import { boardCompose, boardDecide, boardMeet, boardReview } from './board.ts'
 
-export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run'])
+export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run', 'board'])
 
 export type Ctx = { agents: () => Agents; ioAt: (root: string) => Io; registry: () => Promise<Io>; schedule?: (ms: number, fn: () => void) => void; notify?: (text: string) => void }
 
@@ -47,6 +48,14 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
       }
       return note + out.join('\n')
     }
+    case 'board':
+      switch (input.action) {
+        case 'compose': return boardCompose(String(input.topic ?? ''), settings)
+        case 'meet': return boardMeet(io, ctx.agents(), { topic: String(input.topic ?? ''), members: input.members, context: input.context, allow_two: input.allow_two })
+        case 'review': return boardReview(io, ctx.agents(), { phase: input.phase, topic: input.topic })
+        case 'decide': return boardDecide(io, { dir: String(input.dir ?? ''), decision: input.decision, conditions: input.conditions })
+      }
+      return 'board: unknown action'
     case 'dry_run': return renderDryRun(await dryRunReport(io, String(input.command), input.phase, input.target))
     case 'memory':
       switch (input.action) {
