@@ -193,11 +193,10 @@ describe('parity: observability-cycle-delta', () => {
     expect(doc).toContain('## Cycle Delta')
     const delta = doc.slice(doc.indexOf('## Cycle Delta'))
     expect(delta).toContain('- cycle 1: 1 must-fix')
-    expect(delta).toContain('- cycle 2: 0 must-fix')
+    expect(delta).toContain('- cycle 2: 0 must-fix (resolved 1, new 0, unchanged 0)')
   })
-  // Not ported: Legion's per-finding classification (resolved, new,
-  // unchanged, downgraded, upgraded) by location fingerprint. Triad's delta
-  // is per-cycle counts only.
+  // Departure: Legion also classed findings as downgraded or upgraded;
+  // Triad keeps the re-raised finding's id and takes its new severity.
   test('a single-cycle review omits it', async () => {
     const io = await builtProject()
     await review(io, fakeAgents(io))

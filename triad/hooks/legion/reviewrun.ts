@@ -156,9 +156,11 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     const t = triage(reports, all.length + 1)
     // A finding raised again keeps its id; one nobody raised again counts as fixed.
     const same = (a: Finding, b: Finding) => a.file === b.file && (!a.line_range || !b.line_range || (a.line_range[0] <= b.line_range[1] + 2 && b.line_range[0] <= a.line_range[1] + 2))
+    let resolvedNow = 0, unchanged = 0
     for (const f of open) {
       const again = t.mustFix.findIndex(m => same(m, f))
-      if (again < 0) { f.status = 'fixed'; f.cycle = cycle; continue }
+      if (again < 0) { f.status = 'fixed'; f.cycle = cycle; resolvedNow++; continue }
+      unchanged++
       const m = t.mustFix[again]!
       t.actioned.splice(t.actioned.indexOf(m), 1)
       t.mustFix[again] = Object.assign(f, { severity: m.severity, description: m.description, suggested_fix: m.suggested_fix ?? f.suggested_fix, cycle })
@@ -170,7 +172,9 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     deferred.push(...t.deferred)
     suggestions.push(...t.niceToHave)
     t.hotSpots.forEach(f => hot.add(f))
-    delta.push(`cycle ${cycle}: ${t.mustFix.length} must-fix, ${t.niceToHave.length} suggestions, ${t.deferred.length} deferred, ${t.dropped} dropped (low confidence)`)
+    // Cycle Delta (review-loop): what the last fix round resolved, what is new, what is unchanged.
+    const breakdown = cycle > 1 ? ` (resolved ${resolvedNow}, new ${t.mustFix.length - unchanged}, unchanged ${unchanged})` : ''
+    delta.push(`cycle ${cycle}: ${t.mustFix.length} must-fix${breakdown}, ${t.niceToHave.length} suggestions, ${t.deferred.length} deferred, ${t.dropped} dropped (low confidence)`)
     log(delta[delta.length - 1])
     if (passed(reports, t)) { result = 'PASSED'; open = []; break }
     open = t.mustFix

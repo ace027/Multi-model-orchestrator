@@ -164,15 +164,16 @@ describe('parity: decision-complete-contract', () => {
     p.body = '<task>t</task>\n<execution_contract>read-before-write -> evidence-before-action -> minimal diff -> verify-before-report</execution_contract>\n<stop_gates>Return BLOCKED when unsure.</stop_gates>\n<recovery>revert</recovery>'
     expect(rules([p]).filter(r => / harness /.test(r))).toEqual([])
   })
-  test('a decision left to the executor is flagged', () => {
+  test('a decision left open is REWORK; deferring work is a warning', () => {
     const p = seqPlan(1, ['a.ts'])
-    p.body = 'Pick the storage engine: TBD.'
+    for (const body of ['Pick the storage engine: TBD.', 'The executor should decide the cache size.', 'Choose the format, decide later.', 'Add retries as needed.']) {
+      p.body = body
+      expect(rules([p]).some(r => r.startsWith('BLOCKER decisions'))).toBe(true)
+    }
+    p.body = 'Localization is left for a future phase.'
     expect(rules([p]).some(r => r.startsWith('WARNING decisions'))).toBe(true)
-    p.body = 'The executor should decide the cache size.'
-    expect(rules([p]).some(r => r.startsWith('WARNING decisions'))).toBe(true)
+    expect(rules([p]).some(r => r.startsWith('BLOCKER decisions'))).toBe(false)
   })
-  // Gap: Legion made a high-impact decision gap a REWORK; Triad only warns,
-  // and phrasing such as "decide later" is not caught.
 })
 
 const fixtureIo = (name: string) => {

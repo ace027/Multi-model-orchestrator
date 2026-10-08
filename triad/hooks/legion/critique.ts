@@ -31,7 +31,10 @@ export function critique(plans: Plan[], maxTasks = 3, knownAgents?: Set<string>)
     const tasks = (p.body.match(/<task\b/g) ?? []).length
     if (tasks > maxTasks) add(p.id, 'BLOCKER', 'size', `${tasks} tasks; the limit is ${maxTasks} per plan`)
     if (!tasks) add(p.id, 'WARNING', 'size', 'no <task> blocks')
-    if (/\b(leave (this )?for later|future phase|TBD|to be decided|executor (should|can) decide)\b/i.test(p.body)) add(p.id, 'WARNING', 'decisions', 'the plan leaves a decision to the executor or defers work')
+    // plan-critique: an undecided action is REWORK; deferring work to a later phase is a warning.
+    const undecided = p.body.match(/\b(TBD|decide later|to be decided|as needed|executor (should|can|will) decide)\b/i)
+    if (undecided) add(p.id, 'BLOCKER', 'decisions', `the plan leaves a decision open ("${undecided[0]}"); make it now`)
+    else if (/\b(leave (this )?for later|future phase)\b/i.test(p.body)) add(p.id, 'WARNING', 'decisions', 'the plan defers work to a later phase')
     if (!fm.agents.length && fm.autonomous !== true) add(p.id, 'BLOCKER', 'agents', 'no agents named')
   }
   const w = planWaves(plans, knownAgents)
