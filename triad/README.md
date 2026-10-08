@@ -1,6 +1,6 @@
 # triad
 
-Claude Code mod that runs development work across three model tiers: the main session on Opus orchestrates, `triad-coder` agents on Sonnet implement one task each, and `triad-helper` agents on Haiku do menial work. Mode B (routed flat; see `../SPIKE.md`): only the orchestrator has the Agent tool, and coders reach Haiku through the `mcp__triad__delegate_menial` tool, whose handler spawns the helper.
+Claude Code mod that runs development work across three model tiers: the main session on Opus orchestrates, `triad-coder` agents on Sonnet implement one task each, and `triad-helper` agents on Haiku do menial work. Mode B (routed flat; see `../SPIKE.md`): only the orchestrator has the Agent tool. It spawns coders and helpers directly (a Haiku job needs no Sonnet agent in between); coders reach Haiku through the `mcp__triad__delegate_menial` tool, whose handler spawns the helper.
 
 Run it with `claude --model opus --plugin-dir ./triad`. Requires Claude Code 2.1.287 or later.
 

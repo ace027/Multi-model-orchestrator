@@ -159,6 +159,18 @@ describe('hooks', () => {
     expect(r.deny).toBeUndefined()
   })
 
+  test('the orchestrator spawns a Haiku helper directly, with no coder in between', async ($, on) => {
+    const log = { writes: {} as Record<string, string>, spawns: [] as any[] }
+    world(on, log)
+    await start($)
+    const h: any = await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'Run the tests and summarize failures', description: 'h' })
+    expect(h.deny).toBeUndefined()
+    expect(log.spawns.length).toBe(1)
+    expect(log.spawns[0].model).toBe('haiku')
+    const out = await $.command.run({ command: 'triad', args: '' } as any)
+    expect(out.text).toMatch(/orchestrator[\s\S]*helper/)
+  })
+
   // The kit drops `agentId` from a plugin's own spawns, so the wait for the
   // helper's answer is covered by the live acceptance run instead (README).
   test('delegate_menial spawns the helper on Haiku with its writable files', async ($, on) => {
