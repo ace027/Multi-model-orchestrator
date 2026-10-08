@@ -208,3 +208,29 @@ refunds    triad  Y 18/18     0.260    156625    31287   6796    65  coder:1 orc
 - **Cost:** Triad $0.637, Opus alone $0.627. Triad was cheaper on `csvimport`, the larger task, and dearer on `refunds`.
 - **Tests:** Opus wrote more and stricter ones (`csvimport` 36 against 22; `refunds` 19 against 14). Each config's own tests caught every flawed implementation from the table above. Cross-checked, Triad's code passes all of Opus's tests but one: it accepts a single-digit slash date (`1/2/2026`), which Opus's tests reject; the spec does not say. Both configs also went past the reference solution: both reject malformed units in refund requests, and Opus's tests reject non-ASCII digits as amounts, which the reference accepts.
 - The hidden checks are saturated again, so they cannot separate the two configs. The remaining differences (test thoroughness, edge cases the spec leaves open) need either harder hidden cases or several runs per cell.
+
+## Browser games
+
+Two longer tasks with a GUI (`python3 bench/run_bench.py --tasks games`), built from a written spec into an empty repo: plain HTML canvas and JavaScript, no build step, tests under `node --test`. Playwright for Node and Chromium are available to the run, and the task asks it to play the game and look at screenshots. The environment passes `PLAYWRIGHT_BROWSERS_PATH` and `NODE_PATH` through `bench/hermetic.sh` for this.
+
+- **tron:** Light Cycles against the computer. The spec fixes the rules tick by tick (simultaneous moves, ignored reversals, draws, rounds, match to 3), the page and key handling, the colours, and a `window.tron` hook.
+- **pacman:** the classic maze (`levels/classic.txt`), with pellets, power pellets, the tunnel, the ghost house and its release ticks, the scatter and chase schedule, all four ghost targeting rules, the frightened and eyes modes, the 200 to 1600 eating chain, deaths, levels and the extra life. All of it is defined per tick so the game is deterministic, and it is exposed through `window.pacman`.
+
+The hidden checks (`bench/webgrade.cjs`) serve the work dir and drive it in headless Chromium:
+
+| Part | tron | pacman | Pass mark |
+|---|---|---|---|
+| Rules through the hook | 20 cases | 32 scripted cases on small mazes and the classic maze | 80% |
+| The page in real time: load, wait for Space, tick rate, keys, pause, and colour counts from real screenshots (things drawn, trails growing, pellets vanishing) | 8 | 8 | 7/8 |
+| Open-ended | `chooseMove` tournament: 24 rounds against four bots on obstacle arenas, both sides | 4 long replays of the classic maze driven by a deterministic bot, compared field by field | tron 50%; pacman reported only |
+
+A Pac-Man replay matches only if every rule is exact for up to 3000 ticks, including deaths, eaten ghosts, level clears and the extra life. That makes it a strict fidelity signal on top of the rule cases.
+
+**Validating the specs:** two separate agents each wrote a reference game from the spec alone, without seeing the checks (`tasks/<game>/solution`). The Pac-Man expectations come from a third rules engine, written separately from the spec. Both references get full marks:
+
+```
+ok  tron       solution exit 0: score 52/52 rules 20/20 ui 8/8 ai 24/24
+ok  pacman     solution exit 0: score 44/44 rules 32/32 ui 8/8 replay 4/4
+```
+
+Every place the reference writers reported as ambiguous was either left untested or fixed in the spec (the default for Tron's `ai` option). The Tron reference took about 28 minutes and beat every bot in every round. A strong AI can therefore max out the tournament as well, so it separates weak AIs from good ones but not good ones from each other. Not yet run with a model.
