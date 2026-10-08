@@ -317,6 +317,7 @@ window.__tournament = function () {
 }`
 
 async function tournament(browser, url) {
+  if (!browser) return { parts: { ai: [0, 24] }, failed: [] }
   const page = await (await browser.newContext()).newPage()
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 15000 })

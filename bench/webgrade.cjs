@@ -55,6 +55,13 @@ const helpers = page => ({
 })
 
 async function run(work, cases, { hook, caseTimeout = 60000, after } = {}) {
+  if (!fs.existsSync(path.join(work, 'index.html'))) {
+    const parts = {}
+    for (const c of cases) { parts[c.part] = parts[c.part] || [0, 0]; parts[c.part][1]++ }
+    const extra = after ? await after(null, null) : {}
+    for (const [k, v] of Object.entries(extra.parts || {})) parts[k] = [0, v[1]]
+    return { parts, failed: ['no index.html'] }
+  }
   const server = await serve(path.resolve(work))
   const url = `http://127.0.0.1:${server.address().port}/index.html`
   const browser = await chromium.launch()
