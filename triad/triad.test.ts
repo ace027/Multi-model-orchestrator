@@ -150,6 +150,15 @@ describe('hooks', () => {
     expect(second.deny).toBeUndefined()
   })
 
+  test('lets a Legion executor agent reply in its own format', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    on('tool.call', { tool: 'Agent' }, () => ({ result: 'x', text: '### Finding 1\n**Verdict**: PASS\nagentId: agent1' }) as any)
+    await start($)
+    await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'a', description: 'triad legion: review x #1' })
+    const r: any = await $.tool.call({ tool: 'Agent', prompt: 'a', description: 'triad legion: review x #1', subagent_type: 'triad:triad-coder' } as any)
+    expect(r.deny).toBeUndefined()
+  })
+
   // The kit drops `agentId` from a plugin's own spawns, so the wait for the
   // helper's answer is covered by the live acceptance run instead (README).
   test('delegate_menial spawns the helper on Haiku with its writable files', async ($, on) => {

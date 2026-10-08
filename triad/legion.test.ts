@@ -218,6 +218,14 @@ describe('build and review', () => {
     expect(io.commits).toContain('chore(triad): phase 1 review passed — Core')
     expect(io.files.get('.planning/ROADMAP.md')).toContain('[x] Phase 1')
   })
+  test('review: a reviewer that returns nothing is never a pass', async () => {
+    const io = await newProject()
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })
+    await build(io, fakeAgents(io))
+    const r = await review(io, fakeAgents(io, () => ''))
+    expect(r.result === 'PASSED').toBe(false)
+    expect(io.commits.some(c => c.includes('review passed'))).toBe(false)
+  })
   test('status and validate on the built project', async () => {
     const io = await newProject()
     await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })

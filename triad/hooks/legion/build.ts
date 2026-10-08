@@ -88,7 +88,7 @@ const listAfter = (text: string, key: string) => {
   if (i < 0) return []
   const first = lines[i].replace(new RegExp(`^\\s*${key}:\\s*`, 'i'), '').trim()
   const out = first && !/^none$/i.test(first) ? [first] : []
-  for (let j = i + 1; j < lines.length && !/^\s*[a-z_]+:/i.test(lines[j]) && !/^</.test(lines[j]); j++) if (lines[j].trim().replace(/^-\s*/, '')) out.push(lines[j].trim().replace(/^-\s*/, ''))
+  for (let j = i + 1; j < lines.length && !/^\s*[a-z_]+:/i.test(lines[j]) && !/^</.test(lines[j]) && !/^\s*```/.test(lines[j]); j++) if (lines[j].trim().replace(/^-\s*/, '')) out.push(lines[j].trim().replace(/^-\s*/, ''))
   return out
 }
 

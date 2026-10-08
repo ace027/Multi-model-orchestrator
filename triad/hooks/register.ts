@@ -48,6 +48,7 @@ const scopes: Record<string, Scope> = {}
 const scopeLog: Record<string, { files: Set<string>; warnings: string[] }> = {}
 const modelFor: Record<string, string> = {}
 const finished: Record<string, string> = {}
+const legion = new Set<string>()
 const LEGION_MARK = 'triad legion: '
 const LEGION_WAIT = 60 * 60_000
 
@@ -190,7 +191,7 @@ function ioOf($: any): Io {
   }
 }
 
-function agentsOf($: any): Agents {
+function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
   return {
     maxParallel: opts.maxCoders,
     async run({ persona, brief, scope, label }) {
@@ -199,13 +200,22 @@ function agentsOf($: any): Agents {
       if (persona.tier === 'opus') modelFor[description] = 'opus'
       const s: any = await $.agent.spawn({ subagentType: helper ? HELPER_TYPE : 'triad:triad-coder', prompt: brief, description, model: helper ? 'haiku' : persona.tier === 'opus' ? 'opus' : 'sonnet' })
       delete modelFor[description]
-      if (!s?.agentId) return { deny: s?.deny ?? 'the agent could not be spawned' }
+      if (!s?.agentId) {
+        log(`${label}: not started (${s?.deny ?? JSON.stringify(s)})`)
+        return { deny: s?.deny ?? 'the agent could not be spawned' }
+      }
       const id: string = s.agentId
+      log(`${label}: agent ${id} started`)
       scopes[id] = scope
       scopeLog[id] ??= { files: new Set(), warnings: [] }
       try {
-        return { agentId: id, answer: await waitForAnswer($, id, LEGION_WAIT) }
+        const answer = await waitForAnswer($, id, LEGION_WAIT)
+        log(`${label}: agent ${id} answered (${answer === undefined ? 'no answer' : `${answer.length} chars`})`)
+        // Kept for audit: what the executor parsed for this plan or review.
+        await $.fs.write(`${cwd}/.triad/legion/${label.replace(/[^\w.-]+/g, '-')}-${id}.md`, answer ?? '(no answer)')
+        return { agentId: id, answer }
       } catch (err) {
+        log(`${label}: agent ${id} failed: ${err instanceof Error ? err.message : String(err)}`)
         return { agentId: id, deny: `waiting for agent ${id} failed: ${err instanceof Error ? err.message : String(err)}` }
       }
     },
@@ -244,8 +254,8 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
     case 'plan_write': return planWrite(io, input)
     case 'plan_check': return planCheck(io, Number(input.phase))
     case 'persona_brief': return personaQuery(input)
-    case 'build_phase': return (await build(io, agentsOf($), { phase: input.phase, wave: input.wave, rerun: !!input.rerun, log })).text
-    case 'review_phase': return (await review(io, agentsOf($), { phase: input.phase, mode: input.mode, log })).text
+    case 'build_phase': return (await build(io, agentsOf($, log), { phase: input.phase, wave: input.wave, rerun: !!input.rerun, log })).text
+    case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, log })).text
   }
   return `unknown tool ${name}`
 }
@@ -337,6 +347,7 @@ export const register: Register = (on, options) => {
         written[id] = new Set()
       }
       tasks[id] = e.prompt
+      if (e.description.startsWith(LEGION_MARK)) legion.add(id)
       ensureAgent(ledger, id, { role, type, parent: parent ?? 'main', depth, status: 'running' })
     }
     return r
@@ -401,6 +412,9 @@ export const register: Register = (on, options) => {
     if (r.isError || typeof r.text !== 'string') return r
     const id = byToolUse[e.tool_use_id] ?? agentIdIn(r.text)
     if (!id || !roles[id]) return r
+    // The Legion executor's own agents reply in their brief's format (plan return
+    // block, review findings), which the executor parses itself.
+    if (legion.has(id) || String((e as any).description ?? '').startsWith(LEGION_MARK)) return r
     const problems = schemaProblems(r.text)
     if (!problems.length || (retries[id] ?? 0) >= opts.maxRetries) return r
     retries[id] = (retries[id] ?? 0) + 1

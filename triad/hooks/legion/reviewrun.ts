@@ -5,7 +5,7 @@ import { loadPhase, loadProject, today, type Io } from './io.ts'
 import { checkPhase, getSection, overlaps, pad2, setRoadmapRow, updateState, verificationCommands } from './planning.ts'
 import { BY_ID, classicReviewers, composePanel, divisionsOf, fixAgentFor, personaBrief, rubricOf } from './registry.ts'
 import type { Persona } from './personas.ts'
-import { REVIEWER_RULES, parseReport, passed, renderReview, signature, triage, MUST_FIX, type Finding, type ReviewerReport } from './review.ts'
+import { REVIEWER_RULES, parseReport, passed, reviewed, renderReview, signature, triage, MUST_FIX, type Finding, type ReviewerReport } from './review.ts'
 import { runVerification, dirtyFiles, type Agents } from './build.ts'
 import { parseReply } from '../policy.ts'
 import { phaseNumbers } from './status.ts'
@@ -98,7 +98,10 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     const reports: ReviewerReport[] = await Promise.all(reviewers.map(async persona => {
       const brief = reviewerBrief({ persona, panel: panelMode, phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles, open, cycle, checks })
       const r = await agents.run({ persona, brief, scope: { planId: `review-${pad2(n)}`, mode: 'surgical', files_modified: [], files_forbidden: [] }, label: `review ${persona.id}` })
-      return parseReport(persona.id, r.answer ?? '', cycle)
+      const report = parseReport(persona.id, r.answer ?? '', cycle)
+      // Reviewers sometimes give absolute paths; findings are keyed by the project-relative one.
+      for (const f of report.findings) if (f.file.startsWith(io.root + '/')) f.file = f.file.slice(io.root.length + 1)
+      return report
     }))
     for (const r of reports) verdicts.push({ agent: r.agent, verdict: r.verdict ?? (r.findings.length ? 'NEEDS WORK' : 'no verdict'), cycle })
     const t = triage(reports, all.length + 1)
@@ -128,6 +131,13 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     lastSig = sig
     if (staleCount >= 1 && cycle > 2) { result = 'STALE LOOP ABORTED'; break }
     if (cycle === maxCycles) { result = 'ESCALATED'; break }
+    const silent = reports.filter(r => !reviewed(r))
+    if (silent.length) {
+      // No report from a reviewer: ask again next cycle; out of cycles, escalate.
+      delta.push(`cycle ${cycle}: no report from ${silent.map(r => r.agent).join(', ')}`)
+      log(delta[delta.length - 1])
+      if (!open.length) continue
+    }
     if (!open.length) { result = 'PASSED'; break } // FAIL/NEEDS WORK verdicts without actionable findings
 
     // Fix: one agent per routed persona, its files disjoint from the others'.

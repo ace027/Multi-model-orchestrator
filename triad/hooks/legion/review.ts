@@ -51,7 +51,19 @@ export function parseReport(agent: string, text: string, cycle: number): Reviewe
   const findings: Finding[] = []
   const blocks = text.split(/^#{2,4}\s*Finding\b.*$/im).slice(1)
   for (const b of blocks) {
-    const f = (k: string) => b.match(new RegExp(`^\\s*[-*]?\\s*\\*{0,2}(?:${k})\\*{0,2}\\s*:\\s*\\*{0,2}\\s*(.+)$`, 'im'))?.[1]?.trim()
+    // A field runs on over indented or bulleted lines until the next "- **Field**:" line.
+    const f = (k: string) => {
+      const lines = b.split('\n')
+      const i = lines.findIndex(l => new RegExp(`^\\s*[-*]?\\s*\\*{0,2}(?:${k})\\*{0,2}\\s*:`, 'i').test(l))
+      if (i < 0) return undefined
+      const out = [lines[i]!.replace(new RegExp(`^\\s*[-*]?\\s*\\*{0,2}(?:${k})\\*{0,2}\\s*:\\s*\\*{0,2}\\s*`, 'i'), '')]
+      for (let j = i + 1; j < lines.length; j++) {
+        const l = lines[j]!
+        if (!l.trim() || /^\s*[-*]?\s*\*\*[^*]+\*\*\s*:/.test(l) || /^\s*[-*]?\s*[A-Z][\w /-]*:\s/.test(l) || /^#/.test(l)) break
+        out.push(l.trim())
+      }
+      return out.join(' ').trim() || undefined
+    }
     const sev = severityOf(f('Severity') ?? '')
     const file = (f('File') ?? '').replace(/[`*]/g, '').replace(/:(\d+)(-\d+)?$/, '').trim()
     const linesStr = f('Lines?|Line/Section|Line range') ?? (f('File') ?? '').match(/:(\d+(?:-\d+)?)/)?.[1] ?? ''
@@ -105,8 +117,11 @@ export function triage(reports: ReviewerReport[], startId = 1): Triage {
   }
 }
 
+// A reviewer that gave neither a verdict nor a finding did not review: never a pass.
+export const reviewed = (r: ReviewerReport) => r.verdict !== undefined || r.findings.length > 0
+
 export function passed(reports: ReviewerReport[], t: Triage): boolean {
-  return t.mustFix.length === 0 && reports.every(r => r.verdict === 'PASS' || (r.verdict === undefined && !r.findings.some(f => MUST_FIX.has(f.severity) && f.confidence >= 80)))
+  return t.mustFix.length === 0 && reports.length > 0 && reports.every(r => r.verdict === 'PASS' || (r.verdict === undefined && reviewed(r) && !r.findings.some(f => MUST_FIX.has(f.severity) && f.confidence >= 80)))
 }
 
 // The finding as the schema's record (for validation and the JSON sidecar).
