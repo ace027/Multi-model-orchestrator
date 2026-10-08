@@ -9,7 +9,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 4 | Haiku prompt ceiling: no request over 100k | $0.75 |
 | 5 | Legion-format build, review and plan, no migration | $1.15 |
 | 6 | Dry-run build, intent validation, board meeting | $0.56 |
-| 7 | Opus only vs Legion vs Triad, 5 tasks | $3.43 |
+| 7 | Opus only vs Legion vs Triad, 5 tasks, plus a rerun after the guide trim | $4.95 |
 
 ## Phase 2 acceptance
 
@@ -131,3 +131,31 @@ testwrite  triad  Y      0.174    122569    18572   6244    52  coder:1 orchestr
 - Triad spawned a coder on 3 tasks and no helper; Opus kept the small jobs itself, as in Phase 3.
 
 Setting this up found a bug in `run_bench.py`: `--allowedTools` takes several values, so the `opus` config's prompt was read as a tool name. The flag is now passed as `--allowedTools=...`. Phase 3 recorded only `p2` and `p3`, which were not affected.
+
+### Rerun after the guide trim (0.7.1)
+
+0.7.1 cut the orchestrator guide from about 3,100 to 1,420 bytes: the Legion coordination rules and the knowledge index now go out only with `/triad:*` prompts (as `prompt.submit` context). The `opus` and `triad` configs ran again (`bench/results/phase7b`); Legion was not rerun.
+
+```
+task       config ok      cost    tokens    in+cw    out  secs  agents
+discounts  opus   Y      0.165    103741    11603   4483    40
+discounts  triad  Y      0.222    115698    31472   5628    53  coder:1 orchestrator:1
+logfix     opus   Y      0.090     95208     8066   1631    18
+logfix     triad  Y      0.193    215310    29308   8417    72  coder:1 helper:1 orchestrator:1
+noisy      opus   Y      0.074     93555     7680    921    14
+noisy      triad  Y      0.118     78127    16802   1074    20  orchestrator:1
+rename     opus   Y      0.216    178280    26194   2760    32
+rename     triad  Y      0.158    142576    16443   2557    40  compressor:1 orchestrator:1
+testwrite  opus   Y      0.138     79099     9624   3859    33
+testwrite  triad  Y      0.150    110150    16058   5297    46  coder:1 orchestrator:1
+```
+
+| config | passed | cost | tokens | cache writes |
+|---|---|---|---|---|
+| Opus only | 5/5 | $0.683 | 549.9k | 63.1k |
+| Triad 0.7.1 | 5/5 | $0.840 | 661.9k | 110.0k |
+
+- **The trim did not close the gap.** Triad cost 23% more than Opus alone (15% in the first run) and its cache writes did not fall (110.0k against 104.7k). The guide is now about 350 tokens, so it is not where the overhead is.
+- **The overhead is elsewhere in the main-loop prompt.** On `noisy`, where Triad spawned nothing, it wrote 16.8k input and cache tokens against Opus's 7.7k. What the plugin adds to every request besides the guide: its 20 command descriptions in the command listing, the Triad agent descriptions in the Agent tool, the `delegate_menial` schema and the deferred tool names. Each coder spawn adds a cache write of its own.
+- **Runs are noisy.** Opus alone on `logfix` cost $0.168 in the first run and $0.090 here; single runs per cell cannot resolve differences of a few cents per task.
+- Triad still beats Legion by a wide margin, so the removal decision stands.

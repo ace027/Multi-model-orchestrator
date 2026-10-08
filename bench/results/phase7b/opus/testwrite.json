@@ -1,0 +1,31 @@
+{
+  "task": "testwrite",
+  "config": "opus",
+  "options": null,
+  "seconds": 33,
+  "exit": 0,
+  "success": true,
+  "check": "mutants caught 7 of 7: ['available_negative', 'commit_keeps_holds', 'commit_unknown_silent', 'release_unknown', 'reserve_boundary', 'reserve_replace', 'restock_zero']",
+  "cost": 0.1384152,
+  "turns": 4,
+  "tokens": {
+    "inputTokens": 8,
+    "outputTokens": 3859,
+    "cacheReadInputTokens": 65616,
+    "cacheCreationInputTokens": 9616
+  },
+  "totalTokens": 79099,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 8,
+      "outputTokens": 3859,
+      "cacheReadInputTokens": 65616,
+      "cacheCreationInputTokens": 9616,
+      "costUSD": 0.1384152
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-testwrite-3bl0wwtr/repo"
+}
