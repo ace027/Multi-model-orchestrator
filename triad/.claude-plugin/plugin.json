@@ -1,0 +1,67 @@
+{
+  "name": "triad",
+  "version": "0.6.0",
+  "description": "Tiered-model orchestration: Opus orchestrates, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
+  "userConfig": {
+    "maxDepth": {
+      "type": "number",
+      "title": "Max depth below the orchestrator",
+      "description": "Spawns deeper than this are refused.",
+      "default": 2
+    },
+    "maxCoders": {
+      "type": "number",
+      "title": "Max concurrent coders",
+      "description": "triad-coder agents (Sonnet) running at once.",
+      "default": 4
+    },
+    "maxHelpers": {
+      "type": "number",
+      "title": "Max concurrent helpers",
+      "description": "triad-helper agents (Haiku) running at once.",
+      "default": 6
+    },
+    "maxRetries": {
+      "type": "number",
+      "title": "Max automatic retries per task",
+      "description": "How many times a non-conforming reply is sent back before it is passed through.",
+      "default": 1
+    },
+    "strictMenu": {
+      "type": "boolean",
+      "title": "Offer only Triad agent types",
+      "description": "Hide and refuse built-in and other plugins' agent types, which would bypass the tiers.",
+      "default": true
+    },
+    "compress": {
+      "type": "boolean",
+      "title": "Compress long tool output",
+      "description": "Save long Bash/Grep output (and log-like files read) to .triad/out and give the agent its error lines plus a Haiku summary.",
+      "default": true
+    },
+    "compressThreshold": {
+      "type": "number",
+      "title": "Compression threshold (tokens)",
+      "description": "Output longer than this is compressed.",
+      "default": 4000
+    },
+    "deferTools": {
+      "type": "boolean",
+      "title": "Defer rarely used tool descriptions",
+      "description": "Load only the tools the tiers use every turn; the rest stay reachable through ToolSearch.",
+      "default": true
+    },
+    "haikuCeiling": {
+      "type": "number",
+      "title": "Haiku prompt ceiling (tokens)",
+      "description": "A helper whose next request is projected above this is stopped and returns partial. Keep it under 100,000, Haiku's pricing line.",
+      "default": 95000
+    },
+    "haikuWrapAt": {
+      "type": "number",
+      "title": "Haiku wrap-up threshold (tokens)",
+      "description": "At this prompt size a helper is told to finish and return.",
+      "default": 80000
+    }
+  }
+}

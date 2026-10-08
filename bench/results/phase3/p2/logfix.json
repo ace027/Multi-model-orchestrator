@@ -1,0 +1,44 @@
+{
+  "task": "logfix",
+  "config": "p2",
+  "options": {
+    "compress": false,
+    "deferTools": false
+  },
+  "seconds": 29,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 test files changed: True",
+  "cost": 0.19888340000000002,
+  "turns": 9,
+  "tokens": {
+    "inputTokens": 12,
+    "outputTokens": 2726,
+    "cacheReadInputTokens": 98527,
+    "cacheCreationInputTokens": 24922
+  },
+  "totalTokens": 126187,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 2726,
+      "cacheReadInputTokens": 98527,
+      "cacheCreationInputTokens": 24922,
+      "costUSD": 0.19888340000000002
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 6
+    }
+  },
+  "work": "/tmp/bench-p2-logfix-6afxmagw/repo"
+}

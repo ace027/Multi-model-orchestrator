@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 5,
+      "input": 10,
+      "output": 853,
+      "cacheRead": 67690,
+      "cacheWrite": 6323,
+      "cost": 0.08122199999999999
+    },
+    "sonnet": {
+      "requests": 9,
+      "input": 18,
+      "output": 4428,
+      "cacheRead": 74848,
+      "cacheWrite": 19391,
+      "cost": 0.1077631
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 5,
+      "input": 10,
+      "output": 853,
+      "cacheRead": 67690,
+      "cacheWrite": 6323,
+      "cost": 0.08122199999999999,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 15762
+    },
+    "af69e10995483892e": {
+      "requests": 3,
+      "input": 6,
+      "output": 1694,
+      "cacheRead": 24317,
+      "cacheWrite": 6204,
+      "cost": 0.0373254,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "maxPrompt": 11563,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "a10d33039ee0c8e92": {
+      "requests": 3,
+      "input": 6,
+      "output": 1351,
+      "cacheRead": 25646,
+      "cacheWrite": 6693,
+      "cost": 0.035383700000000004,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "maxPrompt": 12052,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "ac5c848332cdbf531": {
+      "requests": 3,
+      "input": 6,
+      "output": 1383,
+      "cacheRead": 24885,
+      "cacheWrite": 6494,
+      "cost": 0.035054,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "maxPrompt": 11853,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    }
+  },
+  "haiku": {
+    "requests": 0,
+    "maxPrompt": 0,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "ceiling": {
+    "wrapNotes": 0,
+    "stops": 0,
+    "trimmed": 0,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 95000,
+    "haikuWrapAt": 80000
+  },
+  "contextInjections": 1
+}

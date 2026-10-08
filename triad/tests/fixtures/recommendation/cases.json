@@ -1,0 +1,72 @@
+[
+  {
+    "name": "backend-performance",
+    "prompt": "Build a scalable backend API and reduce latency under load",
+    "expectedTop": "engineering-backend-architect",
+    "expectedConfidence": "high",
+    "mustInclude": ["testing-api-tester"]
+  },
+  {
+    "name": "marketing-campaign",
+    "prompt": "Design a TikTok and Instagram growth campaign with viral referral loop",
+    "expectedTop": "marketing-growth-hacker",
+    "expectedConfidence": "high",
+    "mustInclude": ["marketing-social-platform-specialist"]
+  },
+  {
+    "name": "ambiguous-low-confidence",
+    "prompt": "Need help improving our thing",
+    "expectedTop": "agents-orchestrator",
+    "expectedConfidence": "low",
+    "mustInclude": []
+  },
+  {
+    "name": "typescript-react-frontend",
+    "prompt": "Build a React TypeScript frontend with component library and accessibility testing",
+    "expectedTop": "engineering-frontend-developer",
+    "expectedConfidence": "high",
+    "mustInclude": []
+  },
+  {
+    "name": "python-ml-pipeline",
+    "prompt": "Build a Python machine learning pipeline with model training and evaluation",
+    "expectedTop": "engineering-ai-engineer",
+    "expectedConfidence": "high",
+    "mustInclude": []
+  },
+  {
+    "name": "laravel-php-app",
+    "prompt": "Build a Laravel PHP application with Livewire components and Eloquent migrations",
+    "expectedTop": "engineering-laravel-specialist",
+    "expectedConfidence": "high",
+    "mustInclude": []
+  },
+  {
+    "name": "swift-visionos-spatial",
+    "prompt": "Build a Swift visionOS spatial computing app with RealityKit and Metal rendering",
+    "expectedTop": "visionos-spatial-engineer",
+    "expectedConfidence": "high",
+    "mustInclude": []
+  },
+  {
+    "name": "review-security-audit",
+    "prompt": "Perform a security audit with OWASP compliance review and threat modeling",
+    "expectedTop": "engineering-security-engineer",
+    "expectedConfidence": "high",
+    "mustInclude": []
+  },
+  {
+    "name": "devops-deployment",
+    "prompt": "Deploy a CI-CD pipeline with infrastructure automation and container orchestration",
+    "expectedTop": "engineering-infrastructure-devops",
+    "expectedConfidence": "high",
+    "mustInclude": []
+  },
+  {
+    "name": "mobile-flutter-app",
+    "prompt": "Build a cross-platform mobile app with Flutter for iOS and Android",
+    "expectedTop": "engineering-mobile-app-builder",
+    "expectedConfidence": "high",
+    "mustInclude": []
+  }
+]

@@ -1,0 +1,32 @@
+35af965 chore(legion): phase 2 review passed — Reporting
+
+ .planning/ROADMAP.md                       |  4 ++--
+ .planning/STATE.md                         |  8 ++++----
+ .planning/phases/02-reporting/02-REVIEW.md | 29 +++++++++++++++++++++++++++++
+ 3 files changed, 35 insertions(+), 6 deletions(-)
+7f84cf5 chore(legion): complete phase 2 execution — Reporting
+
+ .planning/STATE.md | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+38e48af chore(legion): update state after wave 2 of phase 2
+
+ .planning/ROADMAP.md | 2 +-
+ .planning/STATE.md   | 7 ++++---
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+d4c29b6 feat(legion): execute plan 02-02 — Command line for the report: `python -m invlib.cli report FILE --threshold N`.
+
+ .planning/phases/02-reporting/02-02-SUMMARY.md | 46 +++++++++++++++++++++
+ invlib/cli.py                                  | 49 +++++++++++++++++++++++
+ tests/test_cli.py                              | 55 ++++++++++++++++++++++++++
+ 3 files changed, 150 insertions(+)
+67aa402 chore(legion): update state after wave 1 of phase 2
+
+ .planning/ROADMAP.md |  2 +-
+ .planning/STATE.md   | 12 ++++++++----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
+1b245da feat(legion): execute plan 02-01 — Add the low-stock report: which SKUs to reorder, and a plain-text rendering.
+
+ .planning/phases/02-reporting/02-01-SUMMARY.md | 46 ++++++++++++++++++++++++++
+ invlib/report.py                               | 18 ++++++++++
+ tests/test_report.py                           | 39 ++++++++++++++++++++++
+ 3 files changed, 103 insertions(+)

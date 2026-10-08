@@ -36,7 +36,7 @@ Build a throwaway mod and answer these. The architecture in section 3 depends on
 | 8 | Can a mod see the prompt size of each Haiku request before it's sent (e.g. in `turn.step`), message that subagent mid-run (`$.session.send` to an `agentId`), and stop it or compact it? | Enforcing the Haiku prompt ceiling |
 | 9 | Do cache read and cache write tokens count toward Haiku's 100k pricing line? The pricing docs don't say. Run the test in Appendix A | Setting the real limit; until measured, assume they count |
 
-Deliverable: a short `SPIKE.md` with each answer, how it was verified, and the chosen mode below.
+Deliverable: a short `SPIKE.md` with each answer, how it was verified, and the chosen mode below. **Result: Mode B** (see `SPIKE.md`).
 
 **Mode A (true tree)**: if 1, 2 and 6 are yes. Sonnet agents get the Agent tool and spawn Haiku helpers directly.
 **Mode B (routed flat)**: otherwise. Only Opus spawns agents. Sonnet agents get a registered tool `delegate_menial` (via `$.tool.register`) whose handler calls `$.model.complete({ model: 'haiku', ... })` for one-shot jobs, or `$.agent.spawn` for helpers that need tools. The mod, not the model, enforces the tiers.
@@ -112,7 +112,7 @@ Every turn of an agent resends its whole conversation, so a Haiku agent's prompt
 - **Prefer many short Haiku agents over one long one:** the parent splits work so each Haiku job is narrow.
 - **One-shot calls** (`$.model.complete` for compression and summaries): inputs over 60k are chunked and merged map-reduce style. Never `$.model.fork` to Haiku when the conversation is near the ceiling, since fork carries the whole conversation.
 - **Model rerouting:** a `turn.step` hook never moves a request to Haiku if its prompt is above the act-at threshold. It stays on its current model.
-- **Counting:** until spike item 9 is answered, count every token sent in the request, including cache reads and writes. Output tokens are not limited.
+- **Counting:** count every input token sent in the request, including cache reads and writes; spike item 9 measured that both count toward the line. Output tokens are not limited.
 - Opus and Sonnet are never limited or stopped on token grounds.
 
 ## 5. Phases
@@ -122,7 +122,7 @@ Every turn of an agent resends its whole conversation, so a Haiku agent's prompt
 3. **Compression + trimming**: result compression, deferred tool descriptions, prompt trimming. Acceptance: measurable token reduction on the benchmark with no drop in task success.
 4. **Haiku prompt ceiling + escalation**: pre-flight, 80k wrap-up, 95k stop with `partial`, chunked one-shots, `blocked` handling, retry cap. Acceptance: with an oversized job, no Haiku request is ever sent above 100,000 tokens (verified against billed usage), and the agent returns a usable `partial`.
 5. **Legion core workflow port**: `.planning/` layout and schemas, start, plan (with critique and auto-refine), build (wave executor), review (classic and panel), status, quick, validate, authority enforcement, control modes. Acceptance: an existing Legion project loads and completes a phase in Triad with no migration.
-6. **Legion extended port**: map, explore, advise, board, retro, ship, learn and memory, polish, portfolio, milestone, agent creator, spec pipeline, github-sync, domain workflows (marketing, design), cross-CLI dispatch, hooks. Acceptance: every `PARITY.md` row is Ported, Improved, Replaced, or Not applicable.
+6. **Legion extended port**: map, explore, advise, board, retro, ship, learn and memory, polish, portfolio, milestone, agent creator, spec pipeline, github-sync, domain workflows (marketing, design), hooks. Acceptance: every `PARITY.md` row is Ported, Improved, Replaced, or Not applicable.
 7. **Polish**: optional pane showing the tree and spend; docs; Legion removal (section 6).
 
 ## 6. Legion replacement
@@ -146,8 +146,8 @@ Do not delete Legion until Triad matches it on the benchmark. Then disable Legio
 
 ## 9. Open questions for the user
 
-- The pricing docs don't say whether cache read and write tokens count toward Haiku's 100k line. Triad assumes they do until the spike measures it.
-- Legion's runtime adapters and installer (Codex, Cursor, Aider and others) don't apply to a Claude Code mod and are marked Not applicable. Cross-CLI dispatch to Gemini and Codex is kept (section 10). Say so if you'd rather drop it.
+- The pricing docs don't say whether cache read and write tokens count toward Haiku's 100k line. Answered by the spike: they do, both reads and writes (see `SPIKE.md`).
+- Resolved at the Phase 0 gate: Legion's runtime adapters and installer don't apply to a Claude Code mod (Not applicable), and cross-CLI dispatch (Gemini, Codex, Copilot) is dropped. The other decisions are recorded in `PARITY.md` section 14.
 
 ## 10. Legion parity and improvements
 
@@ -166,7 +166,7 @@ Principles:
 | `start` (+ from a design doc) | Opus runs the 5-8 exchange questioning flow; Haiku writes PROJECT/ROADMAP/STATE from Opus's structured notes |
 | `plan <N>` (+ `--auto-refine`, max 2 cycles) | Opus decomposes into wave-structured plans; Haiku formats plan files. Critique checks that are mechanical (missing verification commands, overlapping files in a wave) run in code. Judgment pass (pre-mortem, PASS/CAUTION/REWORK) by Sonnet. Optional architecture proposals (Minimal, Clean, Pragmatic) and 5-stage spec pipeline |
 | `build` (+ `--phase N`) | Wave executor in mod code: same-wave plans in parallel, waves sequential, `sequential_files`, opt-in worktrees with merge-conflict detection, one Sonnet per plan, atomic commit per plan, task `<verify>` blocks run by Haiku |
-| `review` | Sonnet reviewers, classic and panel modes (2-4 reviewers, max 2 per division, at least 1 Testing), 3-5 rubric criteria each. BLOCKER/WARNING/SUGGESTION, file:line plus what/why/fix, 80% confidence filter, anti-sycophancy rules, max 3 cycles with scoped re-review, then escalate with fix history. Dedup and hot-spot detection (files flagged by 2+ reviewers) in code |
+| `review` | Sonnet reviewers, classic and panel modes (2-4 reviewers, max 2 per division, at least 1 Testing), 3-5 rubric criteria each. Severities use the review-finding schema's own enum (`blocker`, `critical`, `major`, `minor`, `advisory`), file:line plus what/why/fix, 80% confidence filter, anti-sycophancy rules, max 3 cycles with scoped re-review, then escalate with fix history. Dedup and hot-spot detection (files flagged by 2+ reviewers) in code |
 | `status` | Pure code, no model |
 | `quick [--fix]` | One Sonnet; Haiku for boilerplate; optional commit, inline review and PR |
 | `advise` | Read-only Sonnet advisor |
@@ -184,23 +184,23 @@ Principles:
 
 ### Agents (49 personalities, nine divisions) and skills
 
-- Port every persona as a compact file with a `tier:` field (`opus`, `sonnet`, `haiku`) that `agent.spawn` uses to set the model. Default Sonnet. Studio Producer is Opus, as in Legion. Haiku is used only for roles tagged mechanical.
+- Port every persona as a compact file with a `tier:` field (`opus`, `sonnet`, `haiku`) that `agent.spawn` uses to set the model. Default Sonnet. Studio Producer is Opus, as in Legion. `agents-orchestrator` is Opus too, distilled into the orchestrator's own guidance rather than spawned. Haiku is used for `testing-test-results-analyzer` and `support-executive-summary-generator`, with Sonnet reviewing their output.
 - Legion injects the entire persona file into every spawned agent. Triad injects a distilled core (expertise, style, hard rules) and loads the full file only on request.
 - Agent registry scoring (keyword 3, division affinity 2, partial match 1, plus memory boost) runs in code.
-- All 21 skills port 1:1 (core contract, questioning flow, registry, portfolio manager, codebase mapper, phase decomposer, memory manager, marketing and design workflows, spec pipeline, plan critique, github-sync, wave executor, execution tracker, review loop and panel, milestone tracker, agent creator, polymath engine, authority enforcer, code polish, hooks integration). The always-loaded core stays lean and the rest load conditionally, using `tool.describe` with `isDeferred`.
+- All 33 skills port 1:1, except the Codex bridge skill and `cli-dispatch` (Not applicable; see `PARITY.md`). Named here: (core contract, questioning flow, registry, portfolio manager, codebase mapper, phase decomposer, memory manager, marketing and design workflows, spec pipeline, plan critique, github-sync, wave executor, execution tracker, review loop and panel, milestone tracker, agent creator, polymath engine, authority enforcer, code polish, hooks integration). The always-loaded core stays lean and the rest load conditionally, using `tool.describe` with `isDeferred`.
 
 ### Enforcement, hooks, modes
 
 - Authority enforcement (`files_forbidden`, `files_modified`) becomes a live `tool.call` check instead of an after-the-fact diff. Guarded warns, surgical blocks and reverts, advisory logs.
 - Legion's three opt-in hooks (pre-build plan validation, post-build notification, pre-ship security gate) become always-on mod hooks.
-- Control modes `autonomous`, `guarded` (default), `advisory`, `surgical` keep their config files (`control-modes.yaml`, `escalation-protocol.yaml`, `agent-communication.yaml`). `autonomous` only skips confirmation gates. It never approves tool calls or loosens permissions.
+- Control modes `autonomous`, `guarded` (default), `advisory`, `surgical` keep their config files (`control-modes.yaml`, `escalation-protocol.yaml`, `agent-communication.yaml`). `autonomous` skips confirmation gates and turns authority checks into warnings (logged, never blocked). It never approves tool calls or loosens permissions. New projects default `execution.commit_prefix` to `triad`; existing values are kept. The portfolio registry stays at `~/.claude/legion/portfolio.md`. No `/legion:*` aliases.
 - Structured escalation blocks, anti-rationalization rules, and BLOCKER/ENVIRONMENT error classification with one retry all carry over.
 - Manual-edit detection (diffs of agent-modified files stored as corrective preferences) carries over.
 
 ### Not ported, or ported differently
 
-- Runtime adapters and installer for 10 other tools: Not applicable (see section 9).
-- Cross-CLI dispatch: ported via `$.process.run` to the Gemini and Codex CLIs, file handoff in `.planning/dispatch/`, fallback to internal agents.
+- Runtime adapters and installer for 11 other tools: Not applicable (see section 9).
+- Cross-CLI dispatch (Gemini, Codex, Copilot): dropped at the Phase 0 gate. Existing `.planning/dispatch/` files are left untouched.
 - Tests and CI: port schema conformance, cross-reference validation and `lint-commands` as `claude plugin test` suites and a CI workflow. `checksums.sha256` is replaced by the plugin marketplace's own integrity checks.
 
 ### Improvements beyond parity (proposals)

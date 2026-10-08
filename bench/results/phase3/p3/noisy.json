@@ -1,0 +1,46 @@
+{
+  "task": "noisy",
+  "config": "p3",
+  "options": {},
+  "seconds": 15,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 tests changed: [] probe 268 -13 14",
+  "cost": 0.08235160000000001,
+  "turns": 6,
+  "tokens": {
+    "inputTokens": 12,
+    "outputTokens": 1243,
+    "cacheReadInputTokens": 77318,
+    "cacheCreationInputTokens": 8396
+  },
+  "totalTokens": 86969,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 1243,
+      "cacheReadInputTokens": 77318,
+      "cacheCreationInputTokens": 8396,
+      "costUSD": 0.08235160000000001
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 6
+    }
+  },
+  "work": "/tmp/bench-p3-noisy-k8z37t2t/repo"
+}

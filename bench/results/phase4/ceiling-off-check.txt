@@ -1,0 +1,10 @@
+haiku requests 30, largest prompt 248450, over the line 15
+ceiling {'wrapNotes': 0, 'stops': 0, 'trimmed': 0, 'refusedBriefs': 0}
+billed haiku (CLI) {'inputTokens': 60, 'outputTokens': 33778, 'cacheReadInputTokens': 2863678, 'cacheCreationInputTokens': 262413}
+ledger helpers    {'inputTokens': 60, 'outputTokens': 33778, 'cacheReadInputTokens': 2863678, 'cacheCreationInputTokens': 262413}
+helper a26c5479cc req 5 status blocked
+helper a9df948959 req 25 status done
+SUMMARY.md: 24/24 files named, 24/24 headlines right, 24/24 high-risk counts right
+cost $0.4488
+FAIL 15 Haiku requests over 100k
+FAIL

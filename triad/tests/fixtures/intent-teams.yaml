@@ -1,0 +1,84 @@
+# Intent Teams Configuration
+# Defines intent-driven execution teams for /legion:build command
+# Requirements: INTENT-01, INTENT-02, INTENT-04
+
+intents:
+  harden:
+    description: "Security hardening and testing focus"
+    mode: filter_plans
+    agents:
+      primary:
+        - security-engineer
+        - qa-automation
+      secondary:
+        - sre-chaos
+    domains:
+      include:
+        - owasp-top-10
+        - stride-model
+        - vulnerability-assessment
+        - test-strategy
+        - test-automation
+        - test-coverage
+        - service-level-objectives
+        - chaos-engineering
+      exclude:
+        - user-interface
+        - user-experience
+    filters:
+      include_task_types:
+        - security-audit
+        - test-implementation
+        - vulnerability-scan
+      exclude_task_types:
+        - feature-implementation
+        - ui-design
+
+  document:
+    description: "Documentation generation only"
+    mode: filter_plans
+    agents:
+      primary:
+        - technical-writer
+        - code-reviewer
+      secondary:
+        - developer-advocate
+    domains:
+      include:
+        - documentation
+        - code-maintainability
+        - language-idioms
+      exclude:
+        - owasp-top-10
+        - vulnerability-assessment
+    filters:
+      include_task_types:
+        - documentation
+        - readme-update
+        - api-docs
+      exclude_task_types:
+        - implementation
+        - testing
+
+  security-only:
+    description: "Security audit without other reviews"
+    mode: filter_review
+    agents:
+      primary:
+        - security-engineer
+      secondary: []
+    domains:
+      include:
+        - owasp-top-10
+        - stride-model
+        - vulnerability-assessment
+        - penetration-testing
+        - security-audit
+        - threat-modeling
+      exclude: []
+    filters:
+      severity_threshold: WARNING
+
+version: "1.0.0"
+last_updated: "2026-03-05"
+requirements_validated: ["INTENT-01", "INTENT-02", "INTENT-04"]

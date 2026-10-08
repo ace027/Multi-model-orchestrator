@@ -1,0 +1,444 @@
+# Intent Teams Registry
+# Maps semantic intent flags to agent team templates and validation rules
+# Version: 2.0.0
+# Requirements Validated: INTENT-05, INTENT-06, INTENT-07, INTENT-08
+
+intents:
+  harden:
+    description: "Security audit with Testing + Security divisions"
+    agents:
+      primary:
+        - testing-qa-verification-specialist
+        - engineering-security-engineer
+      secondary:
+        - testing-api-tester
+    domains:
+      - "security"
+      - "owasp"
+      - "stride"
+      - "vulnerability-assessment"
+    mode: "ad_hoc"
+    
+  document:
+    description: "Generate documentation without implementation"
+    agents:
+      primary:
+        - product-technical-writer
+      secondary:
+        - engineering-frontend-developer
+    filter:
+      include_task_types: ["documentation", "readme", "api-docs", "guides"]
+      exclude_task_types: ["implementation", "code", "testing"]
+    mode: "filter_plans"
+    
+  skip-frontend:
+    description: "Exclude frontend/UI tasks"
+    filter:
+      exclude_agents:
+        - engineering-frontend-developer
+        - design-ui-designer
+      exclude_file_patterns:
+        - "src/frontend/**"
+        - "*.tsx"
+        - "*.jsx"
+        - "*.css"
+        - "*.scss"
+        - "*.vue"
+      exclude_task_types: ["ui-components", "frontend-architecture", "styling"]
+    mode: "filter_plans"
+    
+  skip-backend:
+    description: "Exclude backend/API tasks"
+    filter:
+      exclude_agents:
+        - engineering-backend-architect
+        - engineering-infrastructure-devops
+      exclude_file_patterns:
+        - "src/api/**"
+        - "src/backend/**"
+        - "*.route.ts"
+        - "prisma/schema.prisma"
+      exclude_task_types: ["api-endpoints", "database-schema", "backend-logic"]
+    mode: "filter_plans"
+    
+  security-only:
+    description: "Security-only review audit"
+    agents:
+      primary:
+        - engineering-security-engineer
+      secondary:
+        - testing-api-tester
+    domains:
+      - "security"
+      - "owasp"
+      - "stride"
+      - "authentication"
+      - "authorization"
+    mode: "filter_review"
+
+task_types:
+  # Taxonomy for filtering
+  documentation: ["readme", "api-docs", "guides", "tutorials", "comments"]
+  implementation: ["feature", "bug-fix", "refactor", "optimization"]
+  testing: ["unit-test", "integration-test", "e2e-test", "security-test"]
+  ui-components: ["react", "vue", "angular", "svelte", "web-components"]
+  frontend-architecture: ["routing", "state-management", "build-config"]
+  api-endpoints: ["rest", "graphql", "grpc", "webhook"]
+  database-schema: ["migration", "model", "relation", "index"]
+
+validation:
+  mutual_exclusion:
+    - flags: ["harden", "document"]
+      error: "Cannot use --just-harden and --just-document together. Choose one intent."
+    - flags: ["document", "skip-frontend"]
+      error: "--just-document already excludes implementation; --skip-frontend is redundant."
+    - flags: ["skip-frontend", "skip-backend"]
+      error: "Cannot skip both frontend and backend — nothing to build."
+      
+  requires_command:
+    - flag: "harden"
+      commands: ["build"]
+      error: "--just-harden is only valid for /legion:build"
+    - flag: "document"
+      commands: ["build"]
+      error: "--just-document is only valid for /legion:build"
+    - flag: "skip-frontend"
+      commands: ["build"]
+      error: "--skip-frontend is only valid for /legion:build"
+    - flag: "skip-backend"
+      commands: ["build"]
+      error: "--skip-backend is only valid for /legion:build"
+    - flag: "security-only"
+      commands: ["review"]
+      error: "--just-security is only valid for /legion:review"
+      
+  allowed_combinations:
+    - flags: ["skip-frontend"]
+      allows: ["skip-backend"]
+    - flags: ["harden"]
+      allows: []
+
+# Natural Language Patterns
+# Keyword clusters and phrase templates for NL intent parsing
+# Used by intent-router Section 7: parseNaturalLanguage()
+
+nl_patterns:
+  harden:
+    keywords:
+      security: 1.0
+      harden: 1.0
+      vulnerabilities: 0.9
+      owasp: 0.9
+      audit: 0.7
+      secure: 0.8
+      penetration: 0.8
+      exploit: 0.7
+      threat: 0.6
+      stride: 0.8
+    phrases:
+      - "harden {the|our|my}? security"
+      - "run {a}? security audit"
+      - "fix {the}? vulnerabilities"
+      - "check for {security}? {issues|problems|vulnerabilities}"
+      - "security {audit|scan|review}"
+
+  document:
+    keywords:
+      documentation: 1.0
+      docs: 1.0
+      document: 0.9
+      readme: 0.8
+      write: 0.5
+      guide: 0.7
+      api-docs: 0.9
+      tutorial: 0.6
+      comments: 0.4
+    phrases:
+      - "write {the}? {docs|documentation}"
+      - "generate {the}? documentation"
+      - "create {a}? readme"
+      - "document {the|this}? {code|project|api}"
+
+  skip-frontend:
+    keywords:
+      backend-only: 1.0
+      skip-frontend: 1.0
+      no-frontend: 0.9
+      exclude-ui: 0.8
+      server-only: 0.7
+      without-ui: 0.7
+    phrases:
+      - "skip {the}? frontend"
+      - "backend only"
+      - "no {frontend|ui|client} {code|work|tasks}?"
+      - "exclude {the}? {frontend|ui}"
+
+  skip-backend:
+    keywords:
+      frontend-only: 1.0
+      skip-backend: 1.0
+      no-backend: 0.9
+      exclude-api: 0.8
+      client-only: 0.7
+      without-api: 0.7
+    phrases:
+      - "skip {the}? backend"
+      - "frontend only"
+      - "no {backend|api|server} {code|work|tasks}?"
+      - "exclude {the}? {backend|api}"
+
+  security-only:
+    keywords:
+      security-review: 1.0
+      security-audit: 1.0
+      security: 0.8
+      owasp: 0.9
+      stride: 0.8
+      authentication: 0.7
+      authorization: 0.7
+      vulnerabilities: 0.6
+    phrases:
+      - "security {only|review|audit}"
+      - "review {the}? security"
+      - "check {for}? {security|auth} {issues|problems}?"
+      - "audit {the}? {authentication|authorization}"
+
+# Command Routes
+# NL patterns for direct command routing (not intent flags)
+# Used by intent-router Section 7: parseNaturalLanguage()
+
+command_routes:
+  start:
+    keywords:
+      start: 1.0
+      initialize: 1.0
+      new project: 0.9
+      setup: 0.8
+      begin: 0.7
+      create project: 0.8
+      init: 0.9
+    phrases:
+      - "start {a}? {new}? project"
+      - "initialize {the|a}? {project|codebase}"
+      - "set up {a}? {new}? {project|repo}"
+      - "begin {a}? {new}? project"
+
+  plan:
+    keywords:
+      plan: 1.0
+      decompose: 0.9
+      break down: 0.8
+      phase: 0.7
+      tasks: 0.5
+      scope: 0.5
+      requirements: 0.4
+    phrases:
+      - "plan {the|next}? phase {\\d+}?"
+      - "break down phase {\\d+}"
+      - "decompose {the}? {requirements|work|phase}"
+      - "create {a}? plan {for}?"
+
+  build:
+    keywords:
+      build: 1.0
+      execute: 0.9
+      run: 0.6
+      implement: 0.8
+      code: 0.5
+      ship: 0.6
+      develop: 0.7
+    phrases:
+      - "build {it|the plans}?"
+      - "execute {the}? plans"
+      - "run {the}? build"
+      - "implement {the}? {plans|phase|features}"
+
+  review:
+    keywords:
+      review: 1.0
+      test: 0.8
+      quality: 0.7
+      check: 0.6
+      qa: 0.9
+      verify: 0.7
+      validate: 0.6
+      fix: 0.4
+    phrases:
+      - "review {the}? {code|changes|work}"
+      - "run {the}? {tests|review}"
+      - "check {the}? quality"
+      - "fix {the|my|our} {tests|testing|test suite}"
+      - "verify {the}? {work|output|results}"
+
+  status:
+    keywords:
+      status: 1.0
+      progress: 0.9
+      dashboard: 0.8
+      where: 0.6
+      next: 0.5
+      overview: 0.7
+    phrases:
+      - "show {the}? {status|progress|dashboard}"
+      - "where are we"
+      - "what's next"
+      - "how is {the}? {project|phase} going"
+
+  quick:
+    keywords:
+      quick: 1.0
+      one-off: 0.9
+      ad hoc: 0.9
+      single: 0.6
+      fast: 0.5
+      just do: 0.7
+    phrases:
+      - "quick {task|fix|run}"
+      - "run {a}? {one-off|ad hoc} task"
+      - "just do {this|it|a}"
+      - "quick {fix|patch|change}"
+
+  advise:
+    keywords:
+      advise: 1.0
+      advice: 1.0
+      consult: 0.9
+      ask: 0.6
+      opinion: 0.7
+      recommend: 0.7
+      suggest: 0.6
+    phrases:
+      - "get advice {on|about}"
+      - "ask {about|an expert}"
+      - "consult {on|about}"
+      - "what do you {think|recommend} about"
+
+  explore:
+    keywords:
+      explore: 1.0
+      research: 0.9
+      crystallize: 0.9
+      brainstorm: 0.7
+      investigate: 0.7
+      prototype: 0.6
+      spike: 0.7
+    phrases:
+      - "explore {options|ideas|approaches}"
+      - "research {the|a}? {topic|idea|approach}"
+      - "crystallize {the|an}? idea"
+      - "brainstorm {about|on}?"
+      - "investigate {the|a}? {problem|issue|option}"
+
+# Context Rules
+# Maps project lifecycle positions to ranked action suggestions
+# Used by intent-router Section 8: getContextSuggestions()
+# Placeholders {phase}, {phase_name}, {next_phase} are interpolated at runtime from STATE.md
+
+context_rules:
+  no_project:
+    suggestions:
+      - command: "/legion:start"
+        description: "Initialize a new project"
+        reason: "No project state found — start here"
+      - command: "/legion:explore"
+        description: "Explore and crystallize an idea first"
+        reason: "Pre-flight alignment before formal project setup"
+
+  just_started:
+    suggestions:
+      - command: "/legion:plan 1"
+        description: "Plan Phase 1: {phase_name}"
+        reason: "Project initialized, ready for first phase planning"
+      - command: "/legion:status"
+        description: "View project dashboard"
+        reason: "Orient yourself with the project overview"
+
+  needs_planning:
+    # Alias — maps to same suggestions as phase_complete (for forward compatibility)
+    # The detection function routes to phase_complete directly; this entry exists
+    # so that any external code referencing "needs_planning" still resolves correctly.
+    suggestions:
+      - command: "/legion:plan {next_phase}"
+        description: "Plan Phase {next_phase}: {phase_name}"
+        reason: "Phase {phase} complete and reviewed — move to next phase"
+      - command: "/legion:status"
+        description: "View overall progress"
+        reason: "See milestone completion percentage"
+
+  planned_not_built:
+    suggestions:
+      - command: "/legion:build"
+        description: "Execute Phase {phase} plans"
+        reason: "Phase {phase} is planned and ready for execution"
+      - command: "/legion:status"
+        description: "Review plan breakdown before building"
+        reason: "Verify plan structure looks correct"
+
+  building:
+    suggestions:
+      - command: "/legion:build"
+        description: "Resume Phase {phase} execution"
+        reason: "Build is in progress — continue where you left off"
+      - command: "/legion:status"
+        description: "Check build progress"
+        reason: "See which plans are complete and which remain"
+
+  needs_review:
+    suggestions:
+      - command: "/legion:review"
+        description: "Review Phase {phase} output"
+        reason: "Build complete, quality review is the next step"
+      - command: "/legion:status"
+        description: "Check what was built before reviewing"
+        reason: "Orient on build outputs before starting review"
+
+  review_in_progress:
+    suggestions:
+      - command: "/legion:review"
+        description: "Continue Phase {phase} review"
+        reason: "Review cycle is active — continue the process"
+      - command: "/legion:status"
+        description: "Check review findings so far"
+        reason: "See current review status and findings"
+
+  review_failed:
+    suggestions:
+      - command: "/legion:build"
+        description: "Fix review findings for Phase {phase}"
+        reason: "Review found issues that need to be addressed"
+      - command: "/legion:review"
+        description: "Re-run review after fixes"
+        reason: "Verify fixes resolve the review findings"
+      - command: "/legion:status"
+        description: "See what needs fixing"
+        reason: "Review the specific issues found"
+
+  phase_complete:
+    suggestions:
+      - command: "/legion:plan {next_phase}"
+        description: "Plan Phase {next_phase}: {phase_name}"
+        reason: "Phase {phase} complete and reviewed — move to next phase"
+      - command: "/legion:status"
+        description: "View overall progress"
+        reason: "See milestone completion percentage"
+
+  milestone_complete:
+    suggestions:
+      - command: "/legion:milestone"
+        description: "Complete and archive the milestone"
+        reason: "All phases done — wrap up the milestone"
+      - command: "/legion:status"
+        description: "View final milestone dashboard"
+        reason: "Review everything accomplished in this milestone"
+      - command: "/legion:explore"
+        description: "Explore ideas for the next milestone"
+        reason: "Start thinking about what comes next"
+
+  unknown:
+    suggestions:
+      - command: "/legion:status"
+        description: "Check project status"
+        reason: "Project state is ambiguous — orient with the dashboard"
+      - command: "/legion:start"
+        description: "Initialize a new project"
+        reason: "If no project exists, start here"

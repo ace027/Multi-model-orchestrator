@@ -1,0 +1,58 @@
+{
+  "task": "testwrite",
+  "config": "p3",
+  "options": {},
+  "seconds": 42,
+  "exit": 0,
+  "success": true,
+  "check": "mutants caught 7 of 7: ['available_negative', 'commit_keeps_holds', 'commit_unknown_silent', 'release_unknown', 'reserve_boundary', 'reserve_replace', 'restock_zero']",
+  "cost": 0.15035010000000001,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 16,
+    "outputTokens": 6341,
+    "cacheReadInputTokens": 82428,
+    "cacheCreationInputTokens": 14468
+  },
+  "totalTokens": 103253,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 1398,
+      "cacheReadInputTokens": 63094,
+      "cacheCreationInputTokens": 8101,
+      "costUSD": 0.0811238
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 6,
+      "outputTokens": 4943,
+      "cacheReadInputTokens": 19334,
+      "cacheCreationInputTokens": 6367,
+      "costUSD": 0.06922629999999999
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 5
+    },
+    "a11ab95af301676e0": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-p3-testwrite-mbkkhs5i/repo"
+}

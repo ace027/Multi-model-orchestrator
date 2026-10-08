@@ -1,0 +1,51 @@
+{
+  "task": "rename",
+  "config": "p3",
+  "options": {},
+  "seconds": 35,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 legacy refs left 0 legacy.py exists False calls unchanged True (rescored after the check fix)",
+  "cost": 0.11402319999999999,
+  "turns": 6,
+  "tokens": {
+    "inputTokens": 12,
+    "outputTokens": 2117,
+    "cacheReadInputTokens": 80301,
+    "cacheCreationInputTokens": 11115
+  },
+  "totalTokens": 93545,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 2117,
+      "cacheReadInputTokens": 80301,
+      "cacheCreationInputTokens": 11115,
+      "costUSD": 0.11402319999999999
+    }
+  },
+  "compression": {
+    "calls": 1,
+    "rawTokens": 6633,
+    "outTokens": 422
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 6
+    },
+    "compressor": {
+      "role": "compressor",
+      "depth": 0,
+      "requests": 1
+    }
+  },
+  "work": "/tmp/bench-p3-rename-jv6scp1o/repo"
+}

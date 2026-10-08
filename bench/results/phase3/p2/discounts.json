@@ -1,0 +1,56 @@
+{
+  "task": "discounts",
+  "config": "p2",
+  "options": {
+    "compress": false,
+    "deferTools": false
+  },
+  "seconds": 42,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 cli 900 unknown-code exit 2",
+  "cost": 0.21598069999999997,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 14,
+    "outputTokens": 5617,
+    "cacheReadInputTokens": 77496,
+    "cacheCreationInputTokens": 28832
+  },
+  "totalTokens": 111959,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 8,
+      "outputTokens": 1772,
+      "cacheReadInputTokens": 56668,
+      "cacheCreationInputTokens": 21787,
+      "costUSD": 0.1557406
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 6,
+      "outputTokens": 3845,
+      "cacheReadInputTokens": 20828,
+      "cacheCreationInputTokens": 7045,
+      "costUSD": 0.060240100000000005
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 4
+    },
+    "a1aa236b54a3876d1": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-p2-discounts-u1x7bq88/repo"
+}

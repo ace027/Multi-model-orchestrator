@@ -1,0 +1,6 @@
+{
+  "control_mode": "guarded",
+  "planning": { "max_tasks_per_plan": 3 },
+  "execution": { "auto_commit": true, "commit_prefix": "legion" },
+  "review": { "default_mode": "panel", "max_cycles": 3 }
+}
