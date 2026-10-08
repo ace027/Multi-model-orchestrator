@@ -389,7 +389,7 @@ export const register: Register = (on, options) => {
         delete waiting[id]
         w.resolve(e.answer)
         await $.fs.write(w.marker, 'done')
-      } else if (scopes[id]) finished[id] = e.answer
+      } else if (roles[id]) finished[id] = e.answer // a plugin spawn can resolve after its agent has answered
     }
     await save($)
     return next(e)
