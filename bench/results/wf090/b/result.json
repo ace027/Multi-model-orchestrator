@@ -1,0 +1,68 @@
+{
+  "success": true,
+  "score": [
+    51.0,
+    52
+  ],
+  "cost": 6.7064,
+  "seconds": 3537,
+  "phases": 3,
+  "steps": {
+    "build1": {
+      "cost": 0.40262660000000006,
+      "turns": 5,
+      "error": false
+    },
+    "build2": {
+      "cost": 0.34754169999999995,
+      "turns": 4,
+      "error": false
+    },
+    "build3": {
+      "cost": 1.2081450999999999,
+      "turns": 6,
+      "error": false
+    },
+    "plan1": {
+      "cost": 0.6509049,
+      "turns": 15,
+      "error": false
+    },
+    "plan2": {
+      "cost": 0.7251537,
+      "turns": 17,
+      "error": false
+    },
+    "plan3": {
+      "cost": 0.5915210000000001,
+      "turns": 19,
+      "error": false
+    },
+    "review1": {
+      "cost": 0.7980511000000001,
+      "turns": 14,
+      "error": false
+    },
+    "review2": {
+      "cost": 0.6420193999999998,
+      "turns": 10,
+      "error": false
+    },
+    "review3": {
+      "cost": 1.1069546000000001,
+      "turns": 8,
+      "error": false
+    },
+    "start": {
+      "cost": 0.2335296,
+      "turns": 9,
+      "error": false
+    }
+  },
+  "byModel": {
+    "claude-opus-5-5": 2.9141,
+    "claude-sonnet-5-5": 3.7925
+  },
+  "check": "score 51/52 rules 20/20 ui 8/8 ai 23/24 own-tests pass tests-added True failed=['ai/by-bot straight 5/6, random 6/6, area 6/6, voronoi 6/6']",
+  "work": "/tmp/wf-tron-uXEG/repo"
+}
