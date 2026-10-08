@@ -110,6 +110,18 @@ export const LEGION_TOOLS = [
     description: 'Persona registry. With `task`: the best-matching personas, scored in code. With `agent`: that persona\'s distilled core, to put at the top of an agent brief, and its tier.',
     inputSchema: { type: 'object', properties: { task: str('Task description to match.'), agent: str('Persona id.') } },
   },
+  {
+    name: 'persona_run',
+    description: 'Run persona agents (in parallel, each at its persona\'s tier, with the persona\'s distilled core on top of your brief) and return their answers. read_only (default true) refuses every file write; otherwise each run may write only its `writable` files. For advice, board assessments, research, spec stages, retros and domain work.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runs: { type: 'array', items: { type: 'object', properties: { agent: str('Persona id.'), brief: str('The task: context, question, and the answer format you need.'), label: str('Short label (log and file names).'), writable: strs('Files this run may write (ignored when read_only).') }, required: ['agent', 'brief'] } },
+        read_only: { type: 'boolean' },
+      },
+      required: ['runs'],
+    },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)

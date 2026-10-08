@@ -7,6 +7,7 @@ import { personaQuery, planCheck, planWrite, projectInit, statusText, validateTe
 import { build } from './legion/build.ts'
 import { review } from './legion/reviewrun.ts'
 import { checkWrite, type Scope } from './legion/settings.ts'
+import { renderPersonaRuns, runPersonas } from './legion/personarun.ts'
 import type { Io } from './legion/io.ts'
 import type { Agents } from './legion/build.ts'
 import { COMPRESS_TOOLS, SUMMARY_SYSTEM, chunks, describeCall, eligible, errorLines, headTail, mergePrompt, overThreshold, render as renderCompressed, summaryPrompt } from './compress.ts'
@@ -255,6 +256,7 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
     case 'plan_check': return planCheck(io, Number(input.phase))
     case 'persona_brief': return personaQuery(input)
     case 'build_phase': return (await build(io, agentsOf($, log), { phase: input.phase, wave: input.wave, rerun: !!input.rerun, log })).text
+    case 'persona_run': return renderPersonaRuns(await runPersonas(io, agentsOf($, log), input, log))
     case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, log })).text
   }
   return `unknown tool ${name}`
