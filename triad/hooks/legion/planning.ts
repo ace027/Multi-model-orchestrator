@@ -333,6 +333,9 @@ export function planWaves(plans: Plan[], knownAgents?: Set<string>): Waves {
     if (knownAgents) for (const a of p.fm.agents) if (!knownAgents.has(a)) errors.push(`${p.id} names agent "${a}", which is not in the roster`)
     const forbidden = p.fm.files_forbidden ?? []
     for (const f of p.fm.files_modified) if (forbidden.some(x => overlaps(f, x))) errors.push(`${p.id}: ${f} is in both files_modified and files_forbidden`)
+    // A shared file goes in sequential_files instead of files_modified, never both (wave-executor).
+    const both = sharedFiles(p.fm.sequential_files, p.fm.files_modified)
+    if (both.length) errors.push(`${p.id}: ${both.join(', ')} ${both.length > 1 ? 'are' : 'is'} in both sequential_files and files_modified`)
   }
   for (const w of waves) {
     for (let i = 0; i < w.plans.length; i++) for (let j = i + 1; j < w.plans.length; j++) {

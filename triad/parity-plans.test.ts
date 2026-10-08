@@ -7,6 +7,8 @@ import { describe, expect, test } from 'claude-code/testing'
 import { FIXTURES } from './tests/fixtures/index.ts'
 import { parsePlan, planWaves, runGroups, type Plan } from './hooks/legion/planning.ts'
 import { critique } from './hooks/legion/critique.ts'
+import { planBrief } from './hooks/legion/build.ts'
+import { BY_ID } from './hooks/legion/registry.ts'
 import { ROSTER } from './hooks/legion/registry.ts'
 import { SCHEMAS, SETTINGS } from './hooks/legion/data.ts'
 import { dryRunReport } from './hooks/legion/dryrun.ts'
@@ -126,8 +128,17 @@ describe('parity: sequential-files', () => {
     const w = planWaves([seqPlan(1, ['a.ts'], ['package.json']), seqPlan(2, ['b.ts'], ['package.json'], 2)])
     expect(w.waves.map(x => ids(runGroups(x.plans)))).toEqual([[['01-01']], [['01-02']]])
   })
-  // Legion case 8 (sequential_files must not overlap files_modified) has no
-  // check in critique.ts; the overlap only serializes the plans.
+  test('8. sequential_files must not overlap files_modified', () => {
+    expect(planWaves([seqPlan(1, ['CHANGELOG.md', 'src/app.js'], ['CHANGELOG.md', 'settings.json'])]).errors)
+      .toEqual(['01-01: CHANGELOG.md is in both sequential_files and files_modified'])
+    expect(planWaves([seqPlan(1, ['src/app.js'], ['CHANGELOG.md'])]).errors).toEqual([])
+    expect(planWaves([seqPlan(1, ['src/app.js'])]).errors).toEqual([])
+  })
+  test('a plan may write its sequential files', () => {
+    const plan = seqPlan(1, ['src/a.ts'], ['package.json'])
+    const b = planBrief({ persona: BY_ID.get('engineering-backend-architect')!, plan, planText: 'body', phase: 1, phaseName: 'Core', wave: 1, peers: [], handoffs: '', mode: 'guarded', haiku: false })
+    expect(b).toContain('Files you may write: src/a.ts, package.json (shared with other plans, written one plan at a time: package.json)')
+  })
 })
 
 describe('parity: planning-count-caps', () => {

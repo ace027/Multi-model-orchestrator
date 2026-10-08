@@ -1,6 +1,7 @@
 // Legion files written by code from structured input: PROJECT/ROADMAP/STATE
 // (start), PLAN.md and CONTEXT.md (plan), SUMMARY.md (build), commit messages.
 // Same templates and headings as Legion, so Legion's readers keep working.
+import { renderRationale, type Rationale } from './rationale.ts'
 import { TEMPLATES } from './data.ts'
 import { pad2, progressBar, slugify } from './planning.ts'
 import { renderEscalations, type Escalation } from './escalation.ts'
@@ -293,6 +294,7 @@ export type SummaryInput = {
   error?: string
   tokens?: string
   failure?: { kind: string; reason: string; retried?: boolean; remediated?: boolean }
+  selection?: Rationale
 }
 
 const failureLine = (f: NonNullable<SummaryInput['failure']>) =>
@@ -309,6 +311,7 @@ export function renderSummary(s: SummaryInput): string {
     `**Completed**: ${s.date}`,
     ...(s.failure ? [failureLine(s.failure)] : []),
     '',
+    ...(s.selection ? [...renderRationale(s.selection), ''] : []),
     '## Completed Tasks',
     ...s.tasks.map((t, i) => `- [${t.status === 'done' ? 'x' : ' '}] Task ${i + 1}: ${t.name.replace(/^Task \d+:\s*/, '')} (${t.status})`),
     '',

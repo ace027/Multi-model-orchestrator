@@ -159,9 +159,28 @@ describe('parity: observability-summary', () => {
     expect(s).toContain('## Token Usage')
     expect(s).toContain('1 request')
   })
-  // Not ported: Legion's "Agent Selection Rationale" table (task type,
-  // confidence, adapter, model tier) and score export. render.ts has no such
-  // section; that is a gap for the build workstream, not a test to weaken.
+  test('SUMMARY carries the Agent Selection Rationale; the report the Phase Decision Summary', async () => {
+    const io = memIo()
+    await projectInit(io, { name: 'Demo', description: 'A demo.', phases: [{ name: 'Core', goal: 'Build it', plans: 1 }] } as any)
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan('src/a.ts')] })
+    const r = await build(io, fakeAgents(io))
+    const s = io.files.get('.planning/phases/01-core/01-01-SUMMARY.md')!
+    expect(s).toContain('## Agent Selection Rationale')
+    expect(s).toContain('| Candidate | Semantic | Heuristic | Memory | Total | Source |')
+    for (const f of ['Task type detected', 'Confidence', 'Adapter**: claude-code', 'Model tier**: sonnet']) expect(s).toContain(f)
+    expect(r.text).toContain('## Phase Decision Summary')
+    expect(r.text).toContain('| Plan | Agent | Confidence | Adapter | Model Tier | Escalations |')
+  })
+  test('the rationale is omitted for autonomous plans', async () => {
+    const io = memIo()
+    await projectInit(io, { name: 'Demo', description: 'A demo.', phases: [{ name: 'Core', goal: 'Build it', plans: 1 }] } as any)
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan('src/a.ts')] })
+    const f = '.planning/phases/01-core/01-01-PLAN.md'
+    io.files.set(f, io.files.get(f)!.replace('autonomous: false', 'autonomous: true'))
+    const r = await build(io, fakeAgents(io))
+    expect(io.files.get('.planning/phases/01-core/01-01-SUMMARY.md')!).not.toContain('Agent Selection Rationale')
+    expect(r.text).toContain('| Autonomous |')
+  })
 })
 
 describe('parity: observability-cycle-delta', () => {

@@ -16,11 +16,12 @@ import type { Persona } from './personas.ts'
 import { critique } from './critique.ts'
 import { parseReply } from '../policy.ts'
 import { profileOf, type Mode, type Scope } from './settings.ts'
-import { OUTCOMES, storeOutcome, taskTypeOf } from './memory.ts'
+import { OUTCOMES, agentScores, storeOutcome, taskTypeOf } from './memory.ts'
 import { applyMode, escalationRows, loadProtocol, parseEscalations, type Escalation } from './escalation.ts'
 import { blockerType, classifyFailure, detectManualEdits, envRetryBrief, recordAgentFiles, type Failure } from './resilience.ts'
 import { checkSummary, compactedBody, compactedCovers, compactedPath, compactPhase, shouldCompact, COMPACT_TARGET } from './compact.ts'
 import { PERSONA_BODIES } from './personasfull.ts'
+import { renderDecisionSummary, selectionRationale, type Rationale } from './rationale.ts'
 import { addWorktree, inWorktree, mergeWorktree, removeWorktree, worktreeFiles, type Worktree } from './worktree.ts'
 
 export type AgentRun = { agentId?: string; answer?: string; deny?: string }
@@ -39,7 +40,7 @@ export interface Agents {
 // only: run just these plans (intent filters, two-wave stages); the phase is
 // finalized only once every plan in it has succeeded.
 export type BuildOptions = { phase?: number; wave?: number; rerun?: boolean; only?: string[]; log?: (s: string) => void }
-export type PlanOutcome = { id: string; status: SummaryInput['status']; agent: string; files: string[]; failedChecks: string[]; skipped?: boolean; failure?: Failure; escalations?: Escalation[] }
+export type PlanOutcome = { id: string; status: SummaryInput['status']; agent: string; files: string[]; failedChecks: string[]; skipped?: boolean; failure?: Failure; escalations?: Escalation[]; rationale?: Rationale }
 export type BuildReport = { ok: boolean; phase?: number; error?: string; warnings: string[]; plans: PlanOutcome[]; stoppedAfterWave?: number; text: string }
 
 const VERIFY_TIMEOUT = 10 * 60_000
@@ -82,6 +83,9 @@ export async function commit(io: Io, files: string[], message: string): Promise<
 }
 
 // Escalation blocks an agent emitted (agent-communication format), checked against Legion's escalation_format.
+// What a plan's agent may write: its own files plus the shared sequential files.
+const writableOf = (p: Plan) => [...p.fm.files_modified, ...p.fm.sequential_files]
+
 export const escalationsIn = (text: string): Escalation[] => parseEscalations(text)
 
 const listAfter = (text: string, key: string) => {
@@ -105,7 +109,7 @@ export function planBrief(o: { persona: Persona; plan: Plan; planText: string; p
     '',
     '## Execution Context',
     ...(o.workdir ? [`- Working directory: ${o.workdir} (a git worktree of this project on its own branch). Make every change under it; the paths below are relative to it. Run commands there. Do not touch the main working tree.`] : []),
-    `- Files you may write: ${plan.fm.files_modified.join(', ') || '(none)'}`,
+    `- Files you may write: ${writableOf(plan).join(', ') || '(none)'}${plan.fm.sequential_files.length ? ` (shared with other plans, written one plan at a time: ${plan.fm.sequential_files.join(', ')})` : ''}`,
     `- Files you must not touch: ${(plan.fm.files_forbidden ?? []).join(', ') || '(none listed)'}`,
     '- Triad runs the verification commands after you return, commits your work and writes the SUMMARY.md. Do not commit, and do not write SUMMARY or STATE files.',
     '- Run each task\'s verification commands yourself before returning; on a failure, one focused fix attempt, then report it.',
@@ -128,7 +132,7 @@ export function planBrief(o: { persona: Persona; plan: Plan; planText: string; p
     'handoff: what the next wave needs to know (key outputs, conventions), one per line, or none',
     'blocked_reason: <only when blocked>',
     'Plus any <escalation> blocks (severity, type, decision, context).',
-    ...(o.haiku ? ['', `Writable files: ${plan.fm.files_modified.join(', ') || 'none'}`] : []),
+    ...(o.haiku ? ['', `Writable files: ${writableOf(plan).join(', ') || 'none'}`] : []),
   ].join('\n')
 }
 
@@ -209,6 +213,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   const manualEdits = await detectManualEdits(io, settings).catch(() => [])
   if (manualEdits.length) log(`manual edits recorded: ${manualEdits.length}`)
   const stamp = io.now().toISOString().replace(/\D/g, '').slice(0, 14)
+  const boost = await agentScores(io, settings).catch(() => ({} as Record<string, number>))
 
   const outcomes: PlanOutcome[] = []
   const summaries = { ...ph.summaries }
@@ -275,7 +280,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
             personaText: personaText(persona), workdir: wt ? `${io.root}/${wt.path}` : undefined,
           })
           const at = (fs: string[]) => (wt ? fs.map(f => `${wt.path}/${f}`) : fs)
-          const scope: Scope = { planId: plan.id, mode, files_modified: at(plan.fm.files_modified), files_forbidden: at(plan.fm.files_forbidden ?? []) }
+          const scope: Scope = { planId: plan.id, mode, files_modified: at(writableOf(plan)), files_forbidden: at(plan.fm.files_forbidden ?? []) }
           const r = await agents.run({ persona, brief, scope, label: `plan ${plan.id}` })
           return { plan, persona, r }
         }))
@@ -285,7 +290,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
         const claimed = new Map<string, string[]>()
         const unclaimed: string[] = []
         for (const f of changed) {
-          const owner = batch.find(x => x.fm.files_modified.some(m => overlaps(f, m))) ?? batch.find(x => runs.find(r => r.plan === x)?.r.agentId && agents.writesOf(runs.find(r => r.plan === x)!.r.agentId!).files.includes(f))
+          const owner = batch.find(x => writableOf(x).some(m => overlaps(f, m))) ?? batch.find(x => runs.find(r => r.plan === x)?.r.agentId && agents.writesOf(runs.find(r => r.plan === x)!.r.agentId!).files.includes(f))
           if (owner) claimed.set(owner.id, [...(claimed.get(owner.id) ?? []), f])
           else unclaimed.push(f)
         }
@@ -331,7 +336,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           let status: SummaryInput['status'] = r.deny ? 'Failed' : !r.answer ? 'Failed' : statusFrom(reply, verify, escalations, [])
           const files = wt
             ? (await worktreeFiles(io, wt)).filter(f => !f.startsWith('.triad/') && !f.startsWith('.planning/')).sort()
-            : [...new Set([...(claimed.get(plan.id) ?? []), ...seen.files.filter(f => plan.fm.files_modified.some(m => overlaps(f, m)))])].sort()
+            : [...new Set([...(claimed.get(plan.id) ?? []), ...seen.files.filter(f => writableOf(plan).some(m => overlaps(f, m)))])].sort()
           let error = r.deny ? `The agent could not start: ${r.deny}` : !r.answer ? 'The agent did not return an answer.' : status === 'Failed' ? `Verification failed: ${verify.filter(v => !v.passed).map(v => v.command).join('; ')}` : undefined
           // Worktree: merged back once verification passed; a conflict is aborted, fails the plan, and keeps the worktree.
           if (wt && succeeded(status)) {
@@ -358,6 +363,8 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
             error,
             tokens: r.agentId ? agents.usageOf(r.agentId) : undefined,
             failure,
+            // Omitted for autonomous plans, as Legion does.
+            selection: plan.fm.autonomous ? undefined : selectionRationale(persona, `${plan.title}\n${plan.body}`, boost),
           }
           const summaryText = renderSummary(s)
           for (const e of checkSummary(summaryText, { verificationDeclared: cmds.length > 0 && !!r.answer, escalations: escalations.length, decisions: s.decisions.length })) warnings.push(`SUMMARY ${plan.id}: ${e}`)
@@ -384,7 +391,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
             const gh = await ghTickPlan(io, n, plan.id).catch(() => undefined)
             if (gh) log(gh)
           }
-          outcomes.push({ id: plan.id, status, agent: persona.id, files, failedChecks: verify.filter(v => !v.passed).map(v => v.command), failure, escalations })
+          outcomes.push({ id: plan.id, status, agent: persona.id, files, failedChecks: verify.filter(v => !v.passed).map(v => v.command), failure, escalations, rationale: s.selection })
           log(`${plan.id}: ${status}${failure ? ` [${failure.kind}]` : ''}`)
         }
       }
@@ -442,6 +449,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
     `Phase ${n}: ${phaseName} — ${allOk ? 'all plans executed' : selectedOk ? `selected plans executed${held.length ? ` (not run: ${held.join(', ')})` : ''}` : 'build incomplete'}`,
     ...outcomes.map(o => `- ${o.id} ${o.agent}: ${o.status}${o.skipped ? ' (already done, skipped)' : ''}${o.failedChecks.length ? ` — failed: ${o.failedChecks.join('; ')}` : ''}${o.failure ? ` [${o.failure.kind}${o.failure.remediated ? ', auto-remediated' : ''}: ${o.failure.reason}]` : ''}`),
     ...(escText.length ? ['', 'Escalations:', ...escText] : []),
+    ...(outcomes.some(o => !o.skipped) ? ['', ...renderDecisionSummary(outcomes.filter(o => !o.skipped).map(o => ({ plan: o.id, agent: o.agent, rationale: o.rationale, escalations: o.escalations?.length ?? 0 })))] : []),
     ...(manualEdits.length ? ['', 'Manual edits since the last build, recorded as corrective preferences (.planning/memory/PREFERENCES.md):', ...manualEdits.map(x => `- ${x}`)] : []),
     ...(warnings.length ? ['', 'Warnings:', ...warnings.map(x => `- ${x}`)] : []),
     '',
