@@ -96,8 +96,8 @@ async function waitForAnswer($: any, agentId: string, ms: number): Promise<strin
   waiting[agentId] = { marker, resolve: a => { answer = a } }
   const until = Date.now() + ms
   while (answer === undefined && waiting[agentId]?.marker === marker && Date.now() < until) {
-    const ticks = String(Math.max(1, Math.min(2400, Math.ceil((until - Date.now()) / 250))))
-    await $.process.run(['bash', '-c', 'for i in $(seq 1 "$2"); do [ -e "$1" ] && exit 0; sleep 0.25; done; exit 1', 'wait', marker, ticks], { timeoutMs: 610_000 })
+    const ticks = String(Math.max(1, Math.min(2300, Math.ceil((until - Date.now()) / 250))))
+    await $.process.run(['bash', '-c', 'for i in $(seq 1 "$2"); do [ -e "$1" ] && exit 0; sleep 0.25; done; exit 1', 'wait', marker, ticks], { timeoutMs: 600_000 })
   }
   if (waiting[agentId]?.marker === marker) delete waiting[agentId]
   return answer
@@ -203,8 +203,11 @@ function agentsOf($: any): Agents {
       const id: string = s.agentId
       scopes[id] = scope
       scopeLog[id] ??= { files: new Set(), warnings: [] }
-      const answer = await waitForAnswer($, id, LEGION_WAIT)
-      return { agentId: id, answer }
+      try {
+        return { agentId: id, answer: await waitForAnswer($, id, LEGION_WAIT) }
+      } catch (err) {
+        return { agentId: id, deny: `waiting for agent ${id} failed: ${err instanceof Error ? err.message : String(err)}` }
+      }
     },
     async followUp(id, text) {
       delete finished[id]
