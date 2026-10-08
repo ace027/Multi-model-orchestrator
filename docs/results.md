@@ -12,6 +12,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 7 | Opus only vs Legion vs Triad, 5 tasks, plus a rerun after the guide trim | $4.95 |
 | 7 | Harder graded tasks, Opus only vs Triad | $1.26 |
 | 7 | Browser games, Opus only vs Triad | $5.54 |
+| 8 | Triad 0.8.0 (twice) and Opus (again) on the games and harder tasks | about $8.6 |
 
 ## Phase 2 acceptance
 
@@ -260,3 +261,35 @@ tron       triad  Y 52/52       0.872    720040    91754  36561   673  coder:2 o
   This is the first quality difference between the configs on any task. Opus's extra Tron spend bought a clearly stronger AI, although still not as strong as the reference, which took about 28 minutes. Sixteen rounds is a small sample, and each config was run once.
 
 Screenshots of each game on its start screen and after a few seconds of play (taken afterwards from the runs' work dirs, 1024×768): `bench/results/games1/screens/`.
+
+## Triad 0.8.0: cheaper orchestration (`bench/results/v080`)
+
+The goal was the same output as Opus alone for less money. The games run showed where Triad's money went: the Opus orchestrator re-reads its whole context on every turn (20 turns and $0.65 on Pac-Man), fresh coders and helpers each pay to load context, and the one quality gap (the Tron AI) came from Opus alone tuning its AI against practice bots, which Triad's coder was never asked to do. 0.8.0 changes only the guide and the coder prompt:
+
+- The orchestrator keeps its turns few (brief fully, wait, review once), makes small known edits itself, gives one coder a whole cohesive deliverable, and sends fixes to the same coder with SendMessage instead of a fresh agent.
+- A quality goal that tests don't capture (an AI's strength, speed, looks) goes into the brief, and the coder builds a way to measure it and iterates against it.
+
+Triad 0.8.0 ran twice (`a`, `b`) and Opus alone ran a second time (`opus2`), on the two games and the two harder tasks. **Every run got full marks again.** Cost per run:
+
+| Task | Opus alone (2 runs) | Triad 0.7.1 | Triad 0.8.0 (2 runs) |
+|---|---|---|---|
+| pacman | $1.14, $1.15 | $1.33 | $0.82, $1.10 |
+| tron | $2.19, $1.66 | $0.87 | $1.25; run `a` hit the 40-minute cap (at least $0.75) |
+| csvimport | $0.42, $0.37 | $0.38 | $0.36, $0.37 |
+| refunds | $0.21, $0.21 | $0.26 | $0.21, $0.21 |
+
+- **The orchestrator's overhead is gone.** Its turns fell from 20 to 7–9 on Pac-Man, where Triad is now about 16% cheaper than Opus alone instead of 17% dearer. On the two harder tasks the orchestrator did the work itself, so the cost matches Opus alone; before, Triad cost slightly more.
+- **The measured tuning had no end.** In run `a` the Tron coder built a benchmark (`tools/bench.js`) and kept playing 100-round matches against its previous versions until the 40-minute cap stopped the run. The game was finished and passed all 52 checks, but the CLI was killed before it reported its cost. The figure above is rebuilt from the session transcripts, which undercount output tokens.
+- **The Tron AI did not get stronger.** Head to head (`bench/tron_crossplay.cjs`, 16 rounds per pair, points out of 16):
+
+| AI | vs reference | vs Opus run 1 | vs Opus run 2 |
+|---|---|---|---|
+| Opus alone, run 1 | 6.5 | | 7 |
+| Opus alone, run 2 | 9 | 9 | |
+| Triad 0.7.1 | 4 | 5 | |
+| Triad 0.8.0 `a` | 6 | 6.5 | 6 |
+| Triad 0.8.0 `b` | 5 | 3 | 4 |
+
+  Opus alone still builds the stronger AI: 22.5 of 32 points against run `a`, 25 of 32 against run `b`. Iterating against its own benchmark did not close the gap for a Sonnet coder, even in the run that tuned for 35 minutes.
+
+**Where this leaves "same output, cheaper":** on everything the checks grade, Triad 0.8.0 matches Opus alone at the same cost or less (about 16% less on the largest graded task). On open-ended quality, Opus alone is still ahead, and the extra tuning spends Sonnet time without catching up. Next steps: give the tuning loop a budget (a fixed number of rounds or minutes) so it cannot run to the cap. Then either accept the AI gap, or let the orchestrator hand that one open-ended piece to an Opus coder.
