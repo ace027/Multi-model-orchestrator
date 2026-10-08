@@ -13,6 +13,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 7 | Harder graded tasks, Opus only vs Triad | $1.26 |
 | 7 | Browser games, Opus only vs Triad | $5.54 |
 | 8 | Triad 0.8.0 (twice) and Opus (again) on the games and harder tasks | about $8.6 |
+| 9 | Structured workflow (Triad 0.9.0) on Tron, twice, plus phase 3 rebuilt on the Opus coder | about $19.2 |
 
 ## Phase 2 acceptance
 
@@ -293,3 +294,40 @@ Triad 0.8.0 ran twice (`a`, `b`) and Opus alone ran a second time (`opus2`), on 
   Opus alone still builds the stronger AI: 22.5 of 32 points against run `a`, 25 of 32 against run `b`. Iterating against its own benchmark did not close the gap for a Sonnet coder, even in the run that tuned for 35 minutes.
 
 **Where this leaves "same output, cheaper":** on everything the checks grade, Triad 0.8.0 matches Opus alone at the same cost or less (about 16% less on the largest graded task). On open-ended quality, Opus alone is still ahead, and the extra tuning spends Sonnet time without catching up. Next steps: give the tuning loop a budget (a fixed number of rounds or minutes) so it cannot run to the cap. Then either accept the AI gap, or let the orchestrator hand that one open-ended piece to an Opus coder.
+
+## Triad 0.9.0: the structured workflow on Tron (`bench/results/wf090`, `wf090o`)
+
+`bench/run_workflow.sh` runs the task through the commands a user would: `/triad:start` (requirements taken from TASK.md and the spec), then `/triad:plan N`, `/triad:build N` and `/triad:review N` for every roadmap phase, headless, with `--auto` and control mode autonomous. Each command is its own `claude -p` session, so state passes through `.planning/` only. Both runs planned the same three phases: rules engine and test hook, playable game, computer player.
+
+| Run | Score | Cost | Time | Opus | Sonnet |
+|---|---|---|---|---|---|
+| Opus only, run 1 (games1) | 52/52 | $2.19 | | | |
+| Opus only, run 2 (v080) | 52/52 | $1.66 | | | |
+| Workflow a | 52/52 | about $6.0 (phase 3 build timed out at 40 min; its ~$1.10 is from the transcripts) | 65 min | | |
+| Workflow b | 51/52 (lost one game to the straight bot) | $6.71 | 59 min | $2.91 | $3.79 |
+
+Run b by step: start $0.23, plans $1.97, builds $1.96, reviews $2.55. The planning and review layers cost more than the code.
+
+What it produced beyond the code: `.planning/` with PROJECT, ROADMAP and STATE, three phases of wave-ordered plans with verification commands, a SUMMARY per plan, a REVIEW per phase with fixes applied, and one commit per plan (about 25 commits per run). Gap found: the plan and context files are written but never committed (the build commits only code and state).
+
+Gap fixed: the wave executor picked each plan's model from its persona's tier, so the AI plan ran on Sonnet even with the Opus coder in place. Plans now take `model: opus`, `/triad:plan` sets it for open-ended work, and `build_phase` runs those plans on `triad:triad-opus-coder`. `bench/run_rebuild.sh` then rewound both runs to the end of phase 2 and rebuilt phase 3 with the AI plan on Opus (`wf090o`). Both rebuilds ran out the 40-minute command timeout inside the AI plan (the plan's budget was "10 minutes of benchmark runtime", which the coder's own time does not count against); the code on disk scored 52/52 on both. Cost about $2.35 (a) and $4.1 (b), almost all the Opus coder.
+
+Crossplay, every AI against every other on the 8 seeded arenas, both sides (points of 96):
+
+| AI | Points |
+|---|---|
+| Reference | 65.5 |
+| Opus only, run 2 | 60.5 |
+| Opus only, run 1 | 53 |
+| Workflow a, AI on Opus coder | 51 |
+| Workflow b, AI on Opus coder | 51 |
+| Workflow a, AI on Sonnet | 47 |
+| Workflow b, AI on Sonnet | 8 |
+
+(Raw pairs in `bench/results/wf090o/crossplay.txt`. Pairings vary by a few points between replays: opus1 vs opus2 was 9-7 earlier and 10-6 here.)
+
+Findings:
+- The structured workflow matches Opus on the graded checks and leaves a full project record, at about three times the cost on a task this size.
+- The Sonnet-built AIs were the weak point (47 and 8). On the Opus coder both rebuilt AIs reached 51, level with Opus-only run 1 and below run 2; both were cut off mid-tuning.
+- A budget written in the brief did not hold. Triad now enforces one in code: `coderMinutes` (default 20) sends a coder one wrap-up note once it has worked that long.
+

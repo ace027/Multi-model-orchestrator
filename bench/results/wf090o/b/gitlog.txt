@@ -1,0 +1,18 @@
+d68e761 chore(triad): update state after wave 1 of phase 3
+5951aed feat(triad): execute plan 03-01 — Benchmark harness, bots and obstacle arenas
+5a5937a chore(triad): phase 2 review passed — Playable game
+0402b23 fix(triad): review cycle 1 fixes for phase 2
+21869b3 chore(triad): complete phase 2 execution — Playable game
+c041f26 chore(triad): update state after wave 2 of phase 2
+b237eb8 feat(triad): execute plan 02-02 — Playwright play session, screenshots and network audit
+0c4c4dd chore(triad): update state after wave 1 of phase 2
+f14f1cb feat(triad): execute plan 02-01 — Game controller, real-time loop, input and rendering
+869159d refactor: polish phase 1
+05832af chore(triad): phase 1 review passed — Engine and test hook
+c818158 fix(triad): review cycle 1 fixes for phase 1
+b48eb04 chore(triad): complete phase 1 execution — Engine and test hook
+b312a28 chore(triad): update state after wave 2 of phase 1
+abb4d40 feat(triad): execute plan 01-02 — Minimal page with window.tron test hook and Playwright test
+836f5e2 chore(triad): update state after wave 1 of phase 1
+4050056 feat(triad): execute plan 01-01 — Rules engine, baseline chooseMove and node tests
+de328c6 fixture

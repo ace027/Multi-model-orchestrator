@@ -1,0 +1,1 @@
+score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']

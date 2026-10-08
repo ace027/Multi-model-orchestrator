@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 4,
+      "input": 8,
+      "output": 426,
+      "cacheRead": 57794,
+      "cacheWrite": 20698,
+      "cost": 0.18569480000000002
+    },
+    "sonnet": {
+      "requests": 4,
+      "input": 8,
+      "output": 10571,
+      "cacheRead": 59115,
+      "cacheWrite": 28281,
+      "cost": 0.18825150000000002
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 4,
+      "input": 8,
+      "output": 426,
+      "cacheRead": 57794,
+      "cacheWrite": 20698,
+      "cost": 0.18569480000000002,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 20700
+    },
+    "a0133688c335b3375": {
+      "requests": 4,
+      "input": 8,
+      "output": 10571,
+      "cacheRead": 59115,
+      "cacheWrite": 28281,
+      "cost": 0.18825150000000002,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "maxPrompt": 28283,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    }
+  },
+  "haiku": {
+    "requests": 0,
+    "maxPrompt": 0,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "ceiling": {
+    "wrapNotes": 0,
+    "stops": 0,
+    "trimmed": 0,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 95000,
+    "haikuWrapAt": 80000,
+    "openPane": false
+  },
+  "contextInjections": 1
+}
