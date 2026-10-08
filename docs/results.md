@@ -258,3 +258,5 @@ tron       triad  Y 52/52       0.872    720040    91754  36561   673  coder:2 o
 | reference vs Triad | 12 – 4 |
 
   This is the first quality difference between the configs on any task. Opus's extra Tron spend bought a clearly stronger AI, although still not as strong as the reference, which took about 28 minutes. Sixteen rounds is a small sample, and each config was run once.
+
+Screenshots of each game on its start screen and after a few seconds of play (taken afterwards from the runs' work dirs, 1024×768): `bench/results/games1/screens/`.
