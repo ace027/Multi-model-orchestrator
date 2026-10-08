@@ -124,7 +124,7 @@ def table(recs: list) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--configs", default="p2,p3")
-    ap.add_argument("--tasks", default="core", help="task names or set names (core, hard), comma-separated")
+    ap.add_argument("--tasks", default="core", help="task names or set names (core, hard, games), comma-separated")
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--out", default=os.path.join(ROOT, "bench", "results", "phase3"))
     ap.add_argument("--legion-home", help="a HOME with Legion installed (node bin/install.js --claude --global)")
