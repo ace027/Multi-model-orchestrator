@@ -11,6 +11,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 6 | Dry-run build, intent validation, board meeting | $0.56 |
 | 7 | Opus only vs Legion vs Triad, 5 tasks, plus a rerun after the guide trim | $4.95 |
 | 7 | Harder graded tasks, Opus only vs Triad | $1.26 |
+| 7 | Browser games, Opus only vs Triad | $5.54 |
 
 ## Phase 2 acceptance
 
@@ -233,4 +234,27 @@ ok  tron       solution exit 0: score 52/52 rules 20/20 ui 8/8 ai 24/24
 ok  pacman     solution exit 0: score 44/44 rules 32/32 ui 8/8 replay 4/4
 ```
 
-Every place the reference writers reported as ambiguous was either left untested or fixed in the spec (the default for Tron's `ai` option). The Tron reference took about 28 minutes and beat every bot in every round. A strong AI can therefore max out the tournament as well, so it separates weak AIs from good ones but not good ones from each other. Not yet run with a model.
+Every place the reference writers reported as ambiguous was either left untested or fixed in the spec (the default for Tron's `ai` option). The Tron reference took about 28 minutes and beat every bot in every round. A strong AI can therefore max out the tournament as well, so it separates weak AIs from good ones but not good ones from each other.
+
+### First run (`bench/results/games1`)
+
+```
+task       config ok             cost    tokens    in+cw    out  secs  agents
+pacman     opus   Y 44/44       1.141   1101821    51200  34110   418
+pacman     triad  Y 44/44       1.335   1250248   148006  74709   532  coder:2 helper:1 orchestrator:1
+tron       opus   Y 52/52       2.188   3542743    79030  55574  1478
+tron       triad  Y 52/52       0.872    720040    91754  36561   673  coder:2 orchestrator:1
+```
+
+- **Every run got full marks**, including all four Pac-Man replays (exact rules for up to 3000 ticks) and 24/24 in the Tron tournament. The checks are saturated again.
+- **Cost:** Triad $2.21, Opus alone $3.33. On Pac-Man Triad cost 17% more. On Tron it cost 60% less: there Opus alone spent 25 minutes writing its own practice bots (`tests/bots.js`) and tuning its AI against them.
+- **Tests:** Triad wrote more unit tests on both games (Pac-Man 33 against 18, Tron 26 against 17). Opus alone added browser tests on both games; Triad added them on Pac-Man only. None of the four runs' tests take screenshots; the browser tests drive the page through the hook and the DOM.
+- **AI strength, head to head** (`bench/tron_crossplay.cjs`, 16 rounds per pair, no model calls):
+
+| Pair | Score |
+|---|---|
+| Opus alone vs Triad | 11 – 5 |
+| reference vs Opus alone | 9.5 – 6.5 |
+| reference vs Triad | 12 – 4 |
+
+  This is the first quality difference between the configs on any task. Opus's extra Tron spend bought a clearly stronger AI, although still not as strong as the reference, which took about 28 minutes. Sixteen rounds is a small sample, and each config was run once.
