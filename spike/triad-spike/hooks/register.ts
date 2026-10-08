@@ -65,12 +65,18 @@ export const register: Register = on => {
   on('tool.call', { tool: 'mcp__triad-spike__delegate_menial' }, async ($, e, next) => {
     const brief = String((e as any).brief)
     await log($, 'delegate.in', { callerAgentId: e.agentId, callerType: e.agentId ? types[e.agentId] : 'main' })
+    const started = Date.now()
     const r = await $.agent.spawn({ subagentType: 'triad-spike:spike-helper', prompt: brief, description: 'menial', model: 'haiku' })
-    await log($, 'delegate.spawned', { r, list: await $.agent.list() })
     if (!r.agentId) return { result: 'spawn refused: ' + (r as any).deny }
     types[r.agentId] = 'triad-spike:spike-helper(mod)'; parents[r.agentId] = e.agentId
-    const answer = await new Promise<string>(res => { waiting[r.agentId!] = res })
-    await log($, 'delegate.done', { answer: answer.slice(0, 300) })
+    const marker = logPath + '.' + r.agentId + '.done'
+    let answer: string | undefined
+    waiting[r.agentId] = a => { answer = a }
+    while (answer === undefined) {
+      const w = await $.process.run(['bash', '-c', 'for i in $(seq 1 2400); do [ -e "$1" ] && exit 0; sleep 0.25; done; exit 1', 'wait', marker], { timeoutMs: 600_000 })
+      await log($, 'delegate.poll', { exitCode: w.exitCode, have: answer !== undefined })
+    }
+    await log($, 'delegate.done', { ms: Date.now() - started, answer: answer.slice(0, 200) })
     return { result: answer }
   })
 
@@ -121,7 +127,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     await log($, 'turn.complete', { agentId: e.agentId, type: e.agentId ? types[e.agentId] : 'main', reason: e.reason, usage: e.usage, answer: e.answer.slice(0, 400) })
-    if (e.agentId && waiting[e.agentId]) { waiting[e.agentId](e.answer); delete waiting[e.agentId] }
+    if (e.agentId && waiting[e.agentId]) { waiting[e.agentId](e.answer); delete waiting[e.agentId]; await $.fs.write(logPath + '.' + e.agentId + '.done', 'done') }
     if (mode.has('ret') && e.agentId) return { text: 'REWRITTEN-RETURN-BY-MOD status: done' }
     return next(e)
   })

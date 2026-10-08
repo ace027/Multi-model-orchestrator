@@ -25,7 +25,7 @@ Claude Code 2.1.293 (spec minimum 2.1.287). Types were taken from the build's ow
 - Return-schema enforcement happens in the `delegate_menial` handler (helpers) and in a `tool.call` hook on `Agent` (coders), with `background: false` forced and the agent id included in any deny.
 - Result compression goes in `tool.call` post-processing.
 - Per-agent and per-tier ledger: `turn.step` and `turn.complete` usage keyed by `agentId`, with the tier taken from the type map.
-- Open risk: a `tool.call` handler that awaits a helper's `turn.complete` stayed within budget here (the helper ran for a few seconds). The 10-second hook budget excludes time spent in API calls and `next`, but not necessarily time waiting on another hook's promise. Phase 1 must check this with a helper that runs over 10s. If waiting counts, the handler should return a job id and use a second poll tool.
+- Hook budget for `delegate_menial` (checked before Phase 2): waiting on a plain promise that another hook resolves **does** count toward the 10-second budget, and so does `$.clock.sleep` (r7: a helper that ran over 10s overran the budget). `$.tool.call({ tool: 'Agent' })` is refused, since that is `$.agent.spawn`. What works: the `turn.complete` hook writes a marker file with `$.fs.write`, and the handler waits with `$.process.run(['bash', '-c', <poll for the marker>], { timeoutMs })`, whose time is not the hook's own (r10: a 31.9s helper run returned normally). The handler loops in case the wait times out.
 
 ## Appendix A results (spike #9)
 
