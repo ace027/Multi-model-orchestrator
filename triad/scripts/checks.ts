@@ -4,7 +4,7 @@
 import { splitFrontmatter } from '../hooks/legion/yaml.ts'
 
 // Byte budgets: today's sizes plus headroom. The guide is in every main-loop
-// prompt (1,420 bytes at 0.7.1; the Legion rules and the knowledge index, which
+// prompt (1,420 bytes at 0.7.1, 1,833 at 0.8.0; the Legion rules and the knowledge index, which
 // took it past 3,000 and cost more than Opus alone in the Phase 7 benchmark, now
 // ride with /triad:* prompts only); a command file loads when it runs (largest
 // plan.md, 6,858 bytes at 0.6.0). Raise a budget only with a reason in the PR.
