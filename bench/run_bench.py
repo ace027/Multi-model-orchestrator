@@ -9,7 +9,8 @@ a fresh HOME (a copy of --legion-home for legion), so no config sees the user's 
 
 Each run copies tasks/<task>/repo to a scratch dir (plus setup.py if present), commits it,
 runs `claude -p` headless through bench/hermetic.sh, then runs tasks/<task>/check.py.
-Task sets: core (the Phase 3 tasks, the default) and hard (csvimport, refunds: graded checks
+Task sets: core (the Phase 3 tasks, the default), hard (csvimport, refunds) and games (tron,
+pacman: browser games checked through Playwright). hard and games have graded checks
 that print `score P/N`, recorded as the run's score; bench/selftest.py checks them).
 Writes <out>/<config>/<task>.json and <out>/summary.md (this run's table). Needs ORCHESTRATOR_API_KEY.
 """
@@ -27,7 +28,7 @@ import uuid
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASKS = os.path.join(ROOT, "bench", "tasks")
-SETS = {"core": ["discounts", "logfix", "noisy", "rename", "testwrite"], "hard": ["csvimport", "refunds"]}
+SETS = {"core": ["discounts", "logfix", "noisy", "rename", "testwrite"], "hard": ["csvimport", "refunds"], "games": ["tron", "pacman"]}
 PROMPT = "Do the task described in TASK.md."
 TOOLS = "Agent,SendMessage,Read,Edit,Write,Bash,Glob,Grep,mcp__triad__delegate_menial"
 
@@ -89,7 +90,7 @@ def run(task: str, config: str, out_dir: str) -> dict:
     rec = {
         "task": task, "config": config, "options": opts if opts != "legion" else None, "seconds": secs, "exit": p.returncode,
         "success": chk.returncode == 0, "check": chk.stdout.strip()[-500:],
-        "score": [int(x) for x in m.groups()] if (m := re.search(r"score (\d+)/(\d+)", chk.stdout)) else None,
+        "score": [float(x) for x in m.groups()] if (m := re.search(r"score ([\d.]+)/(\d+)", chk.stdout)) else None,
         "cost": cli.get("total_cost_usd"), "turns": cli.get("num_turns"),
         "tokens": tokens, "totalTokens": sum(tokens.values()),
         "byModel": {m: {k: v for k, v in u.items() if k in tokens or k == "costUSD"} for m, u in usage.items()},
@@ -107,14 +108,14 @@ def run(task: str, config: str, out_dir: str) -> dict:
 
 
 def table(recs: list) -> str:
-    rows = [f"{'task':<11}{'config':<7}{'ok':<9}{'cost':>8}{'tokens':>10}{'in+cw':>9}{'out':>7}{'secs':>6}  agents"]
+    rows = [f"{'task':<11}{'config':<7}{'ok':<11}{'cost':>8}{'tokens':>10}{'in+cw':>9}{'out':>7}{'secs':>6}  agents"]
     for r in sorted(recs, key=lambda r: (r["task"], r["config"])):
         t = r["tokens"]
         roles = {}
         for a in (r["agents"] or {}).values():
             roles[a["role"]] = roles.get(a["role"], 0) + 1
         cost = f"{r['cost']:.3f}" if r["cost"] is not None else "-"
-        rows.append(f"{r['task']:<11}{r['config']:<7}{('Y' if r['success'] else 'N') + (' %d/%d' % tuple(r['score']) if r.get('score') else ''):<9}{cost:>8}{r['totalTokens']:>10}"
+        rows.append(f"{r['task']:<11}{r['config']:<7}{('Y' if r['success'] else 'N') + (' %g/%g' % tuple(r['score']) if r.get('score') else ''):<11}{cost:>8}{r['totalTokens']:>10}"
                     f"{t['inputTokens'] + t['cacheCreationInputTokens']:>9}{t['outputTokens']:>7}{r['seconds']:>6}  "
                     + " ".join(f"{k}:{v}" for k, v in sorted(roles.items())))
     return "\n".join(rows)
