@@ -50,6 +50,7 @@ export type Ledger = {
   measuredUsd?: number
   contextInjections?: number
   compression: { calls: number; rawTokens: number; outTokens: number }
+  ceiling: { wrapNotes: number; stops: number; trimmed: number; refusedBriefs: number }
   deferredTools: string[]
   options?: Record<string, unknown>
 }
@@ -64,6 +65,7 @@ export const emptyLedger = (): Ledger => ({
   refusals: [],
   rejectedReplies: 0,
   compression: { calls: 0, rawTokens: 0, outTokens: 0 },
+  ceiling: { wrapNotes: 0, stops: 0, trimmed: 0, refusedBriefs: 0 },
   deferredTools: [],
 })
 
@@ -135,6 +137,8 @@ export function render(l: Ledger, budgets: { coders: [number, number]; helpers: 
   out.push('', 'Budgets:')
   out.push(`  coders running ${budgets.coders[0]}/${budgets.coders[1]}, helpers running ${budgets.helpers[0]}/${budgets.helpers[1]}, max depth ${budgets.maxDepth}`)
   out.push(`  Haiku: ${l.haiku.requests} requests, largest prompt ${k(l.haiku.maxPrompt)} of ${k(HAIKU_LINE)}, ${l.haiku.overLine} over the line`)
+  const g = l.ceiling ?? { wrapNotes: 0, stops: 0, trimmed: 0, refusedBriefs: 0 }
+  out.push(`  Haiku ceiling: ${g.wrapNotes} wrap-up notes, ${g.trimmed} results withheld, ${g.stops} helpers stopped with partial, ${g.refusedBriefs} briefs too large to start`)
   out.push(`  replies sent back for the return schema: ${l.rejectedReplies}; spawns refused: ${l.refusals.length}`)
   const c = l.compression ?? { calls: 0, rawTokens: 0, outTokens: 0 }
   const comp = l.agents.compressor

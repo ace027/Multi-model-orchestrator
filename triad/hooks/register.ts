@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, schemaProblems, type Options, type Role } from './policy.ts'
-import { emptyLedger, ensureAgent, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
+import { emptyLedger, ensureAgent, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
+import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
 import { COMPRESS_TOOLS, SUMMARY_SYSTEM, chunks, describeCall, eligible, errorLines, headTail, mergePrompt, overThreshold, render as renderCompressed, summaryPrompt } from './compress.ts'
 
 // Triad, Mode B (routed flat; see SPIKE.md). Only the orchestrator (main loop)
@@ -29,6 +30,9 @@ const tasks: Record<string, string> = {}
 const running = { coder: new Set<string>(), helper: new Set<string>() }
 const reserved = { coder: 0, helper: 0 }
 const waiting: Record<string, { marker: string; resolve: (answer: string) => void }> = {}
+// Haiku ceiling: per helper, its last request's size, and the files it wrote.
+const meters: Record<string, Meter> = {}
+const written: Record<string, Set<string>> = {}
 let seq = 0
 
 // Byte-stable (no dates, no per-session data) so it caches with the prefix.
@@ -37,6 +41,7 @@ You are the orchestrator. Decompose the work, make the architecture decisions, r
 - Implementation goes to triad:triad-coder (Sonnet), one well-scoped task per agent. Brief it with file paths, acceptance criteria, constraints and the verify command; no pasted code. Launch independent tasks in parallel (several Agent calls in one message).
 - Menial work (search, running a test suite and summarizing failures, log triage, a checklist, boilerplate you have designed) goes to triad:triad-helper (Haiku). Name the files it may write.
 - Every agent returns status, summary, changes and verify. On blocked, rebrief, split the task, or take it over; retry a task at most once.
+- A helper that reaches its token limit is stopped and returns partial with what is done and what is left. Review what it wrote, then give what is left to a fresh helper as a narrower job.
 - Check results with the verify commands and git diff --stat, not by reading whole files.
 - Long tool output may come back compressed, with the path of the full text in .triad/out/.
 - /triad shows the agent tree and the tokens and cost per tier.`
@@ -87,12 +92,34 @@ async function summarize($: any, prompt: string): Promise<string | undefined> {
   return r.text
 }
 
+async function saveOut($: any, tool: string, input: Record<string, unknown>, raw: string): Promise<string> {
+  const path = `${cwd}/.triad/out/${Date.now().toString(36)}-${++seq}.txt`
+  await $.fs.write(path, `# ${tool} ${describeCall(tool, input)}\n${raw}`)
+  return path
+}
+
+// The partial reply for a helper stopped at the ceiling: a Haiku one-shot reads the
+// tail of its transcript (well under the line) and says what is done and what is left.
+async function stopReply($: any, id: string, projected: number): Promise<string> {
+  let progress: { done?: string; left?: string } = {}
+  try {
+    const rows = await $.session.messages({ agentId: id })
+    if (Array.isArray(rows)) {
+      const r = await $.model.complete({ model: 'haiku', system: PROGRESS_SYSTEM, prompt: progressPrompt(tasks[id] ?? '', transcriptTail(rows, 60_000)), maxTokens: 400 })
+      if (r.isAnswered) {
+        recordCompletion(ledger, r.usage)
+        progress = parseProgress(r.text)
+      }
+    }
+  } catch { /* the reply still names what was written */ }
+  return partialReply({ projected, ceiling: opts.haikuCeiling, ...progress, changes: [...(written[id] ?? [])] })
+}
+
 // Saves the full output, then returns the verbatim error lines plus a Haiku summary
 // (map-reduce over 60k-token chunks), or head and tail when Haiku fails.
 async function compress($: any, agentId: string | undefined, tool: string, input: Record<string, unknown>, raw: string): Promise<string> {
   const what = describeCall(tool, input)
-  const path = `${cwd}/.triad/out/${Date.now().toString(36)}-${++seq}.txt`
-  await $.fs.write(path, `# ${tool} ${what}\n${raw}`)
+  const path = await saveOut($, tool, input, raw)
   const task = (tasks[agentId ?? 'main'] ?? '').slice(0, 1500)
   const { parts, skipped } = chunks(raw)
   const pieces = await Promise.all(parts.map((text, i) =>
@@ -188,6 +215,10 @@ export const register: Register = (on, options) => {
     const parent = e.description.startsWith(DELEGATE_MARK) ? e.description.slice(DELEGATE_MARK.length).split(/\s/)[0] : e.parentAgentId
     const depth = depthOf(parent) + 1
     if (depth > opts.maxDepth) return refuse(`depth ${depth} is over the limit of ${opts.maxDepth}; do this step yourself or return blocked.`)
+    if (role === 'helper' && approxTokens(e.prompt) > PREFLIGHT_TOKENS) {
+      ledger.ceiling.refusedBriefs++
+      return refuse(`the brief is about ${approxTokens(e.prompt)} tokens, too large to start a Haiku helper (limit ${PREFLIGHT_TOKENS}). Give it to triad:triad-coder, or split it into narrower helper jobs.`)
+    }
     if (busy(role) >= capOf(role)) return refuse(`${busy(role)} ${role}s are already running (limit ${capOf(role)}). Wait for one to finish, or batch the work.`)
     reserved[role]++
     let r
@@ -202,16 +233,50 @@ export const register: Register = (on, options) => {
       parents[id] = parent
       running[role].add(id)
       byToolUse[e.tool_use_id] = id
-      if (role === 'helper') writable[id] = writableFrom(e.prompt)
+      if (role === 'helper') {
+        writable[id] = writableFrom(e.prompt)
+        meters[id] = newMeter()
+        written[id] = new Set()
+      }
       tasks[id] = e.prompt
       ensureAgent(ledger, id, { role, type, parent: parent ?? 'main', depth, status: 'running' })
     }
     return r
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the spawn check failed, so the spawn was refused. Try again.' }))
 
+  // Haiku ceiling. Before each helper request, project its size; over the ceiling,
+  // answer the step here with a partial reply so the request is never sent
+  // (SPIKE.md #8). After each request, note its exact size, and at the wrap-up
+  // threshold tell the helper to finish.
   on('turn.step', async function* ($, e, next) {
+    const id = e.agentId
+    const m = id && roles[id] === 'helper' && opts.haikuCeiling > 0 ? meters[id] : undefined
+    let chars: number | undefined
+    if (m) {
+      const msgs = await $.session.messages({ as: 'api', agentId: id })
+      if (Array.isArray(msgs)) chars = apiChars(msgs)
+      const projected = chars === undefined ? 0 : project(m, chars)
+      if (projected > opts.haikuCeiling) {
+        ledger.ceiling.stops++
+        const answer = await stopReply($, id!, projected)
+        yield { kind: 'text', index: 0, text: answer } as any
+        yield { kind: 'stop', stopReason: 'end_turn', usage: null } as any
+        return { turnId: e.turnId, index: e.index, answer, toolUses: [], stopReason: 'end_turn', usage: null } as any
+      }
+    }
     const r = yield* next(e)
-    if (r?.usage) recordStep(ledger, e.agentId, r.usage.model || e.model, r.usage)
+    if (r?.usage) recordStep(ledger, id, r.usage.model || e.model, r.usage)
+    if (m && r?.usage) {
+      m.lastPrompt = promptTokens(r.usage)
+      if (chars !== undefined) m.charsAtLast = chars
+      if (!m.warned && m.lastPrompt >= opts.haikuWrapAt) {
+        m.warned = true
+        ledger.ceiling.wrapNotes++
+        try {
+          await $.session.send({ to: { agentId: id! }, text: WRAP_UP_NOTE(m.lastPrompt, opts.haikuCeiling) })
+        } catch { /* the hard stop still holds */ }
+      }
+    }
     return r
   })
 
@@ -258,6 +323,7 @@ export const register: Register = (on, options) => {
     const brief = String(args.brief ?? '').trim()
     const files = Array.isArray(args.writable) ? args.writable.map(String).filter(Boolean) : []
     if (!brief) return { deny: 'triad: delegate_menial needs a brief.' }
+    if (approxTokens(brief) > PREFLIGHT_TOKENS) ledger.ceiling.refusedBriefs++
     if (approxTokens(brief) > PREFLIGHT_TOKENS) return refuse(`the brief is about ${approxTokens(brief)} tokens, too large to start a Haiku job (limit ${PREFLIGHT_TOKENS}). Split it into narrower jobs or do it yourself.`)
     const prompt = `${brief}\n\nWritable files: ${files.length ? files.join(', ') : 'none (read-only job)'}`
     const s: any = await $.agent.spawn({ subagentType: HELPER_TYPE, prompt, description: `${DELEGATE_MARK}${caller}`, model: 'haiku' })
@@ -280,7 +346,10 @@ export const register: Register = (on, options) => {
       const second = await again
       if (second !== undefined && !schemaProblems(second).length) answer = second
     }
-    return { result: schemaProblems(answer).length ? `triad: helper ${id} did not follow the return schema; its reply follows.\n${answer}` : answer }
+    const status = parseReply(answer).status
+    const note = status === 'partial' ? '\n\ntriad: the helper stopped before finishing. Review what it wrote, then delegate what is left as a narrower job, or do it yourself.'
+      : status === 'blocked' ? '\n\ntriad: the helper is blocked. Rebrief it once with what it needs, or do the job yourself.' : ''
+    return { result: (schemaProblems(answer).length ? `triad: helper ${id} did not follow the return schema; its reply follows.\n${answer}` : answer) + note }
   }).catch(() => ({ deny: 'triad: delegate_menial failed. Do the job yourself or return blocked.' }))
 
   // Helpers write only the files their brief names.
@@ -290,8 +359,10 @@ export const register: Register = (on, options) => {
     const input = e as unknown as { file_path?: string; notebook_path?: string }
     const target = input.file_path ?? input.notebook_path ?? ''
     const allowed = writable[id] ?? []
-    if (!target || mayWrite(target, allowed, cwd)) return next(e)
-    return { deny: `triad: a helper may write only the files its brief names (${allowed.join(', ') || 'none'}); ${target} is not one. Return blocked if the job needs it.` }
+    if (target && !mayWrite(target, allowed, cwd)) return { deny: `triad: a helper may write only the files its brief names (${allowed.join(', ') || 'none'}); ${target} is not one. Return blocked if the job needs it.` }
+    const r: any = await next(e)
+    if (target && !r.deny && !r.isError) written[id]?.add(target.startsWith(cwd + '/') ? target.slice(cwd.length + 1) : target)
+    return r
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the write check failed, so the write was refused.' }))
 
   // Long Bash/Grep output (and log-like files read) is saved to .triad/out and
@@ -299,14 +370,24 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: COMPRESS_TOOLS }, async ($, e, next) => {
     const r: any = await next(e)
     const input = e as unknown as Record<string, unknown>
-    if (!opts.compress || r.deny || typeof r.text !== 'string' || !eligible(e.tool, input)) return r
+    if (r.deny || typeof r.text !== 'string') return r
+    const compressible = opts.compress && eligible(e.tool, input)
+    const meter = e.agentId && roles[e.agentId] === 'helper' && opts.haikuCeiling > 0 ? meters[e.agentId] : undefined
+    if (!compressible && !meter) return r
     let raw: string = r.text
     const persisted = r.result?.persistedOutputPath ?? r.result?.rawOutputPath
     if (persisted) {
       try { raw = String(await $.fs.read(persisted)) } catch { /* keep the text core gave */ }
     }
-    if (!overThreshold(raw, opts.compressThreshold)) return r
-    const result = rewrite(e.tool, r.result, await compress($, e.agentId, e.tool, input, raw), !!r.isError)
+    let text: string | undefined
+    if (compressible && overThreshold(raw, opts.compressThreshold)) text = await compress($, e.agentId, e.tool, input, raw)
+    // A helper near its ceiling gets a pointer instead of output that would take it over.
+    if (meter && resultOverflows(meter, (text ?? r.text).length, opts.haikuCeiling)) {
+      ledger.ceiling.trimmed++
+      text = TRIMMED_RESULT(approxTokens(raw), await saveOut($, e.tool, input, raw))
+    }
+    if (text === undefined) return r
+    const result = rewrite(e.tool, r.result, text, !!r.isError)
     return result === undefined ? r : { result, ...(r.isError ? { isError: true } : {}) }
   }).catch(($, e, next) => next(e))
 

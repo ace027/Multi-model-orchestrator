@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import { mayWrite, pathsInBrief, schemaProblems } from './hooks/policy.ts'
 import { costOf, emptyLedger, recordStep } from './hooks/ledger.ts'
 import { chunks, errorLines, eligible } from './hooks/compress.ts'
+import { newMeter, parseProgress, partialReply, project, resultOverflows, transcriptTail } from './hooks/ceiling.ts'
 
 const GOOD = 'status: done\nsummary: added the parser\nchanges:\n- src/a.ts | added | parser\nverify: npm test => 4 passed'
 const usage = (input: number, output: number, read = 0, write = 0, model = 'claude-haiku-5-5') => ({
@@ -212,6 +213,121 @@ describe('hooks', () => {
     await start($)
     expect((await $.prompt.section({ name: 'communication', text: 'base' })).text).toMatch(/^base\n\n# Triad orchestration/)
     expect((await $.prompt.section({ name: 'env_info_model', text: 'model' })).text).toBe('model')
+  })
+})
+
+// A helper's conversation in both forms, grown by `chars` of tool output, plus the
+// one-shot and send nouns the ceiling uses.
+function helperWorld(on: any, state: { chars: number; sent: string[]; steps: number }) {
+  on('session.messages', (_$: any, e: any) => ({
+    value: e.as === 'api'
+      ? [{ role: 'user', content: [{ type: 'text', text: 'x'.repeat(state.chars) }] }]
+      : [{ role: 'assistant', text: 'Read a.py, b.py; next c.py', toolUses: [] }],
+  }))
+  on('session.send', (_$: any, e: any) => { state.sent.push(e.text); return { isDelivered: true } })
+  on('model.complete', () => ({ value: { isAnswered: true, text: 'done: summarized a.py and b.py\nleft: c.py and d.py', usage: usage(3_000, 40) } }))
+  on('turn.step', async function* (_$: any, e: any) {
+    state.steps++
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'tool_use', usage: usage(10, 50, 89_000, 1_000, e.model) }
+  })
+}
+
+async function step($: any, agentId: string, index: number) {
+  let text = ''
+  for await (const c of $.turn.step({ turnId: 't', index, model: 'claude-haiku-5-5', messageCount: 3, agentId }) as any) if (c.kind === 'text') text += c.text
+  return text
+}
+
+describe('haiku ceiling', () => {
+  test('sends a wrap-up note at 80k, then stops the helper before a request over 95k', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    await start($)
+    const h = await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'Summarize a.py, b.py, c.py, d.py', description: 'h' })
+    await step($, h.agentId!, 0) // sent: 90k prompt
+    expect(state.steps).toBe(1)
+    expect(state.sent[0]).toMatch(/about 90k tokens/)
+    state.chars += 30_000 // a large tool result arrives: ~12k more tokens
+    const answer = await step($, h.agentId!, 1)
+    expect(state.steps).toBe(1) // the request was never sent
+    expect(answer).toMatch(/^status: partial/)
+    expect(answer).toMatch(/left: c.py and d.py/)
+    expect(schemaProblems(answer)).toEqual([])
+    const out = await $.command.run({ command: 'triad' } as any)
+    expect(out.text).toMatch(/1 wrap-up notes, 0 results withheld, 1 helpers stopped/)
+  })
+
+  test('lets a helper continue while the projection stays under the ceiling', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    await start($)
+    const h = await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'x', description: 'h' })
+    await step($, h.agentId!, 0)
+    state.chars += 5_000 // ~2k tokens
+    await step($, h.agentId!, 1)
+    expect(state.steps).toBe(2)
+  })
+
+  test('never stops a coder on token grounds', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const state = { chars: 900_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    await start($)
+    const c = await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'x', description: 'c' })
+    await step($, c.agentId!, 0)
+    await step($, c.agentId!, 1)
+    expect(state.steps).toBe(2)
+    expect(state.sent.length).toBe(0)
+  })
+
+  test('withholds a tool result that would take a helper over the ceiling', async ($, on) => {
+    const log = { writes: {} as Record<string, string>, spawns: [] as any[] }
+    world(on, log)
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    const big = 'def f():\n    return 1\n'.repeat(1_500) // ~33k chars, ~13k tokens
+    on('tool.call', (_$: any, e: any) => ({ result: { type: 'text', file: { filePath: e.file_path, content: big, numLines: 3000, startLine: 1, totalLines: 3000 } }, text: big }) as any)
+    await start($)
+    const h = await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'x', description: 'h' })
+    const early: any = await $.tool.call({ tool: 'Read', file_path: '/repo/src/big.py', agentId: h.agentId } as any)
+    expect(early.result.file.content).toBe(big) // no request yet, nothing to project from
+    await step($, h.agentId!, 0) // 90k
+    const late: any = await $.tool.call({ tool: 'Read', file_path: '/repo/src/big.py', agentId: h.agentId } as any)
+    expect(late.result.file.content).toMatch(/more than your remaining budget/)
+    expect(Object.values(log.writes).some(t => t.includes(big))).toBe(true)
+  })
+
+  test('refuses to start a helper on an oversized brief', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    await start($)
+    const r: any = await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'y'.repeat(200_000), description: 'h' })
+    expect(r.deny).toMatch(/too large to start a Haiku helper/)
+  })
+})
+
+describe('ceiling helpers', () => {
+  test('projects from the last request plus growth, erring high', () => {
+    const m = newMeter()
+    expect(project(m, 35_000)).toBe(8_000 + 14_000 + 1_000)
+    m.lastPrompt = 50_000
+    m.charsAtLast = 100_000
+    expect(project(m, 125_000)).toBe(50_000 + 10_000 + 1_000)
+    expect(resultOverflows(m, 100_000, 95_000)).toBe(false)
+    expect(resultOverflows(m, 120_000, 95_000)).toBe(true)
+  })
+  test('builds a partial reply that follows the return schema', () => {
+    const r = partialReply({ projected: 97_400, ceiling: 95_000, ...parseProgress('done: a\nleft: b'), changes: ['docs/a.md'] })
+    expect(schemaProblems(r)).toEqual([])
+    expect(r).toMatch(/- docs\/a.md \| edit/)
+    expect(schemaProblems(partialReply({ projected: 1, ceiling: 1, changes: [] }))).toEqual([])
+  })
+  test('keeps the most recent part of a transcript', () => {
+    const rows = Array.from({ length: 50 }, (_, i) => ({ role: 'assistant', text: `step ${i}` }))
+    const t = transcriptTail(rows, 40)
+    expect(t).toMatch(/step 49$/)
+    expect(t).not.toMatch(/step 1\n/)
   })
 })
 

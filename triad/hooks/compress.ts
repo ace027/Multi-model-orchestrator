@@ -5,8 +5,9 @@ export const COMPRESS_TOOLS = ['Bash', 'Grep', 'Read']
 // Source files are read to be edited, so their text must stay exact. Only
 // log-like files are compressed when read.
 const LOGLIKE = /\.(log|txt|out|jsonl|csv|tsv|xml|html?)$|(^|\/)(logs?|output|tmp)\//i
-// Haiku one-shot input per chunk: 60k tokens (SPEC section 4), at ~3.5 chars a token.
-export const CHUNK_CHARS = 60_000 * 3.5
+// Haiku one-shot input per chunk: 60k tokens (SPEC section 4). Counted at 2.5 chars
+// a token, the dense end for logs, so a chunk stays near 60k even at that rate.
+export const CHUNK_CHARS = 60_000 * 2.5
 export const MAX_CHUNKS = 8
 const ERRORLINE = /\w*(error|exception)\b|\b(traceback|fail(ed|ure|ing)?|fatal|panic|assert\w*|denied|refused|segfault|undefined reference|cannot|could not|not found)\b|^\s*E\s{2,}|^FAIL|^ERROR/i
 const MAX_ERROR_LINES = 40

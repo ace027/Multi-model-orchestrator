@@ -1,6 +1,6 @@
 {
   "name": "triad",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Tiered-model orchestration: Opus orchestrates, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
   "userConfig": {
     "maxDepth": {
@@ -50,6 +50,18 @@
       "title": "Defer rarely used tool descriptions",
       "description": "Load only the tools the tiers use every turn; the rest stay reachable through ToolSearch.",
       "default": true
+    },
+    "haikuCeiling": {
+      "type": "number",
+      "title": "Haiku prompt ceiling (tokens)",
+      "description": "A helper whose next request is projected above this is stopped and returns partial. Keep it under 100,000, Haiku's pricing line.",
+      "default": 95000
+    },
+    "haikuWrapAt": {
+      "type": "number",
+      "title": "Haiku wrap-up threshold (tokens)",
+      "description": "At this prompt size a helper is told to finish and return.",
+      "default": 80000
     }
   }
 }
