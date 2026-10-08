@@ -10,11 +10,11 @@ const usage = (input: number, output: number, read = 0, write = 0, model = 'clau
 })
 
 // The engine beneath the plugin: just enough of it for session.start and the ledger.
-function world(on: any, log: { writes: Record<string, string>; spawns: any[] }) {
+function world(on: any, log: { writes: Record<string, string>; spawns: any[]; tools?: any[] }) {
   mock.store(on)
   on('session.start', () => ({ cwd: '/repo' }))
   on('session.id', () => ({ value: 'sess-1' }))
-  on('tool.register', (_$: any, e: any) => ({ value: { tool: 'mcp__triad__' + e.name } }))
+  on('tool.register', (_$: any, e: any) => { log.tools?.push(e); return { value: { tool: 'mcp__triad__' + e.name } } })
   on('command.register', (_$: any, e: any) => ({ value: { command: e.name } }))
   on('fs.write', (_$: any, e: any) => { log.writes[e.path] = e.text; return { value: undefined } })
   let n = 0
@@ -122,6 +122,21 @@ describe('hooks', () => {
     expect(out.text).toMatch(/orchestrator \(claude-opus-5-5\)/)
     expect(out.text).toMatch(/coder agent1 \(claude-sonnet-5-5\)/)
     expect(out.text).toMatch(/sonnet\s+1 req/)
+  })
+
+  test('registers the Legion tools deferred, runs them in the main loop only, and adds /triad status', async ($, on) => {
+    const tools: any[] = []
+    world(on, { writes: {}, spawns: [], tools })
+    on('fs.read', () => { throw new Error('ENOENT') })
+    on('fs.list', () => { throw new Error('ENOENT') })
+    await start($)
+    const legion = tools.filter(t => ['planning_status', 'plan_write', 'build_phase', 'review_phase'].includes(t.name))
+    expect(legion.length).toBe(4)
+    expect(legion.every(t => t.isDeferred === true)).toBe(true)
+    const denied: any = await $.tool.call({ tool: 'mcp__triad__build_phase', agentId: 'agent9', tool_use_id: 'x' } as any)
+    expect(denied.deny).toMatch(/main loop only/)
+    const out = await $.command.run({ command: 'triad', args: 'status' } as any)
+    expect(out.text).toMatch(/No Legion project/)
   })
 
   test('sends a non-conforming coder reply back once, then lets it through', async ($, on) => {

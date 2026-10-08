@@ -2,6 +2,13 @@ import type { Register } from 'claude-code'
 import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, schemaProblems, type Options, type Role } from './policy.ts'
 import { emptyLedger, ensureAgent, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
 import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
+import { LEGION_TOOLS } from './legion/tools.ts'
+import { personaQuery, planCheck, planWrite, projectInit, statusText, validateText } from './legion/handlers.ts'
+import { build } from './legion/build.ts'
+import { review } from './legion/reviewrun.ts'
+import { checkWrite, type Scope } from './legion/settings.ts'
+import type { Io } from './legion/io.ts'
+import type { Agents } from './legion/build.ts'
 import { COMPRESS_TOOLS, SUMMARY_SYSTEM, chunks, describeCall, eligible, errorLines, headTail, mergePrompt, overThreshold, render as renderCompressed, summaryPrompt } from './compress.ts'
 
 // Triad, Mode B (routed flat; see SPIKE.md). Only the orchestrator (main loop)
@@ -34,6 +41,15 @@ const waiting: Record<string, { marker: string; resolve: (answer: string) => voi
 const meters: Record<string, Meter> = {}
 const written: Record<string, Set<string>> = {}
 let seq = 0
+// Legion workflow agents: their plan scope, the writes the mod saw, a model
+// override (opus personas, keyed by spawn description), and answers that came
+// before anyone waited for them.
+const scopes: Record<string, Scope> = {}
+const scopeLog: Record<string, { files: Set<string>; warnings: string[] }> = {}
+const modelFor: Record<string, string> = {}
+const finished: Record<string, string> = {}
+const LEGION_MARK = 'triad legion: '
+const LEGION_WAIT = 60 * 60_000
 
 // Byte-stable (no dates, no per-session data) so it caches with the prefix.
 const ORCHESTRATOR_GUIDE = `# Triad orchestration
@@ -44,7 +60,8 @@ You are the orchestrator. Decompose the work, make the architecture decisions, r
 - A helper that reaches its token limit is stopped and returns partial with what is done and what is left. Review what it wrote, then give what is left to a fresh helper as a narrower job.
 - Check results with the verify commands and git diff --stat, not by reading whole files.
 - Long tool output may come back compressed, with the path of the full text in .triad/out/.
-- /triad shows the agent tree and the tokens and cost per tier.`
+- /triad shows the agent tree and the tokens and cost per tier.
+- Legion projects (.planning/) run through /triad:start, /triad:plan, /triad:build, /triad:review and /triad:quick; /triad status and /triad validate are computed in code.`
 
 const depthOf = (id: string | undefined): number => (id ? 1 + depthOf(parents[id]) : 0)
 const runDir = () => `${cwd}/.triad/run`
@@ -72,7 +89,9 @@ async function save($: any) {
 // the wait runs in a child process that polls for the marker the turn.complete
 // hook writes (SPIKE.md, hook budget).
 async function waitForAnswer($: any, agentId: string, ms: number): Promise<string | undefined> {
-  let answer: string | undefined
+  let answer: string | undefined = finished[agentId]
+  delete finished[agentId]
+  if (answer !== undefined) return answer
   const marker = `${runDir()}/${agentId}.${++seq}.done`
   waiting[agentId] = { marker, resolve: a => { answer = a } }
   const until = Date.now() + ms
@@ -153,6 +172,81 @@ async function cancelWait($: any, agentId: string) {
   await $.fs.write(w.marker, 'cancelled')
 }
 
+const rel = (path: string) => (path.startsWith(cwd + '/') ? path.slice(cwd.length + 1) : path)
+
+function ioOf($: any): Io {
+  return {
+    root: cwd,
+    read: async r => { try { return String(await $.fs.read(`${cwd}/${r}`)) } catch { return undefined } },
+    write: async (r, text) => { await $.fs.write(`${cwd}/${r}`, text) },
+    list: async r => {
+      try { return ((await $.fs.list(`${cwd}/${r}`)) as any[]).filter(x => x.kind !== 'other').map(x => ({ name: x.name, dir: x.kind === 'dir' })) } catch { return [] }
+    },
+    run: async (argv, o) => {
+      const r: any = await $.process.run(argv, { cwd, timeoutMs: Math.min(600_000, o?.timeoutMs ?? 120_000) })
+      return { exitCode: r.exitCode ?? 1, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') }
+    },
+    now: () => new Date(),
+  }
+}
+
+function agentsOf($: any): Agents {
+  return {
+    maxParallel: opts.maxCoders,
+    async run({ persona, brief, scope, label }) {
+      const helper = persona.tier === 'haiku'
+      const description = `${LEGION_MARK}${label} #${++seq}`
+      if (persona.tier === 'opus') modelFor[description] = 'opus'
+      const s: any = await $.agent.spawn({ subagentType: helper ? HELPER_TYPE : 'triad:triad-coder', prompt: brief, description, model: helper ? 'haiku' : persona.tier === 'opus' ? 'opus' : 'sonnet' })
+      delete modelFor[description]
+      if (!s?.agentId) return { deny: s?.deny ?? 'the agent could not be spawned' }
+      const id: string = s.agentId
+      scopes[id] = scope
+      scopeLog[id] ??= { files: new Set(), warnings: [] }
+      const answer = await waitForAnswer($, id, LEGION_WAIT)
+      return { agentId: id, answer }
+    },
+    async followUp(id, text) {
+      delete finished[id]
+      const again = waitForAnswer($, id, LEGION_WAIT)
+      let sent: any
+      try { sent = await $.session.send({ to: { agentId: id }, text }) } catch { sent = undefined }
+      if (!sent?.isDelivered) await cancelWait($, id)
+      return again
+    },
+    writesOf: id => ({ files: [...(scopeLog[id]?.files ?? [])], warnings: [...(scopeLog[id]?.warnings ?? [])] }),
+    usageOf(id) {
+      const a = ledger.agents[id]
+      if (!a) return undefined
+      return `${a.requests} requests, ${a.input + a.cacheRead + a.cacheWrite} input tokens (${a.cacheRead} cached), ${a.output} output tokens, $${a.cost.toFixed(4)}`
+    },
+  }
+}
+
+// The Legion tools run in the main loop only: they spawn and wait for agents.
+async function legionTool($: any, name: string, input: any): Promise<string> {
+  const io = ioOf($)
+  // Progress goes to .triad/legion.log (tail -f it during a long build).
+  const lines: string[] = []
+  const log = (line: string) => {
+    lines.push(`${new Date().toISOString().slice(11, 19)} ${line}`)
+    void $.fs.write(`${cwd}/.triad/legion.log`, lines.join('\n') + '\n').catch(() => {})
+  }
+  switch (name) {
+    case 'planning_status': {
+      const v = await validateText(io, '--ci')
+      return `${await statusText(io)}\n\nValidate: ${v.text}`
+    }
+    case 'project_init': return projectInit(io, input)
+    case 'plan_write': return planWrite(io, input)
+    case 'plan_check': return planCheck(io, Number(input.phase))
+    case 'persona_brief': return personaQuery(input)
+    case 'build_phase': return (await build(io, agentsOf($), { phase: input.phase, wave: input.wave, rerun: !!input.rerun, log })).text
+    case 'review_phase': return (await review(io, agentsOf($), { phase: input.phase, mode: input.mode, log })).text
+  }
+  return `unknown tool ${name}`
+}
+
 export const register: Register = (on, options) => {
   opts = { ...DEFAULTS, ...(options as Partial<Options>) }
 
@@ -178,7 +272,8 @@ export const register: Register = (on, options) => {
       },
       isDeferred: false,
     })
-    await $.command.register({ name: 'triad', description: 'Show the Triad agent tree, tokens and cost per tier, and budgets' })
+    for (const t of LEGION_TOOLS) await $.tool.register({ ...t, isDeferred: true })
+    await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project', argumentHint: '[status | validate [--ci] [--fix]]' })
     return r
   })
 
@@ -223,7 +318,7 @@ export const register: Register = (on, options) => {
     reserved[role]++
     let r
     try {
-      r = await next({ ...e, model: MODEL_FOR[role], background: false })
+      r = await next({ ...e, model: modelFor[e.description] ?? MODEL_FOR[role], background: false })
     } finally {
       reserved[role]--
     }
@@ -291,7 +386,7 @@ export const register: Register = (on, options) => {
         delete waiting[id]
         w.resolve(e.answer)
         await $.fs.write(w.marker, 'done')
-      }
+      } else if (scopes[id]) finished[id] = e.answer
     }
     await save($)
     return next(e)
@@ -352,12 +447,22 @@ export const register: Register = (on, options) => {
     return { result: (schemaProblems(answer).length ? `triad: helper ${id} did not follow the return schema; its reply follows.\n${answer}` : answer) + note }
   }).catch(() => ({ deny: 'triad: delegate_menial failed. Do the job yourself or return blocked.' }))
 
-  // Helpers write only the files their brief names.
+  // Helpers write only the files their brief names. Agents working a Legion
+  // plan are held to its files under the project's control mode.
   on('tool.call', { tool: WRITE_TOOLS }, async ($, e, next) => {
     const id = e.agentId
-    if (!id || roles[id] !== 'helper') return next(e)
     const input = e as unknown as { file_path?: string; notebook_path?: string }
     const target = input.file_path ?? input.notebook_path ?? ''
+    const scope = id ? scopes[id] : undefined
+    if (id && scope && target) {
+      const d = checkWrite(rel(target), scope)
+      if (d.action === 'deny') return { deny: 'triad: ' + d.reason }
+      if (d.action !== 'allow' && d.reason && !scopeLog[id]!.warnings.includes(d.reason)) scopeLog[id]!.warnings.push(d.reason)
+      const r: any = await next(e)
+      if (!r.deny && !r.isError) scopeLog[id]!.files.add(rel(target))
+      return r
+    }
+    if (!id || roles[id] !== 'helper') return next(e)
     const allowed = writable[id] ?? []
     if (target && !mayWrite(target, allowed, cwd)) return { deny: `triad: a helper may write only the files its brief names (${allowed.join(', ') || 'none'}); ${target} is not one. Return blocked if the job needs it.` }
     const r: any = await next(e)
@@ -396,7 +501,21 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  for (const t of LEGION_TOOLS) {
+    on('tool.call', { tool: `mcp__triad__${t.name}` }, async ($, e, next) => {
+      if (e.agentId) return { deny: 'triad: the Legion workflow tools run in the main loop only.' }
+      try {
+        return { result: await legionTool($, t.name, e) }
+      } catch (err) {
+        return { result: `triad: ${t.name} failed: ${err instanceof Error ? err.message : String(err)}`, isError: true }
+      }
+    })
+  }
+
   on('command.run', { command: 'triad' }, async ($, e) => {
+    const args = String(e.args ?? '').trim()
+    if (/^status\b/.test(args)) return { text: await statusText(ioOf($)) }
+    if (/^validate\b/.test(args)) return validateText(ioOf($), args)
     await save($)
     return {
       text: render(ledger, {
