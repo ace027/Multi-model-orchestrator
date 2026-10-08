@@ -4,9 +4,12 @@ Triad's `.planning/` workflow (the `/triad:*` commands and `hooks/legion/`) is a
 
 - `personas/*.md` and `hooks/legion/personas.ts`: distilled from Legion's `agents/*.md`. Each file names its source.
 - `hooks/legion/data.ts`: Legion's schemas (plan, summary, finding, outcome, settings), its PROJECT/ROADMAP/STATE templates, default settings, control modes, review rubrics and domain map.
+- `hooks/legion/personasfull.ts`: Legion's full persona bodies, used when `execution.agent_personality_verbosity` is `full`.
+- `hooks/legion/execdata.ts`: Legion's escalation protocol and agent-communication defaults (escalation format, control-mode behaviors, resolution statuses, SUMMARY sections).
+- `hooks/legion/configdata.ts`: Legion's intent-teams and roster-gap configuration.
 - File layout, frontmatter fields, commit message formats and the review triage rules follow Legion's so that existing Legion projects load unchanged.
 
-`scripts/gen_legion.ts` regenerates the derived files from a Legion checkout. Legion's scripts were not copied or run; its logic was reimplemented.
+`scripts/gen_legion.ts` and `scripts/gen_legion_exec.ts` regenerate the derived files from a Legion checkout. Legion's scripts were not copied or run; its logic was reimplemented.
 
 Legion (`@9thlevelsoftware/legion` 8.0.6, https://github.com/9thLevelSoftware) is distributed under the MIT License, Copyright (c) 9thLevelSoftware:
 
