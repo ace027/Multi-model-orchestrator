@@ -30,7 +30,9 @@ export interface Agents {
   maxParallel: number
 }
 
-export type BuildOptions = { phase?: number; wave?: number; rerun?: boolean; log?: (s: string) => void }
+// only: run just these plans (intent filters, two-wave stages); the phase is
+// finalized only once every plan in it has succeeded.
+export type BuildOptions = { phase?: number; wave?: number; rerun?: boolean; only?: string[]; log?: (s: string) => void }
 export type PlanOutcome = { id: string; status: SummaryInput['status']; agent: string; files: string[]; failedChecks: string[]; skipped?: boolean }
 export type BuildReport = { ok: boolean; phase?: number; error?: string; warnings: string[]; plans: PlanOutcome[]; stoppedAfterWave?: number; text: string }
 
@@ -215,8 +217,9 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   let stopped: number | undefined
   for (const w of waves.waves) {
     if (opts.wave !== undefined && w.wave !== opts.wave) continue
-    const todo = w.plans.filter(x => opts.rerun || !ok(x.id))
-    for (const x of w.plans.filter(x => !todo.includes(x))) outcomes.push({ id: x.id, status: 'Complete', agent: personaOf.get(x.id)!.id, files: [], failedChecks: [], skipped: true })
+    const mine = opts.only ? w.plans.filter(x => opts.only!.includes(x.id)) : w.plans
+    const todo = mine.filter(x => opts.rerun || !ok(x.id))
+    for (const x of mine.filter(x => !todo.includes(x))) outcomes.push({ id: x.id, status: 'Complete', agent: personaOf.get(x.id)!.id, files: [], failedChecks: [], skipped: true })
     if (!todo.length) continue
     // Dependencies must have succeeded (in this build or before it).
     const unmet = todo.flatMap(x => x.fm.depends_on.filter(d => !ok(d)).map(d => `${x.id} needs ${d}`))
@@ -313,7 +316,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
     // After the wave: ROADMAP row and a state commit.
     const failedHere = outcomes.filter(o => todo.some(t => t.id === o.id) && !succeeded(o.status))
     const last = w.wave === waves.waves[waves.waves.length - 1].wave
-    roadmap = setRoadmapRow(roadmap, n, { plans: Math.max(p.roadmap.rows.find(r => r.phase === n)?.plans ?? 0, planned), completed: doneCount(), status: failedHere.length ? 'Partial' : last ? 'Executed' : 'In Progress' })
+    roadmap = setRoadmapRow(roadmap, n, { plans: Math.max(p.roadmap.rows.find(r => r.phase === n)?.plans ?? 0, planned), completed: doneCount(), status: failedHere.length ? 'Partial' : last && ph.plans.every(x => ok(x.id)) ? 'Executed' : 'In Progress' })
     await io.write('.planning/ROADMAP.md', roadmap)
     const t = overall()
     if (autoCommit) {
@@ -325,7 +328,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
 
   const allOk = ph.plans.every(x => ok(x.id))
   const failed = ph.plans.filter(x => summaries[x.id] !== undefined && !ok(x.id))
-  if (opts.wave === undefined || allOk) {
+  if ((opts.wave === undefined && !opts.only) || allOk) {
     if (allOk) {
       await saveState({ phase: `${n} of ${total} (executed, pending review)`, status: `Phase ${n} complete — all plans executed successfully`, nextAction: `Run \`/triad:review\` to verify Phase ${n}: ${phaseName}` })
       roadmap = setRoadmapRow(roadmap, n, { status: 'Executed', completed: doneCount() })
@@ -339,14 +342,17 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
       if (err) warnings.push(err)
     }
   }
+  // With only, success means the selected plans succeeded; the rest of the phase is someone else's run.
+  const selectedOk = opts.only ? ph.plans.filter(x => opts.only!.includes(x.id)).every(x => ok(x.id)) && stopped === undefined : allOk
+  const held = opts.only ? ph.plans.filter(x => !opts.only!.includes(x.id) && !ok(x.id)).map(x => x.id) : []
   const text = [
-    `Phase ${n}: ${phaseName} — ${allOk ? 'all plans executed' : 'build incomplete'}`,
+    `Phase ${n}: ${phaseName} — ${allOk ? 'all plans executed' : selectedOk ? `selected plans executed${held.length ? ` (not run: ${held.join(', ')})` : ''}` : 'build incomplete'}`,
     ...outcomes.map(o => `- ${o.id} ${o.agent}: ${o.status}${o.skipped ? ' (already done, skipped)' : ''}${o.failedChecks.length ? ` — failed: ${o.failedChecks.join('; ')}` : ''}`),
     ...(warnings.length ? ['', 'Warnings:', ...warnings.map(x => `- ${x}`)] : []),
     '',
-    allOk ? `Next: /triad:review` : `Next: fix ${failed.map(f => f.id).join(', ') || 'the plans'} and run /triad:build again`,
+    allOk ? `Next: /triad:review` : selectedOk ? 'Next: the plans not run here' : `Next: fix ${failed.map(f => f.id).join(', ') || 'the plans'} and run /triad:build again`,
   ].join('\n')
-  return { ok: allOk, phase: n, warnings, plans: outcomes, stoppedAfterWave: stopped, text }
+  return { ok: selectedOk, phase: n, warnings, plans: outcomes, stoppedAfterWave: stopped, text }
 }
 
 export { BY_ID, checkPhase, pad2 }

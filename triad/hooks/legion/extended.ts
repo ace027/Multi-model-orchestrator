@@ -1,5 +1,5 @@
 // Dispatch for the Phase 6 (extended Legion) tools.
-import { loadProject, type Io } from './io.ts'
+import { loadPhase, loadProject, type Io } from './io.ts'
 import type { Agents } from './build.ts'
 import { agentScores, briefing, learnList, learnRecall, learnRecord, prune, recallOutcomes } from './memory.ts'
 import { milestoneArchive, milestoneComplete, milestoneDefine, milestoneFacts, milestoneStatus } from './milestone.ts'
@@ -12,8 +12,10 @@ import { canaryCheck, renderCanary, shipCheck, shipPublish } from './ship.ts'
 import { polishRun, polishScope } from './polish.ts'
 import { securitySave, securityScan } from './security.ts'
 import { retroGather, retroSave } from './retro.ts'
+import { filterPlans, loadIntentConfig, parseIntentFlags, parseNaturalLanguage, renderNl, renderValidation, resolveTeam, validateFlagCombination } from './intents.ts'
+import { dryRunReport, renderDryRun } from './dryrun.ts'
 
-export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security'])
+export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run'])
 
 export type Ctx = { agents: () => Agents; ioAt: (root: string) => Io; registry: () => Promise<Io>; schedule?: (ms: number, fn: () => void) => void; notify?: (text: string) => void }
 
@@ -21,6 +23,31 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
   await loadCustomPersonas(io)
   const settings = (await loadProject(io)).settings
   switch (name) {
+    case 'intent': {
+      const { config, warnings } = await loadIntentConfig(io)
+      const note = warnings.map(w => `Note: ${w}\n`).join('')
+      const command = String(input.command ?? 'build').replace(/^\/?(triad:)?/, '')
+      if (input.action === 'route') return note + renderNl(parseNaturalLanguage(String(input.text ?? ''), config), input.command ? command : undefined)
+      const f = parseIntentFlags(String(input.flags ?? ''), command)
+      const v = validateFlagCombination(f, command, config)
+      if (!v.valid) return note + renderValidation(v)
+      const out = [`Flags valid for /triad:${command}.${v.info.length ? ' ' + v.info.join('; ') : ''}`]
+      for (const i of f.intents) {
+        const t = resolveTeam(config, i)!
+        out.push(`- ${i} (${t.mode}): ${t.description}${t.agents.primary.length ? `; team ${[...t.agents.primary, ...t.agents.secondary].join(', ')}` : ''}${t.domains.length ? `; domains ${t.domains.join(', ')}` : ''}`)
+      }
+      if (f.intents.some(i => resolveTeam(config, i)?.mode === 'filter_plans')) {
+        const p = await loadProject(io)
+        const n = input.phase ?? p.state?.phase
+        const ph = n ? await loadPhase(io, p, n) : undefined
+        if (ph?.plans.length) {
+          const fl = filterPlans(ph.plans, f, config)
+          out.push(`Plans run: ${fl.keep.join(', ') || 'none'}`, ...fl.drop.map(d => `- skip ${d.id}: ${d.reason}`), ...fl.warnings.map(w => `- ${w}`))
+        }
+      }
+      return note + out.join('\n')
+    }
+    case 'dry_run': return renderDryRun(await dryRunReport(io, String(input.command), input.phase, input.target))
     case 'memory':
       switch (input.action) {
         case 'record': return learnRecord(io, { type: input.type, summary: String(input.summary ?? ''), tags: input.tags ?? [], text: String(input.text ?? input.summary ?? '') })

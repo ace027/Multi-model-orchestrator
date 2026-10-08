@@ -37,6 +37,7 @@ const PLAN = {
     edge_cases: strs('Named boundary, failure and empty cases.'),
     tasks: { type: 'array', items: TASK, description: 'At most planning.max_tasks_per_plan tasks (default 3).' },
     success_criteria: strs('Testable outcomes.'),
+    wave_role: { type: 'string', enum: ['build', 'analysis', 'execution', 'remediation'], description: 'Two-wave role: build and analysis run in Wave A (analysis read-only), execution and remediation in Wave B (remediation read-only).' },
   },
   required: ['plan', 'title', 'wave', 'agents', 'files_modified', 'verification_commands', 'objective', 'tasks'],
 }
@@ -98,7 +99,7 @@ export const LEGION_TOOLS = [
   {
     name: 'build_phase',
     description: 'Run the wave executor on a planned phase: one agent per plan at its persona\'s tier, plans of a wave in parallel, verification commands run in code, SUMMARY.md per plan, STATE/ROADMAP updates, a commit per plan. Resumes where a previous build stopped. Blocks until the build ends; returns the per-plan outcome.',
-    inputSchema: { type: 'object', properties: { phase: { type: 'integer', description: 'Default: the phase in STATE.md.' }, wave: { type: 'integer', description: 'Run only this wave.' }, rerun: { type: 'boolean', description: 'Run plans that already have a successful summary again.' } } },
+    inputSchema: { type: 'object', properties: { phase: { type: 'integer', description: 'Default: the phase in STATE.md.' }, wave: { type: 'integer', description: 'Run only this wave.' }, rerun: { type: 'boolean', description: 'Run plans that already have a successful summary again.' }, flags: { type: 'string', description: 'The command\'s flags verbatim: --just-harden, --just-document, --skip-frontend, --skip-backend, --two-wave, --single-wave, --skip-gates, --skip-architecture, --skip-security, --dry-run. Validated in code; an invalid combination returns the error to show.' }, stage: { type: 'string', enum: ['A', 'B'], description: 'Two-wave: B continues after the architecture gate.' } } },
   },
   {
     name: 'review_phase',
@@ -254,6 +255,16 @@ export const LEGION_TOOLS = [
       },
       required: ['action'],
     },
+  },
+  {
+    name: 'intent',
+    description: 'Intent router in code. check: validate a command\'s flags (--just-*/--skip-* and the command\'s own flags; unknown flags fail with a did-you-mean) and return the intent team or plan filter. route: score free text against intent-teams.yaml nl_patterns and command_routes; returns the command, flags and a HIGH/MEDIUM/LOW tier.',
+    inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['check', 'route'] }, command: str('build, review, plan, quick, ...'), flags: str('The flags verbatim.'), text: str('Free text to route.'), phase: { type: 'integer' } }, required: ['action'] },
+  },
+  {
+    name: 'dry_run',
+    description: 'Deterministic prerequisite report for plan, build, review, status, retro, ship or polish: what exists, what would run, no writes, no agents, no tokens. Exit code 0 ready, 2 not ready, 1 unknown command.',
+    inputSchema: { type: 'object', properties: { command: { type: 'string', enum: ['plan', 'build', 'review', 'status', 'retro', 'ship', 'polish'] }, phase: { type: 'integer' }, target: str('polish target') }, required: ['command'] },
   },
 ]
 

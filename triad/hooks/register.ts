@@ -4,7 +4,7 @@ import { emptyLedger, ensureAgent, promptTokens, recordCompletion, recordStep, r
 import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
 import { LEGION_TOOLS } from './legion/tools.ts'
 import { personaRank, planCheck, planWrite, projectInit, statusText, validateText } from './legion/handlers.ts'
-import { build } from './legion/build.ts'
+import { buildRun } from './legion/buildrun.ts'
 import { review } from './legion/reviewrun.ts'
 import { checkWrite, type Scope } from './legion/settings.ts'
 import { renderPersonaRuns, runPersonas } from './legion/personarun.ts'
@@ -263,7 +263,7 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
     case 'plan_write': return planWrite(io, input)
     case 'plan_check': return planCheck(io, Number(input.phase))
     case 'persona_brief': return personaRank(io, input)
-    case 'build_phase': return (await build(io, agentsOf($, log), { phase: input.phase, wave: input.wave, rerun: !!input.rerun, log })).text
+    case 'build_phase': return buildRun(io, agentsOf($, log), input, log)
     case 'persona_run': return renderPersonaRuns(await runPersonas(io, agentsOf($, log), input, log))
     case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, log })).text
   }
