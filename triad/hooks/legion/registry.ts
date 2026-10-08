@@ -16,7 +16,7 @@ export function findPersona(name: string): { persona?: Persona; ambiguous?: stri
 }
 
 const DIVISION_WORDS: Record<string, string[]> = {
-  Engineering: ['api', 'backend', 'frontend', 'code', 'server', 'database', 'refactor', 'bug', 'implement', 'feature', 'service', 'cli', 'library'],
+  Engineering: ['api', 'backend', 'frontend', 'code', 'server', 'database', 'sqlite', 'sql', 'storage', 'persistence', 'refactor', 'bug', 'implement', 'feature', 'service', 'cli', 'library'],
   Testing: ['test', 'tests', 'qa', 'verify', 'verification', 'coverage', 'benchmark', 'performance'],
   Design: ['ui', 'ux', 'design', 'visual', 'brand', 'accessibility', 'layout'],
   Marketing: ['marketing', 'campaign', 'social', 'seo', 'content', 'growth'],
@@ -31,15 +31,25 @@ const words = (s: string) => s.toLowerCase().split(/[^a-z0-9+#.]+/).filter(w => 
 // Data formats every kind of project uses; they say nothing about who should do the work.
 const GENERIC = new Set(['json', 'yaml', 'yml', 'toml', 'xml', 'csv', 'markdown', 'md', 'text', 'txt'])
 
+// Concrete technologies imply the general area their personas list.
+const IMPLIES: Record<string, string[]> = {
+  database: ['sqlite', 'postgres', 'postgresql', 'mysql', 'sql', 'mongodb', 'redis', 'persistence', 'storage', 'orm', 'migration', 'migrations'],
+}
+
 export function score(p: Persona, text: string): number {
   const terms = new Set(words(text))
-  const keys = [...p.languages, ...p.frameworks, ...p.artifact_types, ...p.review_strengths, ...p.id.split('-')].map(k => k.toLowerCase()).filter(k => !GENERIC.has(k))
+  for (const [area, xs] of Object.entries(IMPLIES)) if (xs.some(x => terms.has(x))) terms.add(area)
+  const keys = [...p.languages, ...p.frameworks, ...p.artifact_types, ...p.review_strengths].map(k => k.toLowerCase()).filter(k => !GENERIC.has(k))
   let s = 0
   for (const k of new Set(keys)) {
     const parts = words(k)
     if (terms.has(k) || (parts.length > 1 && parts.every(w => terms.has(w)))) s += 3
     else if (parts.some(w => w.length > 3 && terms.has(w))) s += 1
   }
+  // Id words ("app-store-optimizer") are a weak signal: an everyday word like
+  // "store" must not outrank a persona's declared skills.
+  const idParts = p.id.split('-').filter(w => w.length > 3 && !keys.includes(w))
+  if (idParts.some(w => terms.has(w))) s += 1
   if ((DIVISION_WORDS[p.division] ?? []).some(w => terms.has(w))) s += 2
   return s
 }

@@ -134,3 +134,16 @@ Every Legion workflow now has a Triad equivalent (`PARITY.md`). Judgment work is
 | `/triad:review` flags | `--security` / `--just-security` (scan in code, OWASP/STRIDE by the security persona, unresolved CRITICAL/HIGH block ship), `--dry-run`, domain reviews. |
 
 Legion inconsistencies were resolved in code and noted where they live (for example: the board follows the skill's vote, not the command's SUPPORT/OPPOSE; domain documents are flat files; the merged marketing roster ids are remapped).
+
+### Phase 6 live acceptance
+
+`bench/run_phase6.sh` runs three headless checks on the Legion sample project. The evidence is in `bench/results/phase6/`. Costs come from the ledger and include subagents.
+
+| Run | Result | Cost |
+|---|---|---|
+| `/triad:build 2 --dry-run --skip-frontend` | Prerequisites, mode and plan filter reported; `git status` empty afterwards | $0.15 |
+| `/triad:build --just-harden --just-document` | Rejected by the intent validator before any work started | $0.08 |
+| `/triad:board meet Store the inventory in SQLite instead of JSON files` | 3 independent assessments, 1 discussion round, vote 0-3 REJECTED; `.planning/board/` artifacts, an OUTCOMES record and a commit | $0.33 |
+| Total | | $0.56 |
+
+The board run found a scoring bug. The everyday word "store" matched `marketing-app-store-optimizer` by its id, so it led a storage decision. Id words are now a weak signal, and database technologies (SQLite, Postgres and others) imply "database". The same topic now leads with `engineering-backend-architect`. A test covers it.

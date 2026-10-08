@@ -204,6 +204,13 @@ describe('board', () => {
     expect(resolveVotes(0, 0)).toBe('ESCALATED')
   })
 
+  test('composition: everyday words in persona ids do not outrank skills', () => {
+    // Live run: "store" put the app-store optimizer first on a storage decision.
+    const m = compose('Store the inventory in SQLite instead of JSON files', 3)
+    expect(m[0].id).toBe('engineering-backend-architect')
+    expect(m.some(x => x.id === 'marketing-app-store-optimizer')).toBe(false)
+  })
+
   test('composition: scored, max two per division', () => {
     const m = compose('database schema migration and API security review', 5)
     expect(m.length).toBeGreaterThanOrEqual(3)
