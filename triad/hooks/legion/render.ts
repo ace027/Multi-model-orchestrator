@@ -3,6 +3,7 @@
 // Same templates and headings as Legion, so Legion's readers keep working.
 import { TEMPLATES } from './data.ts'
 import { pad2, progressBar, slugify } from './planning.ts'
+import { renderEscalations, type Escalation } from './escalation.ts'
 
 const fill = (tpl: string, v: Record<string, string>) => tpl.replace(/\{([a-z_]+)\}/g, (m: string, k: string) => v[k] ?? m)
 const bullets = (a: readonly string[] | undefined, none = '(none)') => (a?.length ? a.map(s => `- ${s}`).join('\n') : none)
@@ -286,12 +287,16 @@ export type SummaryInput = {
   verification: VerifyRun[]
   decisions: string[]
   issues: string[]
-  escalations: { severity: string; type: string; decision: string; status: string }[]
+  escalations: Escalation[]
   handoff: { keyOutputs: string[]; decisions: string[]; openQuestions: string[]; conventions: string[] }
   requirements: string[]
   error?: string
   tokens?: string
+  failure?: { kind: string; reason: string; retried?: boolean; remediated?: boolean }
 }
+
+const failureLine = (f: NonNullable<SummaryInput['failure']>) =>
+  `**Failure Class**: ${f.kind}${f.remediated ? ' (auto-remediated: one retry passed)' : f.retried ? ' (after one automatic ENVIRONMENT retry)' : ''} — ${f.reason}`
 
 export function renderSummary(s: SummaryInput): string {
   const lines = [
@@ -302,6 +307,7 @@ export function renderSummary(s: SummaryInput): string {
     `**Wave**: ${s.wave}`,
     `**Agent**: ${s.agent}`,
     `**Completed**: ${s.date}`,
+    ...(s.failure ? [failureLine(s.failure)] : []),
     '',
     '## Completed Tasks',
     ...s.tasks.map((t, i) => `- [${t.status === 'done' ? 'x' : ' '}] Task ${i + 1}: ${t.name.replace(/^Task \d+:\s*/, '')} (${t.status})`),
@@ -324,10 +330,7 @@ export function renderSummary(s: SummaryInput): string {
     bullets(s.issues),
     '',
     '## Escalations',
-    s.escalations.length
-      ? ['| # | Severity | Type | Decision | Status | Resolution |', '|---|----------|------|----------|--------|------------|',
-          ...s.escalations.map((e, i) => `| ${i + 1} | ${e.severity} | ${e.type} | ${e.decision.replace(/\|/g, '/')} | ${e.status} | |`)].join('\n')
-      : '(none)',
+    renderEscalations(s.escalations),
     '',
     '## Handoff Context',
     `- **Key outputs**: ${s.handoff.keyOutputs.join('; ') || '(none)'}`,

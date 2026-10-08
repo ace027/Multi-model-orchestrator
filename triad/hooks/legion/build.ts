@@ -17,11 +17,17 @@ import { critique } from './critique.ts'
 import { parseReply } from '../policy.ts'
 import { profileOf, type Mode, type Scope } from './settings.ts'
 import { OUTCOMES, storeOutcome, taskTypeOf } from './memory.ts'
+import { applyMode, escalationRows, loadProtocol, parseEscalations, type Escalation } from './escalation.ts'
+import { blockerType, classifyFailure, detectManualEdits, envRetryBrief, recordAgentFiles, type Failure } from './resilience.ts'
+import { checkSummary, compactedBody, compactedCovers, compactedPath, compactPhase, shouldCompact, COMPACT_TARGET } from './compact.ts'
+import { PERSONA_BODIES } from './personasfull.ts'
+import { addWorktree, inWorktree, mergeWorktree, removeWorktree, worktreeFiles, type Worktree } from './worktree.ts'
 
 export type AgentRun = { agentId?: string; answer?: string; deny?: string }
 export interface Agents {
-  // Starts an agent on a brief and resolves with its final answer.
-  run(o: { persona: Persona; brief: string; scope: Scope; label: string }): Promise<AgentRun>
+  // Starts an agent on a brief and resolves with its final answer. timeoutMs
+  // replaces the default wait; an agent that does not answer in time is denied.
+  run(o: { persona: Persona; brief: string; scope: Scope; label: string; timeoutMs?: number }): Promise<AgentRun>
   // A follow-up message to an agent that already answered; resolves with its new answer.
   followUp(agentId: string, text: string): Promise<string | undefined>
   // Writes the mod saw this agent make (relative paths), and warnings it gave.
@@ -33,17 +39,17 @@ export interface Agents {
 // only: run just these plans (intent filters, two-wave stages); the phase is
 // finalized only once every plan in it has succeeded.
 export type BuildOptions = { phase?: number; wave?: number; rerun?: boolean; only?: string[]; log?: (s: string) => void }
-export type PlanOutcome = { id: string; status: SummaryInput['status']; agent: string; files: string[]; failedChecks: string[]; skipped?: boolean }
+export type PlanOutcome = { id: string; status: SummaryInput['status']; agent: string; files: string[]; failedChecks: string[]; skipped?: boolean; failure?: Failure; escalations?: Escalation[] }
 export type BuildReport = { ok: boolean; phase?: number; error?: string; warnings: string[]; plans: PlanOutcome[]; stoppedAfterWave?: number; text: string }
 
 const VERIFY_TIMEOUT = 10 * 60_000
 
-export async function runVerification(io: Io, cmds: string[]): Promise<VerifyRun[]> {
+export async function runVerification(io: Io, cmds: string[], wt?: Worktree): Promise<VerifyRun[]> {
   const out: VerifyRun[] = []
   for (const command of cmds) {
     let r
     try {
-      r = await io.run(['bash', '-c', command], { timeoutMs: VERIFY_TIMEOUT })
+      r = await io.run(['bash', '-c', inWorktree(wt, command)], { timeoutMs: VERIFY_TIMEOUT })
     } catch (e) {
       r = { exitCode: 124, stdout: '', stderr: `did not finish: ${(e as Error).message}` }
     }
@@ -75,17 +81,8 @@ export async function commit(io: Io, files: string[], message: string): Promise<
   return c.exitCode === 0 ? undefined : `git commit failed: ${(c.stderr || c.stdout).trim()}`
 }
 
-// Escalation blocks an agent emitted (agent-communication format).
-export function escalationsIn(text: string): { severity: string; type: string; decision: string; status: string }[] {
-  const out = []
-  for (const m of text.matchAll(/<escalation>([\s\S]*?)<\/escalation>/g)) {
-    const f = (k: string) => m[1].match(new RegExp(`^\\s*${k}:\\s*(.+)$`, 'im'))?.[1]?.trim()
-    const sev = f('severity')
-    const severity = sev && ['info', 'warning', 'blocker'].includes(sev) ? sev : 'warning'
-    out.push({ severity, type: f('type') ?? 'scope', decision: f('decision') ?? '(no decision given)', status: 'pending' })
-  }
-  return out
-}
+// Escalation blocks an agent emitted (agent-communication format), checked against Legion's escalation_format.
+export const escalationsIn = (text: string): Escalation[] => parseEscalations(text)
 
 const listAfter = (text: string, key: string) => {
   const lines = text.split('\n')
@@ -97,16 +94,17 @@ const listAfter = (text: string, key: string) => {
   return out
 }
 
-export function planBrief(o: { persona: Persona; plan: Plan; planText: string; phase: number; phaseName: string; wave: number; peers: string[]; handoffs: string; mode: Mode; haiku: boolean }): string {
+export function planBrief(o: { persona: Persona; plan: Plan; planText: string; phase: number; phaseName: string; wave: number; peers: string[]; handoffs: string; mode: Mode; haiku: boolean; personaText?: string; workdir?: string }): string {
   const { plan } = o
   return [
-    personaBrief(o.persona),
+    o.personaText ?? personaBrief(o.persona),
     '',
     `# Plan ${plan.id}: ${plan.title}`,
     `Phase ${o.phase}: ${o.phaseName}. Wave ${o.wave}.${o.peers.length ? ` Running in parallel with ${o.peers.join(', ')}; do not touch their files.` : ''}`,
     `Control mode: ${o.mode}.`,
     '',
     '## Execution Context',
+    ...(o.workdir ? [`- Working directory: ${o.workdir} (a git worktree of this project on its own branch). Make every change under it; the paths below are relative to it. Run commands there. Do not touch the main working tree.`] : []),
     `- Files you may write: ${plan.fm.files_modified.join(', ') || '(none)'}`,
     `- Files you must not touch: ${(plan.fm.files_forbidden ?? []).join(', ') || '(none listed)'}`,
     '- Triad runs the verification commands after you return, commits your work and writes the SUMMARY.md. Do not commit, and do not write SUMMARY or STATE files.',
@@ -134,12 +132,12 @@ export function planBrief(o: { persona: Persona; plan: Plan; planText: string; p
   ].join('\n')
 }
 
-function statusFrom(reply: ReturnType<typeof parseReply>, verify: VerifyRun[], escalations: { severity: string }[], warnings: string[]): SummaryInput['status'] {
+function statusFrom(reply: ReturnType<typeof parseReply>, verify: VerifyRun[], escalations: Escalation[], warnings: string[]): SummaryInput['status'] {
   if (reply.status === 'blocked') return 'BLOCKED'
   if (verify.some(v => !v.passed)) return reply.status === 'done' ? 'Failed' : 'Partial'
   if (reply.status === 'partial' || !reply.status) return 'Partial'
-  if (escalations.some(e => e.severity === 'blocker')) return 'Partial'
-  return warnings.length || escalations.some(e => e.severity === 'warning') ? 'Complete with Warnings' : 'Complete'
+  if (escalations.some(e => e.severity === 'blocker' && !e.problems)) return 'Partial'
+  return warnings.length || escalations.some(e => e.severity === 'warning' || e.problems) ? 'Complete with Warnings' : 'Complete'
 }
 
 function taskList(plan: Plan, answer: string): SummaryInput['tasks'] {
@@ -169,6 +167,9 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   }
   const ph = await loadPhase(io, p, n)
   if (!ph.plans.length || !ph.rel) return fail(`No plans found for Phase ${n}. Run /triad:plan ${n} first.`)
+  // Pre-build validation: every plan must pass the plan-frontmatter schema once legacy forms are read.
+  const invalid = ph.plans.filter(x => x.normalizedErrors.length)
+  if (invalid.length) return fail(`plans in Phase ${n} fail the plan-frontmatter schema:\n${invalid.flatMap(x => x.normalizedErrors.map(e => `- ${x.file}: ${e}`)).join('\n')}\nFix the plans (/triad:plan ${n}) and build again.`)
   const info = p.roadmap.phases.find(x => x.phase === n)
   const phaseName = info?.name ?? p.roadmap.rows.find(r => r.phase === n)?.name ?? ph.dir!.replace(/^\d+-/, '')
   const settings = p.settings
@@ -176,6 +177,19 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   const profile = profileOf(mode, await io.read('.planning/config/control-modes.yaml'))
   const prefix = settings.execution.commit_prefix
   const autoCommit = settings.execution.auto_commit !== false && !profile.read_only
+  const esc = await loadProtocol(io)
+  const protocol = esc.protocol
+  warnings.push(...esc.warnings)
+  // agent_personality_verbosity: full only when the project's settings.json asks for it.
+  let raw: any = {}
+  try { raw = JSON.parse((await io.read('settings.json')) ?? '{}') } catch { /* loadProject warned */ }
+  const fullPersonas = raw?.execution?.agent_personality_verbosity === 'full' ? PERSONA_BODIES : undefined
+  const personaText = (x: Persona) => (fullPersonas?.[x.id] ? `# Persona: ${x.name} (${x.id}, ${x.division})\n${fullPersonas[x.id]}` : personaBrief(x))
+  let useWorktrees = settings.execution.use_worktrees === true
+  if (useWorktrees && !autoCommit) {
+    warnings.push('execution.use_worktrees needs commits (auto_commit on, a writable control mode); plans run in the main tree')
+    useWorktrees = false
+  }
 
   // Hard stops (wave-executor plan discovery).
   const waves = planWaves(ph.plans, ROSTER)
@@ -191,6 +205,10 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   warnings.push(...waves.warnings, ...p.settingsWarnings)
   const crit = critique(ph.plans, settings.planning?.max_tasks_per_plan ?? 3, ROSTER)
   for (const i of crit.issues.filter(i => i.severity === 'BLOCKER' && i.rule !== 'waves')) warnings.push(`critique ${i.plan} ${i.rule}: ${i.message}`)
+  // Manual edits to agent-written files since their plan's commit: corrective preferences.
+  const manualEdits = await detectManualEdits(io, settings).catch(() => [])
+  if (manualEdits.length) log(`manual edits recorded: ${manualEdits.length}`)
+  const stamp = io.now().toISOString().replace(/\D/g, '').slice(0, 14)
 
   const outcomes: PlanOutcome[] = []
   const summaries = { ...ph.summaries }
@@ -233,14 +251,31 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
       for (let i = 0; i < group.length; i += Math.max(1, agents.maxParallel)) {
         const batch = group.slice(i, i + Math.max(1, agents.maxParallel))
         const before = await dirtyFiles(io)
+        // execution.use_worktrees: one worktree per plan; creation failures fall back to the main tree.
+        const trees = new Map<string, Worktree>()
+        if (useWorktrees) for (const plan of batch) {
+          const wt = await addWorktree(io, plan.id, stamp)
+          if (typeof wt === 'string') warnings.push(`${plan.id}: ${wt}; running in the main tree`)
+          else trees.set(plan.id, wt)
+        }
+        const compacted = await io.read(compactedPath(ph.rel!, n))
         const runs = await Promise.all(batch.map(async plan => {
           const persona = personaOf.get(plan.id)!
-          const handoffs = plan.fm.depends_on.filter(d => summaries[d]).map(d => `### From Plan ${d}\n${handoffOf(summaries[d])}`).join('\n\n')
+          const wt = trees.get(plan.id)
+          const full = plan.fm.depends_on.filter(d => summaries[d]).map(d => {
+            const open = escalationRows(summaries[d]!).filter(e => e.status === 'pending' || e.status === 'deferred')
+            return `### From Plan ${d}\n${handoffOf(summaries[d]!)}${open.length ? `\nUnresolved escalations: ${open.map(e => `#${e.n} ${e.severity} ${e.type}: ${e.decision} (${e.status})`).join('; ')}` : ''}`
+          }).join('\n\n')
+          // A COMPACTED.md covering every dependency replaces their longer handoff text.
+          const useCompact = compacted !== undefined && plan.fm.depends_on.length > 0 && plan.fm.depends_on.every(d => compactedCovers(compacted).includes(d)) && compactedBody(compacted).length < full.length
+          const handoffs = useCompact ? `(from ${pad2(n)}-COMPACTED.md, in place of the dependency summaries)\n${compactedBody(compacted!)}` : full
           const brief = planBrief({
             persona, plan, planText: (await io.read(`${ph.rel}/${plan.file}`)) ?? plan.body, phase: n, phaseName, wave: w.wave,
             peers: batch.filter(x => x !== plan).map(x => x.id), handoffs, mode, haiku: persona.tier === 'haiku',
+            personaText: personaText(persona), workdir: wt ? `${io.root}/${wt.path}` : undefined,
           })
-          const scope: Scope = { planId: plan.id, mode, files_modified: plan.fm.files_modified, files_forbidden: plan.fm.files_forbidden ?? [] }
+          const at = (fs: string[]) => (wt ? fs.map(f => `${wt.path}/${f}`) : fs)
+          const scope: Scope = { planId: plan.id, mode, files_modified: at(plan.fm.files_modified), files_forbidden: at(plan.fm.files_forbidden ?? []) }
           const r = await agents.run({ persona, brief, scope, label: `plan ${plan.id}` })
           return { plan, persona, r }
         }))
@@ -254,6 +289,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           if (owner) claimed.set(owner.id, [...(claimed.get(owner.id) ?? []), f])
           else unclaimed.push(f)
         }
+        const fileScope = !!protocol.modes[mode]?.fileScope
         if (unclaimed.length && (mode === 'surgical' || profile.file_scope_restriction)) {
           // Surgical: changes outside every plan's files are reverted.
           await io.run(['git', 'checkout', '--', ...unclaimed]).catch(() => undefined)
@@ -262,33 +298,69 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
         } else if (unclaimed.length) warnings.push(`changes outside every plan's files_modified (left uncommitted): ${unclaimed.join(', ')}`)
 
         for (const { plan, persona, r } of runs) {
+          const wt = trees.get(plan.id)
           let answer = r.answer ?? ''
           const cmds = verificationCommands(plan)
-          let verify = r.deny ? [] : await runVerification(io, cmds)
-          // One focused fix attempt on a failed check (wave-executor's rule).
-          if (r.agentId && verify.some(v => !v.passed) && parseReply(answer).status !== 'blocked') {
-            const failed = verify.filter(v => !v.passed)
-            const again = await agents.followUp(r.agentId, `Triad ran the plan's verification commands and ${failed.length} failed:\n${failed.map(v => `$ ${v.command}\n(exit ${v.exitCode})\n${v.output.slice(-1500)}`).join('\n\n')}\n\nMake one focused fix inside the plan's files, then reply again with the full return block.`)
+          let verify = r.deny ? [] : await runVerification(io, cmds, wt)
+          // BLOCKER/ENVIRONMENT classification of a failed check or a blocked agent
+          // (workflow-common Auto-Remediation): ENVIRONMENT gets one automatic retry, BLOCKER escalates.
+          const failing = () => {
+            if (verify.some(v => !v.passed)) return verify.filter(v => !v.passed).map(v => `$ ${v.command} (exit ${v.exitCode})\n${v.output.slice(-1500)}`).join('\n\n')
+            const rp = parseReply(answer)
+            return rp.status === 'blocked' ? rp.blockedReason || rp.summary.join(' ') || answer : undefined
+          }
+          let why = r.answer ? failing() : undefined
+          let failure: Failure | undefined = why === undefined ? undefined : classifyFailure(why)
+          if (failure?.kind === 'ENVIRONMENT' && r.agentId) {
+            log(`${plan.id}: ENVIRONMENT ISSUE: ${failure.reason}. Attempting remediation...`)
+            const again = await agents.followUp(r.agentId, envRetryBrief(failure, why!))
             if (again) answer = again
-            verify = await runVerification(io, cmds)
+            verify = await runVerification(io, cmds, wt)
+            const still = failing()
+            failure = still === undefined ? { ...failure, retried: true, remediated: true } : { kind: 'BLOCKER', reason: `ENVIRONMENT issue persisted after one automatic retry: ${classifyFailure(still).reason}`, retried: true }
+            why = still ?? why
           }
           const reply = parseReply(answer)
-          const esc = escalationsIn(answer)
+          const raised = parseEscalations(answer, protocol)
           const seen = r.agentId ? agents.writesOf(r.agentId) : { files: [], warnings: [] }
-          for (const wmsg of seen.warnings) esc.push({ severity: 'warning', type: 'scope', decision: wmsg, status: 'pending' })
-          const status: SummaryInput['status'] = r.deny ? 'Failed' : !r.answer ? 'Failed' : statusFrom(reply, verify, esc, [])
-          const files = [...new Set([...(claimed.get(plan.id) ?? []), ...seen.files.filter(f => plan.fm.files_modified.some(m => overlaps(f, m)))])].sort()
+          // surgical auto_escalate_file_scope: out-of-scope access is a blocker even without a block.
+          for (const wmsg of seen.warnings) raised.push({ severity: fileScope ? 'blocker' : 'warning', type: 'scope', decision: wmsg, status: 'pending' })
+          if (fileScope && unclaimed.length) raised.push({ severity: 'blocker', type: 'scope', decision: `Out-of-scope changes were reverted: ${unclaimed.join(', ')}`, context: `Control mode ${mode} auto-escalates file access outside files_modified${batch.length > 1 ? ` (batch ${batch.map(x => x.id).join(', ')})` : ''}.`, status: 'pending' })
+          if (failure?.kind === 'BLOCKER') raised.push({ severity: 'blocker', type: blockerType(why ?? ''), decision: `Resolve: ${failure.reason}`, context: `${verify.some(v => !v.passed) ? `Verification failed (${verify.filter(v => !v.passed).map(v => v.command).join('; ')})` : 'The agent returned blocked'}; a BLOCKER is not auto-fixed.`, status: 'pending' })
+          const escalations = raised.map(e => applyMode(e, mode, protocol))
+          let status: SummaryInput['status'] = r.deny ? 'Failed' : !r.answer ? 'Failed' : statusFrom(reply, verify, escalations, [])
+          const files = wt
+            ? (await worktreeFiles(io, wt)).filter(f => !f.startsWith('.triad/') && !f.startsWith('.planning/')).sort()
+            : [...new Set([...(claimed.get(plan.id) ?? []), ...seen.files.filter(f => plan.fm.files_modified.some(m => overlaps(f, m)))])].sort()
+          let error = r.deny ? `The agent could not start: ${r.deny}` : !r.answer ? 'The agent did not return an answer.' : status === 'Failed' ? `Verification failed: ${verify.filter(v => !v.passed).map(v => v.command).join('; ')}` : undefined
+          // Worktree: merged back once verification passed; a conflict is aborted, fails the plan, and keeps the worktree.
+          if (wt && succeeded(status)) {
+            const m = await mergeWorktree(io, wt, plan.id, prefix)
+            if (m.ok) await removeWorktree(io, wt)
+            else {
+              status = 'Failed'
+              error = `Merge conflict: ${wt.branch} could not be merged into the main tree${m.conflicts.length ? ` (${m.conflicts.join(', ')})` : ''}; the merge was aborted and the worktree is kept at ${wt.path} for inspection.${m.error ? ` ${m.error}` : ''}`
+              escalations.push(applyMode({ severity: 'blocker', type: 'scope', decision: `Resolve the merge conflict of plan ${plan.id}${m.conflicts.length ? ` in ${m.conflicts.join(', ')}` : ''}`, context: `Worktree ${wt.path} (branch ${wt.branch}) is kept; merge it by hand or remove it and rerun the plan.`, status: 'pending' }, mode, protocol))
+              warnings.push(`${plan.id}: merge conflict; worktree kept at ${wt.path}`)
+            }
+          } else if (wt) warnings.push(`${plan.id}: not merged (${status}); worktree kept at ${wt.path} for inspection`)
           const s: SummaryInput = {
             planId: plan.id, title: plan.title, wave: w.wave, agent: persona.id, status, date,
             tasks: taskList(plan, answer), files, verification: verify,
-            decisions: listAfter(answer, 'decisions'), issues: [...listAfter(answer, 'issues'), ...(reply.blockedReason ? [`Blocked: ${reply.blockedReason}`] : [])],
-            escalations: esc,
+            decisions: listAfter(answer, 'decisions'),
+            issues: [
+              ...listAfter(answer, 'issues'), ...(reply.blockedReason ? [`Blocked: ${reply.blockedReason}`] : []),
+              ...(failure ? [failure.remediated ? `Auto-remediated: ${failure.reason} → one retry → passed` : `${failure.kind}: ${failure.reason}`] : []),
+            ],
+            escalations,
             handoff: { keyOutputs: files, decisions: listAfter(answer, 'decisions'), openQuestions: [], conventions: listAfter(answer, 'handoff') },
             requirements: plan.fm.requirements,
-            error: r.deny ? `The agent could not start: ${r.deny}` : !r.answer ? 'The agent did not return an answer.' : status === 'Failed' ? `Verification failed: ${verify.filter(v => !v.passed).map(v => v.command).join('; ')}` : undefined,
+            error,
             tokens: r.agentId ? agents.usageOf(r.agentId) : undefined,
+            failure,
           }
           const summaryText = renderSummary(s)
+          for (const e of checkSummary(summaryText, { verificationDeclared: cmds.length > 0 && !!r.answer, escalations: escalations.length, decisions: s.decisions.length })) warnings.push(`SUMMARY ${plan.id}: ${e}`)
           summaries[plan.id] = summaryText
           await io.write(`${ph.rel}/${plan.id}-SUMMARY.md`, summaryText)
           const okNow = succeeded(status)
@@ -300,16 +372,20 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
             outcome: status === 'Complete' ? 'success' : status === 'Complete with Warnings' ? 'partial' : 'failed',
             summary: `${plan.title}: ${status}${s.error ? ` — ${s.error.slice(0, 120)}` : ''}`,
           }).catch(() => undefined)
+          let committed = false
           if (okNow && autoCommit) {
             const err = await commit(io, [...files, `${ph.rel}/${plan.id}-SUMMARY.md`, ...(rec ? [OUTCOMES] : [])], commitPlan(prefix, plan.id, plan.title, n, phaseName, w.wave, plan.fm.requirements))
             if (err) warnings.push(`${plan.id}: ${err}`)
+            else committed = true
           }
+          // Content hashes of what the agent wrote, for manual-edit detection at the next build.
+          await recordAgentFiles(io, { files, plan: plan.id, agent: persona.id, phase: n, committed }).catch(() => undefined)
           if (okNow && settings.integrations?.github === 'enabled') {
             const gh = await ghTickPlan(io, n, plan.id).catch(() => undefined)
             if (gh) log(gh)
           }
-          outcomes.push({ id: plan.id, status, agent: persona.id, files, failedChecks: verify.filter(v => !v.passed).map(v => v.command) })
-          log(`${plan.id}: ${status}`)
+          outcomes.push({ id: plan.id, status, agent: persona.id, files, failedChecks: verify.filter(v => !v.passed).map(v => v.command), failure, escalations })
+          log(`${plan.id}: ${status}${failure ? ` [${failure.kind}]` : ''}`)
         }
       }
     }
@@ -318,9 +394,21 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
     const last = w.wave === waves.waves[waves.waves.length - 1].wave
     roadmap = setRoadmapRow(roadmap, n, { plans: Math.max(p.roadmap.rows.find(r => r.phase === n)?.plans ?? 0, planned), completed: doneCount(), status: failedHere.length ? 'Partial' : last && ph.plans.every(x => ok(x.id)) ? 'Executed' : 'In Progress' })
     await io.write('.planning/ROADMAP.md', roadmap)
+    // Compaction: when the phase is complete, or once the completed handoffs outgrow the budget.
+    const compactedFiles: string[] = []
+    if (!failedHere.length && shouldCompact(ph.plans, summaries, ph.plans.every(x => ok(x.id)))) {
+      const c = compactPhase({ n, dir: ph.dir!, name: phaseName, date, plans: ph.plans, summaries })
+      if (c) {
+        await io.write(compactedPath(ph.rel!, n), c.text)
+        compactedFiles.push(compactedPath(ph.rel!, n))
+        log(`compacted ${c.covered.length} summaries (${Math.round(c.ratio * 100)}%)`)
+        if (c.ratio > COMPACT_TARGET) warnings.push(`${pad2(n)}-COMPACTED.md is ${Math.round(c.ratio * 100)}% of the summaries it covers (target at most ${COMPACT_TARGET * 100}%)`)
+        if (c.missing.length) warnings.push(`compaction: ${c.missing.join(', ')} were missing from the summaries and were added`)
+      }
+    }
     const t = overall()
     if (autoCommit) {
-      const err = await commit(io, ['.planning/STATE.md', '.planning/ROADMAP.md', ...todo.map(x => `${ph.rel}/${x.id}-SUMMARY.md`)], commitWave(prefix, w.wave, n, todo.length - failedHere.length, todo.length, t.done, t.all))
+      const err = await commit(io, ['.planning/STATE.md', '.planning/ROADMAP.md', ...todo.map(x => `${ph.rel}/${x.id}-SUMMARY.md`), ...compactedFiles], commitWave(prefix, w.wave, n, todo.length - failedHere.length, todo.length, t.done, t.all))
       if (err) warnings.push(err)
     }
     if (failedHere.length) { stopped = w.wave; break }
@@ -345,9 +433,16 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   // With only, success means the selected plans succeeded; the rest of the phase is someone else's run.
   const selectedOk = opts.only ? ph.plans.filter(x => opts.only!.includes(x.id)).every(x => ok(x.id)) && stopped === undefined : allOk
   const held = opts.only ? ph.plans.filter(x => !opts.only!.includes(x.id) && !ok(x.id)).map(x => x.id) : []
+  // escalation-protocol routing in the report: warnings highlighted, blockers pending a user decision, invalid blocks flagged.
+  const escText = outcomes.flatMap(o => (o.escalations ?? []).map((e, i) => e.problems?.length
+    ? `- [INVALID ESCALATION] ${o.id} #${i + 1}: ${e.problems.join('; ')}`
+    : e.severity === 'blocker' ? `- [ESCALATION BLOCKER] ${o.id} #${i + 1} ${e.type}: ${e.decision} — pending; ask the user to approve, reject or defer, then record it with the escalation tool`
+    : e.severity === 'warning' ? `- [ESCALATION WARNING] ${o.id} #${i + 1} ${e.type}: ${e.decision}` : undefined).filter((x): x is string => !!x))
   const text = [
     `Phase ${n}: ${phaseName} — ${allOk ? 'all plans executed' : selectedOk ? `selected plans executed${held.length ? ` (not run: ${held.join(', ')})` : ''}` : 'build incomplete'}`,
-    ...outcomes.map(o => `- ${o.id} ${o.agent}: ${o.status}${o.skipped ? ' (already done, skipped)' : ''}${o.failedChecks.length ? ` — failed: ${o.failedChecks.join('; ')}` : ''}`),
+    ...outcomes.map(o => `- ${o.id} ${o.agent}: ${o.status}${o.skipped ? ' (already done, skipped)' : ''}${o.failedChecks.length ? ` — failed: ${o.failedChecks.join('; ')}` : ''}${o.failure ? ` [${o.failure.kind}${o.failure.remediated ? ', auto-remediated' : ''}: ${o.failure.reason}]` : ''}`),
+    ...(escText.length ? ['', 'Escalations:', ...escText] : []),
+    ...(manualEdits.length ? ['', 'Manual edits since the last build, recorded as corrective preferences (.planning/memory/PREFERENCES.md):', ...manualEdits.map(x => `- ${x}`)] : []),
     ...(warnings.length ? ['', 'Warnings:', ...warnings.map(x => `- ${x}`)] : []),
     '',
     allOk ? `Next: /triad:review` : selectedOk ? 'Next: the plans not run here' : `Next: fix ${failed.map(f => f.id).join(', ') || 'the plans'} and run /triad:build again`,

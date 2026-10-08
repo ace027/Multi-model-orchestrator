@@ -17,8 +17,9 @@ import { dryRunReport, renderDryRun } from './dryrun.ts'
 import { renderSpecCheck, specAssess, specCheck, specGather, specTrigger } from './spec.ts'
 import { designGrade, designTeam, detectDomain, domainCheck, marketingTeam, passSummary, setStatus, slopGrade, wavePattern, writeDoc } from './domain.ts'
 import { boardCompose, boardDecide, boardMeet, boardReview } from './board.ts'
+import { escalationTool } from './escalation.ts'
 
-export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run', 'board', 'spec', 'domain'])
+export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run', 'board', 'spec', 'domain', 'escalation'])
 
 export type Ctx = { agents: () => Agents; ioAt: (root: string) => Io; registry: () => Promise<Io>; schedule?: (ms: number, fn: () => void) => void; notify?: (text: string) => void }
 
@@ -50,6 +51,7 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
       }
       return note + out.join('\n')
     }
+    case 'escalation': return escalationTool(io, input)
     case 'board':
       switch (input.action) {
         case 'compose': return boardCompose(String(input.topic ?? ''), settings)
