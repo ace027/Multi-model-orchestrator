@@ -76,7 +76,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   const text = `${info?.goal ?? ''} ${name} ${ph.context ?? ''} ${files.join(' ')}`
   const agentIds = ph.plans.flatMap(x => x.fm.agents)
   const panelMode = (opts.mode ?? settings.review?.default_mode ?? 'panel') === 'panel'
-  const reviewers = panelMode ? composePanel(text, divisionsOf(files, agentIds).length) : classicReviewers(text)
+  const reviewers = panelMode ? composePanel(text, divisionsOf(files, agentIds)) : classicReviewers(text)
   log(`reviewers: ${reviewers.map(r => r.id).join(', ')}`)
 
   let state = p.stateText

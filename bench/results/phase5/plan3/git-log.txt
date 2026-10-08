@@ -1,0 +1,15 @@
+cd9d6d1 chore(legion): phase 3 review passed — Restock Orders
+c46cb6a chore(legion): complete phase 3 execution — Restock Orders
+d99be96 chore(legion): update state after wave 2 of phase 3
+03d57f8 feat(legion): execute plan 03-02 — Order CLI subcommand
+f968eeb chore(legion): update state after wave 1 of phase 3
+abb1df6 feat(legion): execute plan 03-01 — Restock order core
+3d6ef8f plan phase 3
+69abf89 roadmap: add phase 3 (restock orders)
+35af965 chore(legion): phase 2 review passed — Reporting
+7f84cf5 chore(legion): complete phase 2 execution — Reporting
+38e48af chore(legion): update state after wave 2 of phase 2
+d4c29b6 feat(legion): execute plan 02-02 — Command line for the report: `python -m invlib.cli report FILE --threshold N`.
+67aa402 chore(legion): update state after wave 1 of phase 2
+1b245da feat(legion): execute plan 02-01 — Add the low-stock report: which SKUs to reorder, and a plain-text rendering.
+566ac09 legion project (phase 2 planned)

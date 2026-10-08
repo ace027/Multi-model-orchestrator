@@ -28,9 +28,12 @@ const DIVISION_WORDS: Record<string, string[]> = {
 
 const words = (s: string) => s.toLowerCase().split(/[^a-z0-9+#.]+/).filter(w => w.length > 1)
 
+// Data formats every kind of project uses; they say nothing about who should do the work.
+const GENERIC = new Set(['json', 'yaml', 'yml', 'toml', 'xml', 'csv', 'markdown', 'md', 'text', 'txt'])
+
 export function score(p: Persona, text: string): number {
   const terms = new Set(words(text))
-  const keys = [...p.languages, ...p.frameworks, ...p.artifact_types, ...p.review_strengths, ...p.id.split('-')].map(k => k.toLowerCase())
+  const keys = [...p.languages, ...p.frameworks, ...p.artifact_types, ...p.review_strengths, ...p.id.split('-')].map(k => k.toLowerCase()).filter(k => !GENERIC.has(k))
   let s = 0
   for (const k of new Set(keys)) {
     const parts = words(k)
@@ -53,8 +56,11 @@ export function rubricOf(p: Persona): Rubric {
 
 // Panel: review-capable personas (non-empty review_strengths), 2/3/4 reviewers
 // for 1/2/3+ divisions touched, at most 2 per division, at least one Testing.
-export function composePanel(text: string, divisionsTouched: number, size?: number): Persona[] {
-  const want = Math.min(4, Math.max(2, size ?? (divisionsTouched >= 3 ? 4 : divisionsTouched === 2 ? 3 : 2)))
+// `divisionsTouched` is a count or the divisions themselves; given the divisions,
+// reviewers come from them first (Testing always counts as touched).
+export function composePanel(text: string, divisionsTouched: number | string[], size?: number): Persona[] {
+  const count = Array.isArray(divisionsTouched) ? divisionsTouched.length : divisionsTouched
+  const want = Math.min(4, Math.max(2, size ?? (count >= 3 ? 4 : count === 2 ? 3 : 2)))
   const ranked = rank(text, p => p.review_strengths.length > 0 && p.tier !== 'haiku' && p.tier !== 'opus')
   const panel: Persona[] = []
   const per: Record<string, number> = {}
@@ -66,9 +72,13 @@ export function composePanel(text: string, divisionsTouched: number, size?: numb
   }
   const qa = BY_ID.get('testing-qa-verification-specialist')
   if (qa) take(qa)
-  for (const r of ranked) {
-    if (panel.length >= want) break
-    take(r.persona)
+  const inScope = Array.isArray(divisionsTouched) ? new Set([...divisionsTouched, 'Testing']) : undefined
+  for (const pass of inScope ? [true, false] : [false]) {
+    for (const r of ranked) {
+      if (panel.length >= want) break
+      if (pass && !inScope!.has(r.persona.division)) continue
+      take(r.persona)
+    }
   }
   return panel
 }

@@ -123,6 +123,19 @@ describe('plans and critique', () => {
     expect(parseRoadmap(io.files.get('.planning/ROADMAP.md')!).rows[0]).toMatchObject({ plans: 2, status: 'Planned' })
     expect(await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })).toContain('already has plans')
   })
+  test('plan_write with only rewrites those plans and keeps CONTEXT.md', async () => {
+    const io = await newProject()
+    await planWrite(io, { phase: 1, context: { goal: 'core', decisions: ['keep me'] }, plans: [plan(1, 1, 'src/a.ts'), plan(2, 2, 'src/b.ts', { depends_on: ['01-01'] })] })
+    const ctx = io.files.get('.planning/phases/01-core/01-CONTEXT.md')!
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(2, 2, 'src/b.ts', { title: 'Better', depends_on: ['01-01'] })], only: [2] })
+    expect(io.files.get('.planning/phases/01-core/01-CONTEXT.md')).toBe(ctx)
+    expect(io.files.get('.planning/phases/01-core/01-02-PLAN.md')).toContain('Better')
+    expect(io.files.has('.planning/phases/01-core/01-01-PLAN.md')).toBe(true)
+  })
+  test('a Python CLI phase gets no designer on its panel', () => {
+    const panel = composePanel('restock orders from a JSON file, CLI subcommand invlib/cli.py tests/test_cli.py targets.json', ['Engineering', 'Testing'])
+    expect(panel.every(p => p.division === 'Engineering' || p.division === 'Testing')).toBe(true)
+  })
   test('critique blocks same-wave file overlap and a missing verification command', async () => {
     const io = await newProject()
     await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts'), plan(2, 1, 'src/a.ts', { verification_commands: [] })] })

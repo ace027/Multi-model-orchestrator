@@ -57,7 +57,9 @@ export async function planWrite(io: Io, input: { phase: number; context: Context
   if (unknown.length) return `Unknown persona ids: ${[...new Set(unknown)].join(', ')}. Pick ids with persona_brief.`
   const writing = input.plans.filter(pl => !only || only.has(pl.plan))
   if (input.replace && !only) for (const f of existing) await io.run(['rm', '-f', `${rel}/${f}`])
-  await io.write(`${rel}/${pad2(n)}-CONTEXT.md`, renderContext(n, name, input.context, input.plans))
+  // A partial rewrite (auto-refine) keeps CONTEXT.md, which describes every plan.
+  const contextPath = `${rel}/${pad2(n)}-CONTEXT.md`
+  if (!only || (await io.read(contextPath)) === undefined) await io.write(contextPath, renderContext(n, name, input.context, input.plans))
   for (const pl of writing) await io.write(`${rel}/${pad2(n)}-${pad2(pl.plan)}-PLAN.md`, renderPlan(n, slug, pl))
   // Read back what is on disk: the critique and the schema see the files as written.
   const files = (await io.list(rel)).filter(e => !e.dir && isPlanFile(e.name)).map(e => e.name).sort()
@@ -73,7 +75,7 @@ export async function planWrite(io: Io, input: { phase: number; context: Context
   })
   await io.write('.planning/STATE.md', state)
   await io.write('.planning/ROADMAP.md', setRoadmapRow(p.roadmapText, n, { plans: plans.length, completed: 0, status: 'Planned' }))
-  return [`Wrote ${rel}/${pad2(n)}-CONTEXT.md and ${writing.length} plan file(s): ${writing.map(pl => `${pad2(n)}-${pad2(pl.plan)}-PLAN.md`).join(', ')}.`, '', renderCritique(c)].join('\n')
+  return [`Wrote ${only ? '' : `${rel}/${pad2(n)}-CONTEXT.md and `}${writing.length} plan file(s): ${writing.map(pl => `${pad2(n)}-${pad2(pl.plan)}-PLAN.md`).join(', ')}.`, '', renderCritique(c)].join('\n')
 }
 
 export async function planCheck(io: Io, phase: number): Promise<string> {
