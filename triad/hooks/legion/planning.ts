@@ -286,12 +286,17 @@ export function parsePlan(file: string, text: string, phaseNum: number): Plan {
   return { id: fm.plan, file, fm, body, schemaErrors, normalized, normalizedErrors, title }
 }
 
-// `> verification: cmd` lines in task actions, plus frontmatter verification_commands.
+// Frontmatter verification_commands, `> verification: cmd` lines in task actions,
+// and older Legion plans' `<verify><automated>cmd</automated>` task blocks.
 export function verificationCommands(p: Plan): string[] {
   const out = [...p.fm.verification_commands]
-  for (const m of p.body.matchAll(/^\s*>\s*verification:\s*(.+)$/gim)) {
-    const c = m[1].trim().replace(/^`|`$/g, '')
-    if (!out.includes(c)) out.push(c)
+  const found = [
+    ...[...p.body.matchAll(/^\s*>\s*verification:\s*(.+)$/gim)].map(m => m[1]!),
+    ...[...p.body.matchAll(/<automated>([\s\S]*?)<\/automated>/gi)].map(m => m[1]!.replace(/\s*\n\s*/g, ' ')),
+  ]
+  for (const raw of found) {
+    const c = raw.trim().replace(/^`|`$/g, '')
+    if (c && !out.includes(c)) out.push(c)
   }
   return out
 }

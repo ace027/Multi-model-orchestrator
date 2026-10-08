@@ -32,8 +32,9 @@ export function loadSettings(text: string | undefined): { settings: Settings; wa
   }
   const existing = !!user && ('control_mode' in user || 'execution' in user || 'review' in user)
   if (user && !existing) user = undefined // some other tool's settings.json
-  if (user) for (const e of validate(SCHEMAS.settings, user)) warnings.push(`settings.json ${e}`)
   const settings = merge(SETTINGS, user ?? {}) as Settings
+  // Legion fills missing keys from its defaults, so a partial file is valid: check the merged result.
+  if (user) for (const e of validate(SCHEMAS.settings, settings)) warnings.push(`settings.json ${e}`)
   if (!user?.execution?.commit_prefix) settings.execution.commit_prefix = existing ? SETTINGS.execution.commit_prefix : 'triad'
   if (!MODES.includes(settings.control_mode)) {
     warnings.push(`control_mode "${settings.control_mode}" is not one of ${MODES.join(', ')}; using guarded`)

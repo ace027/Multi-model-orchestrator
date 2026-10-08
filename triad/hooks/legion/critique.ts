@@ -1,7 +1,7 @@
 // Plan critique, mechanical part (plan-critique R1-R3, same-wave overlap,
 // harness sections, task cap, schema). The judgment part (pre-mortem,
 // assumption hunt) is a Sonnet pass the plan command runs on top.
-import { planWaves, sharedFiles, overlaps, type Plan } from './planning.ts'
+import { planWaves, sharedFiles, overlaps, verificationCommands, type Plan } from './planning.ts'
 
 export type Issue = { plan: string; severity: 'BLOCKER' | 'WARNING'; rule: string; message: string }
 export type Verdict = 'PASS' | 'CAUTION' | 'REWORK'
@@ -15,7 +15,11 @@ export function critique(plans: Plan[], maxTasks = 3, knownAgents?: Set<string>)
     const fm = p.fm
     for (const e of p.normalizedErrors) add(p.id, 'BLOCKER', 'schema', `frontmatter ${e}`)
     if (p.normalized.length) add(p.id, 'WARNING', 'schema', `legacy frontmatter (${p.normalized.join('; ')})`)
-    if (!fm.verification_commands.length) add(p.id, 'BLOCKER', 'R1', 'verification_commands is missing or empty')
+    if (!fm.verification_commands.length) {
+      // Older Legion plans carry their checks in the tasks (<automated> or "> verification:"); those still run.
+      if (verificationCommands(p).length) add(p.id, 'WARNING', 'R1', 'no plan-level verification_commands; the task-level checks are run instead')
+      else add(p.id, 'BLOCKER', 'R1', 'verification_commands is missing or empty')
+    }
     const touchesCode = fm.files_modified.some(f => CODE.test(f))
     if (fm.files_forbidden === undefined && touchesCode) add(p.id, 'WARNING', 'R2', 'files_forbidden is missing on a plan that touches code')
     for (const f of fm.files_modified) if ((fm.files_forbidden ?? []).some(x => overlaps(f, x))) add(p.id, 'BLOCKER', 'R2', `${f} is in both files_modified and files_forbidden`)
