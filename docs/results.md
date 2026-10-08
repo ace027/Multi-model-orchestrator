@@ -159,3 +159,15 @@ testwrite  triad  Y      0.150    110150    16058   5297    46  coder:1 orchestr
 - **The overhead is elsewhere in the main-loop prompt.** On `noisy`, where Triad spawned nothing, it wrote 16.8k input and cache tokens against Opus's 7.7k. What the plugin adds to every request besides the guide: its 20 command descriptions in the command listing, the Triad agent descriptions in the Agent tool, the `delegate_menial` schema and the deferred tool names. Each coder spawn adds a cache write of its own.
 - **Runs are noisy.** Opus alone on `logfix` cost $0.168 in the first run and $0.090 here; single runs per cell cannot resolve differences of a few cents per task.
 - Triad still beats Legion by a wide margin, so the removal decision stands.
+
+### Quality of the work
+
+The hidden checks are pass/fail, so the run directories were also compared by hand and each run's own tests were scored against extra mutants (`testwrite`: 9 more bugs in `inventory.py`; `discounts`: 7 bugs across the discount math, lookup, cart and CLI). No model calls; covers both Phase 7 runs.
+
+- **noisy:** the same one-line fix (`ROUND_HALF_EVEN` to `ROUND_HALF_UP`) in all five runs, byte for byte.
+- **rename:** the same 60-file migration in all five runs. Triad (first run) and Legion also reworded a docstring in `app/client.py` that still pointed at the deleted module.
+- **logfix:** every run found the cause (the new firmware's `Z` suffix) and fixed `parse_ts` correctly. Triad's coder wrote the most thorough regression tests both times (exact datetime, lowercase `z`, a still-rejected timestamp with no offset); Legion's fix accepts only an uppercase `Z`.
+- **discounts:** near-identical designs. Opus's tests were a little broader (a real-process exit-status test, a registry loaded from a temp file); Triad's CLI skips the code on `--code ""` instead of rejecting it. Every run's tests caught all 7 extra mutants.
+- **testwrite:** every suite caught the 7 benchmark mutants and all 9 extra ones.
+
+On these tasks the work is equivalent across Opus alone, Legion and Triad, although in Triad a Sonnet coder wrote the code for `discounts`, `logfix` and `testwrite`. The tasks are small and well specified, so quality saturates; telling the configs apart on quality would need harder, more open tasks.
