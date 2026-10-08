@@ -1,0 +1,47 @@
+FAIL phases/04-observability/04-02-PLAN.md: agent "testing-evidence-collector" is not in the roster
+FAIL phases/08-codebase-mapper-enrichment/08-02-PLAN.md: agent "testing-evidence-collector" is not in the roster
+WARN phases/03-control-modes/03-02-PLAN.md: no expected_artifacts
+WARN phases/04-observability/04-01-PLAN.md: no expected_artifacts
+WARN phases/04-observability/04-02-PLAN.md: no expected_artifacts
+WARN no must_haves.truths: 5 files (phases/09-polymath-advanced-modes/09-01-PLAN.md … phases/10-authority-conflict-resolution/10-02-PLAN.md)
+WARN no expected_artifacts, verification_commands: 40 files (phases/24-foundation/24-01-PLAN.md … phases/40-roster-gap-analysis/40-03-PLAN.md)
+WARN no CONTEXT.md: 7 files (phases/27-plugin-manifest … phases/40-roster-gap-analysis)
+PASS PROJECT.md: title and requirements present
+PASS ROADMAP.md: 12 phases in the progress table
+PASS STATE.md: phase 12 of 12
+PASS parses: 5 files (.planning/config/agent-communication.yaml … .planning/config/roster-gap-config.yaml)
+PASS .planning/config/authority-matrix.yaml: parses; 48 agent references resolve
+PASS .planning/config/intent-teams.yaml: parses; 8 agent references resolve
+PASS settings: control mode guarded
+
+validate: 11 passed, 55 warnings, 2 failures
+Legion v6.0 — Discipline & Intelligence
+
+Position: Phase 12 of 12 (complete)
+Status: All 12 phases complete — v6.0.0 ready to publish
+Last activity: Phase 12 execution (2026-03-07)
+
+[####################] 100% — 31/31 plans complete
+
+Phases:
+  [x] Phase 1: Plan Schema Hardening — 3/3 plans, Complete
+  [x] Phase 2: Wave Safety — 2/2 plans, Complete
+  [x] Phase 3: Control Modes — 3/3 plans, Complete
+  [x] Phase 4: Observability — 3/3 plans, Complete
+  [x] Phase 5: Agent Metadata Enrichment — 3/3 plans, Complete
+  [x] Phase 6: Recommendation Engine v2 — 3/3 plans, Complete
+  [x] Phase 7: Validation & Conformance — 3/3 plans, Complete
+  [x] Phase 8: Codebase Mapper Enrichment — 2/2 plans, Complete
+  [x] Phase 9: Polymath Advanced Modes — 3/3 plans, Complete
+  [x] Phase 10: Authority & Conflict Resolution — 2/2 plans, Complete
+  [x] Phase 11: Intent Routing v2 — 2/2 plans, Complete
+  [x] Phase 12: Integration & Release — 2/2 plans, Complete
+
+Recent decisions:
+  - **Scope**: One big v6.0 milestone covering all Tier 1/2/3 + backlog items
+  - **Ordering**: Foundation → Features (discipline infrastructure before advanced features)
+  - **ROI boundaries**: Follow FEEDBACK-ROI-ANALYSIS.md "worth doing" lines
+
+Control mode: guarded; commit prefix: legion
+
+Next: all phases complete — project finished
