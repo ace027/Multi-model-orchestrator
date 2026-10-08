@@ -1,0 +1,55 @@
+{
+  "task": "tron",
+  "config": "triad",
+  "options": {},
+  "seconds": 2402,
+  "exit": 124,
+  "success": true,
+  "check": "score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']",
+  "score": [
+    52.0,
+    52.0
+  ],
+  "cost": null,
+  "turns": null,
+  "tokens": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 0
+  },
+  "totalTokens": 0,
+  "byModel": {},
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 5
+    },
+    "aba2f19f72f107185": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 5
+    },
+    "aea876006f4aca97b": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-triad-tron-6evywr6r/repo",
+  "stderr": "",
+  "stdout": ""
+}
