@@ -284,8 +284,8 @@ Triad 0.8.0 ran twice (`a`, `b`) and Opus alone ran a second time (`opus2`), on 
 
 | AI | vs reference | vs Opus run 1 | vs Opus run 2 |
 |---|---|---|---|
-| Opus alone, run 1 | 6.5 | | 7 |
-| Opus alone, run 2 | 9 | 9 | |
+| Opus alone, run 1 | 6.5 | | 9 |
+| Opus alone, run 2 | 9 | 7 | |
 | Triad 0.7.1 | 4 | 5 | |
 | Triad 0.8.0 `a` | 6 | 6.5 | 6 |
 | Triad 0.8.0 `b` | 5 | 3 | 4 |
