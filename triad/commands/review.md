@@ -1,10 +1,11 @@
 ---
 description: Review a built phase: reviewer panel or classic, findings triaged in code, fixes routed to agents, up to 3 cycles
-argument-hint: "[phase number] [--panel | --classic] [--security | --just-security]"
+argument-hint: "[phase number] [--panel | --classic] [--security | --just-security] [--dry-run]"
 ---
 Review a built phase of the Triad project in `.planning/`. Arguments: $ARGUMENTS
 
-1. Load the tool: ToolSearch with query `select:mcp__triad__review_phase,mcp__triad__planning_status`.
+1. Load the tools: ToolSearch with query `select:mcp__triad__review_phase,mcp__triad__planning_status,mcp__triad__intent,mcp__triad__dry_run`. If any flags were given, call intent action `check` with command `review` and the flags; if it fails validation, show the result and stop.
+   With `--dry-run`, call `dry_run` with command `review` (and the phase) and show the report; nothing else runs.
 2. If no phase number was given, call `planning_status` and use the phase it names. If the phase has not been built, tell the user to run `/triad:build` and stop.
 3. With `--just-security`, skip to step 4. Otherwise call `review_phase` with the phase and `mode` (`panel` unless the user asked for `--classic` or settings.json says otherwise). It runs the whole loop: reviewers, triage, fix agents, re-review, NN-REVIEW.md, STATE/ROADMAP and commits. It blocks until done; progress is in `.triad/legion.log`.
 4. Security review, after the code review (it adds its section to the phase review file), with `--security` or `--just-security` (also offer it when the phase touched auth, input handling, secrets, payments or dependencies): load `mcp__triad__security,mcp__triad__persona_run`.
