@@ -60,7 +60,7 @@ The computer player is scored by playing rounds against bots of increasing stren
 
 Once the page has loaded, `window.tron` provides:
 
-- `reset(options)`: starts a new match in manual mode. Real-time ticking stops; ticks then happen only through `step()`. `options` (all optional): `width` (64), `height` (48), `obstacles` (an array of `[x, y]` cells, default none), `ai` (`true`: player 2 is steered by `chooseMove`; `false`: player 2 is steered only through `setDirection`).
+- `reset(options)`: starts a new match in manual mode. Real-time ticking stops; ticks then happen only through `step()`. `options` (all optional): `width` (64), `height` (48), `obstacles` (an array of `[x, y]` cells, default none), `ai` (default `true`: player 2 is steered by `chooseMove`; `false`: player 2 is steered only through `setDirection`).
 - `setDirection(player, dir)`: a steering request for player 1 or 2, exactly like a key press.
 - `step()`: one tick, following the rules above. With `ai` on, player 2's `chooseMove` request is made just before the move.
 - `state()`: the current state as a plain object, in manual mode and during normal play:
