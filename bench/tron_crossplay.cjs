@@ -1,6 +1,7 @@
 // Head-to-head Tron between finished games: each AI's chooseMove runs in its own page and
 // this script applies the spec's rules on 8 seeded 40x30 obstacle arenas, both sides (16 rounds per pair).
 // Usage: node bench/tron_crossplay.cjs name=<work dir> name=<work dir> ...  (no model calls)
+const { chromium } = require('playwright')
 const http = require('http'), fs = require('fs'), path = require('path')
 const serve = root => new Promise(ok => { const s = http.createServer((q, r) => { let f = path.join(root, decodeURIComponent(new URL(q.url, 'http://x').pathname)); if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html'); if (!fs.existsSync(f)) { r.writeHead(404); return r.end() } r.writeHead(200, { 'content-type': f.endsWith('.js') ? 'text/javascript' : f.endsWith('.css') ? 'text/css' : 'text/html' }); fs.createReadStream(f).pipe(r) }); s.listen(0, '127.0.0.1', () => ok(s)) })
 const AIS = Object.fromEntries(process.argv.slice(2).map(a => a.split('=')))
