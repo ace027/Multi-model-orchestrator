@@ -7,7 +7,7 @@ Project memory for the Triad project. Arguments: $ARGUMENTS
 Load the tool first: ToolSearch with query `select:mcp__triad__memory`.
 
 Pick the mode from the arguments (first match wins):
-- `--recall <topic>`: call memory with action `recall` and the topic; show the result as is.
+- `--recall <topic>`: call memory with action `recall` and the topic; show the result as is. When memory is enabled and Claude Code's own memory file (`~/.claude/projects/{project}/memory/MEMORY.md`) exists, the result ends with a "Claude Code memory suggests" note: advisory, read only. Never write to or copy into that file; lessons go only to `.planning/memory/`.
 - `--list`: action `list`; show the result.
 - `--prune`: action `outcomes` with limit 1 to see the record count. If the count is at or under the prune threshold (settings.json `memory.prune_threshold`, default 200), ask the user (AskUserQuestion) "OUTCOMES.md has N records (threshold: T). Prune anyway?" with options Yes (prune records older than `memory.prune_age_days` days with importance <= 3) / No. On yes (or over the threshold), call action `prune` and show the report.
 - Any other text is a lesson to record:
