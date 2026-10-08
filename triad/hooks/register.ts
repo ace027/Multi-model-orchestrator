@@ -1,6 +1,8 @@
 import type { BuiltinToolName, Register } from 'claude-code'
 import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, schemaProblems, type Options, type Role } from './policy.ts'
-import { emptyLedger, ensureAgent, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
+import { atom, update } from 'claude-code'
+import { emptyLedger, ensureAgent, paneView, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
+import { PANE, registerPane } from './pane.tsx'
 import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
 import { LEGION_TOOLS } from './legion/tools.ts'
 import { personaRank, planCheck, planWrite, projectInit, statusText, validateText } from './legion/handlers.ts'
@@ -105,6 +107,19 @@ function refuse(reason: string) {
 async function save($: any) {
   await $.fs.write(`${cwd}/.triad/ledger.json`, JSON.stringify(ledger, null, 2) + '\n')
   if (sessionId) await $.store.set(`ledger:${sessionId}`, ledger)
+  await publish($)
+}
+
+// The pane's view (pane.tsx draws it); the state scan wants the atom in each file that uses it.
+const paneState = atom({ plugin: 'triad', key: 'view' } as const, null)
+const budgets = () => ({ coders: [running.coder.size, opts.maxCoders] as [number, number], helpers: [running.helper.size, opts.maxHelpers] as [number, number], maxDepth: opts.maxDepth })
+
+// The pane's view; a failed write never costs the ledger or the hook.
+async function publish($: any) {
+  try {
+    const view = paneView(ledger, budgets())
+    await update($, paneState, () => view)
+  } catch { /* the pane shows the last view */ }
 }
 
 // Waits for an agent's turn.complete without spending the hook's own budget:
@@ -297,6 +312,7 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
 
 export const register: Register = (on, options) => {
   opts = { ...DEFAULTS, ...(options as Partial<Options>) }
+  registerPane(on)
 
   on('session.start', async ($, e, next) => {
     const r = await next(e)
@@ -324,7 +340,9 @@ export const register: Register = (on, options) => {
     try {
       guide = `${ORCHESTRATOR_GUIDE}\n\n${await loadKnowledgeIndex(ioOf($, $.plugin.root))}`
     } catch { guide = ORCHESTRATOR_GUIDE }
-    await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project', argumentHint: '[status | validate [--ci] [--fix]]' })
+    await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `pane` opens it as a live pane; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project', argumentHint: '[pane | status | validate [--ci] [--fix]]' })
+    await publish($)
+    if (opts.openPane) void $.ui.open({ id: PANE, title: 'Triad' })
     return r
   })
 
@@ -387,6 +405,7 @@ export const register: Register = (on, options) => {
       tasks[id] = e.prompt
       if (e.description.startsWith(LEGION_MARK)) legion.add(id)
       ensureAgent(ledger, id, { role, type, parent: parent ?? 'main', depth, status: 'running' })
+      await publish($)
     }
     return r
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the spawn check failed, so the spawn was refused. Try again.' }))
@@ -412,7 +431,10 @@ export const register: Register = (on, options) => {
       }
     }
     const r = yield* next(e)
-    if (r?.usage) recordStep(ledger, id, r.usage.model || e.model, r.usage)
+    if (r?.usage) {
+      recordStep(ledger, id, r.usage.model || e.model, r.usage)
+      await publish($)
+    }
     if (m && r?.usage) {
       m.lastPrompt = promptTokens(r.usage)
       if (chars !== undefined) m.charsAtLast = chars
@@ -594,12 +616,10 @@ export const register: Register = (on, options) => {
     if (/^status\b/.test(args)) return { text: `${await statusText(ioOf($), { dryRun: /--dry-run\b/.test(args) })}\n${controlModeLine(await controlMode(ioOf($)))}` }
     if (/^validate\b/.test(args)) return validateText(ioOf($), args)
     await save($)
-    return {
-      text: render(ledger, {
-        coders: [running.coder.size, opts.maxCoders],
-        helpers: [running.helper.size, opts.maxHelpers],
-        maxDepth: opts.maxDepth,
-      }),
+    if (/^pane\b/.test(args)) {
+      await $.ui.open({ id: PANE, title: 'Triad' })
+      return { text: 'Triad pane opened: the agent tree and spend, updated as agents run.' }
     }
+    return { text: render(ledger, budgets()) }
   })
 }

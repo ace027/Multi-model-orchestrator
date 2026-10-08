@@ -1,7 +1,8 @@
 {
   "name": "triad",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Tiered-model orchestration: Opus orchestrates, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
+  "types": "./types/index.d.ts",
   "userConfig": {
     "maxDepth": {
       "type": "number",
@@ -62,6 +63,12 @@
       "title": "Haiku wrap-up threshold (tokens)",
       "description": "At this prompt size a helper is told to finish and return.",
       "default": 80000
+    },
+    "openPane": {
+      "type": "boolean",
+      "title": "Open the Triad pane at start",
+      "description": "Open the agent tree and spend pane when a session starts (it seats from 144 terminal columns). `/triad pane` opens it at any width.",
+      "default": false
     }
   }
 }

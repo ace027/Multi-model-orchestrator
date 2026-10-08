@@ -8,7 +8,7 @@ Run it with `claude --model opus --plugin-dir ./triad`. Requires Claude Code 2.1
 
 | Hook | Does |
 |---|---|
-| `session.start` | Registers `delegate_menial` and `/triad`, loads this session's ledger from `$.store`. |
+| `session.start` | Registers `delegate_menial` and `/triad`, loads this session's ledger from `$.store`; with `openPane`, opens the Triad pane. |
 | `prompt.section` `communication` | Adds the orchestrator guidance (byte-stable, for caching) to the main loop only; a `prompt.context` block would also reach every subagent. |
 | `tool.describe` | With `deferTools`, defers engine tools the tiers do not use every turn (in a clean environment: ListAgents, ReportFindings, ScheduleWakeup, Workflow); they stay reachable through ToolSearch. |
 | `agent.offer` | Offers only `triad:triad-coder` and `triad:triad-helper` (with `strictMenu`). |
@@ -19,15 +19,16 @@ Run it with `claude --model opus --plugin-dir ./triad`. Requires Claude Code 2.1
 | `turn.step` (helpers) | Haiku ceiling. Before each helper request, projects its prompt: the previous request's exact size plus the conversation's growth at 2.5 chars a token (errs high), plus a margin. At `haikuWrapAt` (80k) the helper is told to finish; when the projection passes `haikuCeiling` (95k) the hook answers the step itself with a `status: partial` reply (done and left, from a Haiku one-shot over the transcript's tail, plus the files it wrote), so the request is never sent. Coders and the orchestrator are never stopped. |
 | `tool.call` `Edit`/`Write`/... | A helper may write only the files its brief names (`Writable files:` line, or the paths in the brief). |
 | `turn.step`, `turn.complete`, `session.measure` | Feed the ledger: per request usage by agent and tier, priced per tier, including Haiku's over-100k rate (cache reads and writes count toward the line). |
-| `command.run` `/triad` | Prints the tree, tokens and cost per tier, and budgets. |
+| `command.run` `/triad` | Prints the tree, tokens and cost per tier, and budgets. `/triad pane` opens the same as a live pane. |
+| `ui.render` `Pane` `triad` | The Triad pane: the agent tree (role, tier, status, requests, tokens, cost per agent), spend per tier and in total, the session's measured cost once known, and running coders and helpers against their caps. It redraws on every spawn, request and finished turn, from a view the hooks keep in `$.state`. Under 60 columns each row shows cost only. |
 
 The ledger is kept in `$.store` (`ledger:<session id>`) and written to `.triad/ledger.json` in the project (the folder has its own `.gitignore`). `bench/check_ledger.py` checks that every agent ran on its tier's model.
 
-Options (`userConfig`): `maxDepth` 2, `maxCoders` 4, `maxHelpers` 6, `maxRetries` 1, `strictMenu` true, `compress` true, `compressThreshold` 4000, `deferTools` true, `haikuCeiling` 95000, `haikuWrapAt` 80000. A helper brief over 40k tokens is refused at spawn (give it to a coder, or split it). Headless runs can set them with `--settings '{"pluginConfigs":{"triad@inline":{"options":{...}}}}'`.
+Options (`userConfig`): `maxDepth` 2, `maxCoders` 4, `maxHelpers` 6, `maxRetries` 1, `strictMenu` true, `compress` true, `compressThreshold` 4000, `deferTools` true, `haikuCeiling` 95000, `haikuWrapAt` 80000, `openPane` false (open the pane at session start; an unasked pane seats from 144 terminal columns, while `/triad pane` opens it at any width). A helper brief over 40k tokens is refused at spawn (give it to a coder, or split it). Headless runs can set them with `--settings '{"pluginConfigs":{"triad@inline":{"options":{...}}}}'`.
 
 ## Tests
 
-`claude plugin test triad` runs `triad.test.ts` (policy, ledger and hook tests). The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the helper round trip of `delegate_menial` is covered by the live acceptance run (`bench/run_accept.sh`) instead.
+`claude plugin test triad` runs `triad.test.ts` (policy, ledger and hook tests) and `pane.test.ts` (the pane's view, and the pane mounted on the terminal and desktop surfaces at two widths), with the Legion suites. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the helper round trip of `delegate_menial` is covered by the live acceptance run (`bench/run_accept.sh`) instead.
 
 ## Phase 2 acceptance
 
@@ -114,7 +115,7 @@ Live `/triad:plan` (`bench/run_legion_plan.sh`, evidence in `bench/results/phase
 
 ## Phase 6: the rest of Legion
 
-Version 0.6.0.
+Version 0.7.0.
 
 Every Legion workflow now has a Triad equivalent (`PARITY.md`). Judgment work is a plugin command; anything deterministic (parsing, scoring, formulas, file layout, checks, git and `gh`) is mod code behind a deferred `mcp__triad__*` tool, so it costs no tokens and cannot drift. Persona agents run through `persona_run`: in parallel, at the persona's tier, with its distilled core on top of the brief, and read-only unless the command names writable files.
 
