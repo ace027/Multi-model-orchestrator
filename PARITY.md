@@ -35,23 +35,23 @@ Triad names: judgment workflows become plugin commands (`/triad:<name>`). Determ
 
 | Legion item (path) | What it does (one line) | Triad status | Triad approach / reason |
 |---|---|---|---|
-| `commands/start.md` (`/legion:start [design-doc-path]`) | Guided 3-stage questioning, writes PROJECT/ROADMAP/STATE, registers project in portfolio | Improved | Opus runs the 5-8 exchange flow; Haiku writes the files from Opus's structured notes, using the same templates |
-| `commands/plan.md` (`/legion:plan <N>`) | Decomposes a phase into wave-structured PLAN.md files with agent recommendations, optional critique, spec and GitHub issues | Improved | Opus decomposes; Haiku formats plan files; mechanical critique checks run in code; Sonnet runs the judgment critique; frontmatter is validated against the schema in code |
-| `commands/build.md` (`/legion:build`) | Runs phase plans in waves with personality-injected agents, then atomic commits and summaries | Improved | Wave executor in mod code; one Sonnet per plan; Haiku runs `<verify>` blocks; resumable wave state |
+| `commands/start.md` (`/legion:start [design-doc-path]`) | Guided 3-stage questioning, writes PROJECT/ROADMAP/STATE, registers project in portfolio | Improved | Opus runs the 5-8 exchange flow; the `project_init` tool writes PROJECT/ROADMAP/STATE in code from Legion's templates and registers the project in the portfolio |
+| `commands/plan.md` (`/legion:plan <N>`) | Decomposes a phase into wave-structured PLAN.md files with agent recommendations, optional critique, spec and GitHub issues | Improved | Opus decomposes; `plan_write` writes the plan files in code, validates frontmatter against the schema and runs the mechanical critique; Opus does the judgment critique itself |
+| `commands/build.md` (`/legion:build`) | Runs phase plans in waves with personality-injected agents, then atomic commits and summaries | Improved | Wave executor in mod code; one agent per plan at its persona's tier; verification commands run in code; resumes from SUMMARY files |
 | `commands/review.md` (`/legion:review`) | Dev-QA loop with classic or panel reviewers, fix routing, max cycles, then escalation | Improved | Sonnet reviewers; dedup and hot-spot detection in code; 80% confidence filter and cycle cap enforced in code |
 | `commands/status.md` (`/legion:status`) | Progress dashboard and next-action routing (Read/Grep/Glob only) | Improved | Pure code, no model; next action computed from `intent-teams.yaml` `context_rules` |
 | `commands/quick.md` (`/legion:quick [--fix]`) | Ad-hoc single task with agent selection, optional commit, inline review and PR | Improved | One Sonnet; Haiku for boilerplate; registry scoring in code |
 | `commands/advise.md` (`/legion:advise <topic>`) | Read-only expert consultation from a selected persona | Ported | Read-only Sonnet advisor, denied write tools by a `tool.call` hook |
-| `commands/portfolio.md` (`/legion:portfolio`) | Multi-project dashboard, cross-project dependencies, agent allocation, optional Studio Producer (Opus) | Improved | Aggregation in code; Haiku summaries; Studio Producer persona on Opus |
-| `commands/milestone.md` (`/legion:milestone`) | Milestone status, definition, completion metrics and archiving | Improved | Code moves and archives files; Haiku summaries; optional GitHub milestone sync |
-| `commands/agent.md` (`/legion:agent`) | 3-stage guided persona creation with 8 schema checks | Improved | Sonnet runs the 3 stages; the 8 checks run in code; new persona gets a `tier:` field |
-| `commands/map.md` (`/legion:map`) | Generates CODEBASE.md and `.planning/codebase/` index (index.jsonl, symbols.json, search.md) | Improved | Code builds the `rg` index; Haiku writes summaries; no embeddings |
+| `commands/portfolio.md` (`/legion:portfolio`) | Multi-project dashboard, cross-project dependencies, agent allocation, optional Studio Producer (Opus) | Improved | Aggregation, dependencies and allocation in code; optional Studio Producer persona (Opus) through `persona_run` |
+| `commands/milestone.md` (`/legion:milestone`) | Milestone status, definition, completion metrics and archiving | Improved | Code writes MILESTONE-N.md and archives phases; Opus writes the deliverable lines from the facts the tool returns; GitHub milestone close through `gh` |
+| `commands/agent.md` (`/legion:agent`) | 3-stage guided persona creation with 8 schema checks | Improved | Opus runs the 3 stages; the 8 checks run in code; the new persona gets a `tier:` field |
+| `commands/map.md` (`/legion:map`) | Generates CODEBASE.md and `.planning/codebase/` index (index.jsonl, symbols.json, search.md) | Improved | Code builds the index (`git ls-files` plus regex scans for symbols, routes, imports); a Haiku helper drafts the narrative sections; no embeddings |
 | `commands/explore.md` (`/legion:explore`) | Polymath pre-flight research and clarification, then writes a design doc | Improved | Opus with the Polymath persona; Haiku fans out research; saves to `.planning/explorations/` |
 | `commands/board.md` (`/legion:board meet\|review`) | Board-of-directors deliberation (meet) or quick parallel assessment (review) | Ported | Opus convenes; members are parallel Sonnet agents; votes and artifacts persisted to `.planning/board/` |
-| `commands/retro.md` (`/legion:retro`) | Structured retrospective; saves RETRO.md; supports cross-project mode | Improved | Haiku gathers metrics; Sonnet writes RETRO.md |
-| `commands/ship.md` (`/legion:ship`) | Pre-ship gates, ship report, PR via `gh`, post-ship checks, canary monitoring | Improved | Gates and PR creation in code via `gh`; canary on `$.clock.every`; always-on security gate hook |
-| `commands/learn.md` (`/legion:learn`) | Record, recall, list and prune project lessons in `.planning/memory/` | Improved | Memory manager in code (classification by Haiku); four-bracket decay; archive, never delete |
-| `commands/polish.md` (`/legion:polish`) | 4-pass code cleanup, capped at 50 files, reverts files whose tests regress | Improved | Haiku runs mechanical passes, Sonnet runs judgment passes; revert and cap enforced in code |
+| `commands/retro.md` (`/legion:retro`) | Structured retrospective; saves RETRO.md; supports cross-project mode | Improved | Metrics and evidence gathered in code; a Sonnet persona (studio operations) writes the retrospective; saved to RETRO.md in code |
+| `commands/ship.md` (`/legion:ship`) | Pre-ship gates, ship report, PR via `gh`, post-ship checks, canary monitoring | Improved | Gates and PR creation in code via `gh`; canary checks scheduled with `$.clock.after` at 1, 5 and 15 minutes; always-on security gate hook on `gh pr create` |
+| `commands/learn.md` (`/legion:learn`) | Record, recall, list and prune project lessons in `.planning/memory/` | Improved | Memory manager in code; Opus classifies the lesson; four-bracket decay; archive, never delete |
+| `commands/polish.md` (`/legion:polish`) | 4-pass code cleanup, capped at 50 files, reverts files whose tests regress | Improved | One Sonnet code polisher runs the 4 passes; the 50-file cap, test and type-check baseline and per-file revert run in code |
 | `commands/validate.md` (`/legion:validate`) | Validates `.planning/` files, schemas, cross-refs, roster and config | Improved | Pure code against `docs/schemas/` and `settings.schema.json`, no model |
 | `commands/update.md` (`/legion:update [--check]`) | Detects runtime, checks npm for latest version, reinstalls | Replaced | Replaced by `claude plugin update` and the marketplace |
 
@@ -60,9 +60,9 @@ Triad names: judgment workflows become plugin commands (`/triad:<name>`). Determ
 | Legion item (path) | What it does (one line) | Triad status | Triad approach / reason |
 |---|---|---|---|
 | `--dry-run` on plan/build/review/status/retro/ship/polish | Deterministic prerequisite report with no side effects | Improved | Report generated in code (port of `scripts/dry-run-report.js` logic), zero tokens |
-| `plan --auto-refine` | Critique, then automatic re-plan, max 2 cycles | Improved | Per spec: mechanical critique in code, Sonnet judgment pass, cycle cap in code |
+| `plan --auto-refine` | Critique, then automatic re-plan, max 2 cycles | Improved | Mechanical critique in code, Opus judgment pass, at most 2 refine rounds (the command's cap) |
 | `plan --auto` (+ `--skip-board`, `--skip-security`) | Skips confirmation gates and runs board quick-assess, decompose, critique, design and security stages | Ported | Same stages; only skips confirmation gates, never loosens permissions |
-| `plan --security` | Forces a security surface scan during planning | Ported | Sonnet security reviewer |
+| `plan --security` | Forces a security surface scan during planning | Ported | Security surface scan in code (`security scan`); Opus checks each plan touching auth, crypto, input handling or routes for security considerations |
 | `build --phase N`, `review --phase N`, `retro/ship/polish --phase N` | Target a specific phase | Ported | Same flag semantics |
 | `build --two-wave` / `--single-wave` / `--skip-gates` / `--skip-architecture` / `--skip-security` | Two-wave mode (build plus analysis wave, then remediation wave) and its gate controls | Ported | Implemented in the wave executor code; analysis roles on Sonnet |
 | `build --just-harden`, `--just-document`, `--skip-frontend`, `--skip-backend` | Intent flags that filter plans or assemble an ad-hoc team from `intent-teams.yaml` | Improved | Flag parsing, mutual-exclusion validation and team resolution in code |
@@ -72,7 +72,7 @@ Triad names: judgment workflows become plugin commands (`/triad:<name>`). Determ
 | `map --check/--refresh/--scope/--query` | Freshness check, incremental refresh, scoped map, index query | Improved | Per spec, code-built index |
 | `learn --recall/--list/--prune` | Recall, list and archive-prune memory | Improved | Code |
 | `retro --milestone M` and cross-project mode | Milestone-level or cross-project retrospectives | Ported | Same flow, tiered as for `retro` |
-| `ship --canary` | Post-deploy canary monitor | Improved | `$.clock.every` |
+| `ship --canary` | Post-deploy canary monitor | Improved | Canary checks scheduled in code with `$.clock.after` (1, 5 and 15 minutes); never auto-rollback |
 | `polish --scope=changed\|dependents\|directory`, `<target-path>` | Scope selection | Ported | Per spec |
 | `validate --fix`, `--ci` | Auto-fix and CI exit codes | Improved | Code |
 | `update --check` | Version check only | Replaced | Plugin update shows available versions |
@@ -88,27 +88,27 @@ Always-loaded core stays lean. Everything else is deferred (`tool.describe` with
 |---|---|---|---|
 | `skills/workflow-common-core/SKILL.md` | Always-load core: harness contract, adapter detection, state paths, settings and mode resolution, command-to-skill map, budgets, quick validation | Improved | Becomes the byte-stable CLAUDE.md prefix; settings, mode resolution and quick validation run in code; adapter detection dropped (Claude Code only) |
 | `skills/workflow-common/SKILL.md` | Deprecated compatibility shim; still holds unique sections (BLOCKER/ENVIRONMENT error classification, manual-edit detection, cost profiles) | Replaced | Covered by core prefix and code; unique sections extracted into Triad conventions (section 11) |
-| `skills/workflow-common-domains/SKILL.md` | Optional design, marketing and specialized conventions | Ported | Deferred, loaded for MKT-/DSN- work |
-| `skills/workflow-common-github/SKILL.md` | Optional GitHub conventions | Ported | Deferred, loaded when `gh` is authenticated |
-| `skills/workflow-common-memory/SKILL.md` | Optional memory conventions | Ported | Deferred, loaded when OUTCOMES.md exists |
+| `skills/workflow-common-domains/SKILL.md` | Optional design, marketing and specialized conventions | Improved | Conventions live in the deferred `domain` tool (detection, teams, waves, documents, checks in code) and `/triad:design` / `/triad:marketing`, which load it |
+| `skills/workflow-common-github/SKILL.md` | Optional GitHub conventions | Improved | Deferred `github` tool, loaded by the commands that sync; mode from `integrations.github` (prompt/enabled/disabled), and a missing `gh` is reported in one line |
+| `skills/workflow-common-memory/SKILL.md` | Optional memory conventions | Improved | Deferred `memory` tool, loaded by the commands when `.planning/memory/` exists |
 | `skills/questioning-flow/SKILL.md` | Adaptive project-init questioning (vision, requirements, preferences, cost profile) | Ported | Opus runs it; the cost-profile question is replaced by tiering (section 11) |
-| `skills/questioning-flow/templates/project-template.md` | PROJECT.md template | Ported | Byte-identical, used by Haiku writer |
-| `skills/questioning-flow/templates/roadmap-template.md` | ROADMAP.md template | Ported | Byte-identical |
-| `skills/questioning-flow/templates/state-template.md` | STATE.md template | Ported | Byte-identical |
+| `skills/questioning-flow/templates/project-template.md` | PROJECT.md template | Ported | Bundled with the leading comment stripped; filled in code by `project_init` |
+| `skills/questioning-flow/templates/roadmap-template.md` | ROADMAP.md template | Ported | Bundled with the leading comment stripped |
+| `skills/questioning-flow/templates/state-template.md` | STATE.md template | Ported | Bundled with the leading comment stripped; the `/legion:plan 1` hint reads `/triad:plan 1` |
 | `skills/agent-registry/SKILL.md` | Maps agents by division and capability; recommendation scoring | Improved | Scoring (keyword 3, division 2, partial 1, metadata, memory boost) in code |
-| `skills/agent-registry/CATALOG.md` | Agent catalog data plus intent mappings | Ported | Read as data by the scoring code |
+| `skills/agent-registry/CATALOG.md` | Agent catalog data plus intent mappings | Replaced | Not bundled; the same catalog data is the persona metadata (`personas.ts`: division, languages, frameworks, artifact types, review strengths) that the scorer reads |
 | `skills/agent-registry/DOMAINS.md` | Quick reference of authority domains | Ported | Data; authority-matrix.yaml remains canonical |
 | `skills/agent-registry/GAP_ANALYSIS.md` | Roster coverage gap analysis engine | Improved | Gap scoring in code from `roster-gap-config.yaml` |
 | `skills/agent-registry/MANDATORY-PERSONA-CONTRACT.md` | Contract every persona follows when planning, executing or reviewing | Improved | Folded into the stable prefix and enforced by the return schema and hooks |
-| `skills/portfolio-manager/SKILL.md` | Global portfolio registry, aggregation, dependencies, allocation | Improved | Code with Haiku summaries |
+| `skills/portfolio-manager/SKILL.md` | Global portfolio registry, aggregation, dependencies, allocation | Improved | Code; optional Studio Producer (Opus) through `persona_run` |
 | `skills/codebase-mapper/SKILL.md` | Engine for `/map`: CODEBASE.md and index artifacts, dependency risk | Improved | Code-built `rg` index, Haiku summaries |
-| `skills/phase-decomposer/SKILL.md` | Breaks a roadmap phase into wave-grouped plans with assigned agents | Improved | Opus decomposes, Haiku formats, code validates |
+| `skills/phase-decomposer/SKILL.md` | Breaks a roadmap phase into wave-grouped plans with assigned agents | Improved | Opus decomposes; `plan_write` formats and validates in code |
 | `skills/memory-manager/SKILL.md` | OUTCOMES/PATTERNS/ERRORS/PREFERENCES store, decay recall, pruning, Claude auto-memory bridge | Improved | Code; four-bracket decay; archive-not-delete |
-| `skills/marketing-workflows/SKILL.md` | Campaign docs, content calendars, marketing decomposition | Ported | Deferred skill, Sonnet personas |
-| `skills/design-workflows/SKILL.md` | Design systems, UX research, three-lens design review | Ported | Deferred skill, Sonnet personas |
+| `skills/marketing-workflows/SKILL.md` | Campaign docs, content calendars, marketing decomposition | Improved | `/triad:marketing` plus the deferred `domain` tool (teams, waves, campaign document, lifecycle, checks in code); Sonnet personas through `persona_run` |
+| `skills/design-workflows/SKILL.md` | Design systems, UX research, three-lens design review | Improved | `/triad:design` plus the deferred `domain` tool (teams, waves, system and research documents, grades in code); Sonnet personas through `persona_run` |
 | `skills/spec-pipeline/SKILL.md` | 5-stage pre-coding spec pipeline | Ported | Per spec |
 | `skills/plan-critique/SKILL.md` | Pre-mortem, assumption hunting, wave overlap checks, PASS/CAUTION/REWORK | Improved | Mechanical checks in code; Sonnet judgment pass |
-| `skills/github-sync/SKILL.md` | Issues, PRs, milestone sync and readback via `gh` | Improved | `gh` calls in code via `$.process.run`; Haiku drafts issue and PR text |
+| `skills/github-sync/SKILL.md` | Issues, PRs, milestone sync and readback via `gh` | Improved | `gh` calls in code via `$.process.run`; issue and PR bodies from code templates |
 | `skills/wave-executor/SKILL.md` | Wave execution, personality injection, worktrees, sequential_files, handoffs | Improved | Mod code executor, resumable state |
 | `skills/wave-executor/WAVE-A.md` | Two-wave pattern: build plus analysis wave protocol | Ported | In executor code |
 | `skills/wave-executor/WAVE-B.md` | Two-wave pattern: execution plus remediation wave protocol | Ported | In executor code |
@@ -118,7 +118,7 @@ Always-loaded core stays lean. Everything else is deferred (`tool.describe` with
 | `skills/review-evaluators/SKILL.md` | Multi-pass evaluators (code quality, UI/UX, integration, business logic) | Ported | Sonnet evaluators; honors `review.evaluator_depth` |
 | `skills/security-review/SKILL.md` | OWASP Top 10 and STRIDE security review | Ported | Sonnet security persona; feeds the ship security gate |
 | `skills/ship-pipeline/SKILL.md` | Pre-ship gates, deploy verification, canary | Improved | Per `ship` row |
-| `skills/milestone-tracker/SKILL.md` | Milestone definition, completion metrics, archiving, summaries | Improved | Code with Haiku summaries |
+| `skills/milestone-tracker/SKILL.md` | Milestone definition, completion metrics, archiving, summaries | Improved | Code; Opus supplies the deliverable lines |
 | `skills/agent-creator/SKILL.md` | Guided persona creation with 8 schema checks | Improved | Checks in code |
 | `skills/polymath-engine/SKILL.md` | Research-first discovery engine for `/explore` | Ported | Opus Polymath; Haiku research fan-out |
 | `skills/authority-enforcer/SKILL.md` | Validates authority boundaries during waves and reviews; decision logs | Improved | Live `tool.call` check; guarded warns, surgical blocks and reverts, advisory logs |
@@ -157,7 +157,7 @@ All personas are ported as compact files with a `tier:` field that `agent.spawn`
 | `agents/marketing-growth-hacker.md` (Marketing) | Data-driven acquisition experiments | Ported | tier: sonnet |
 | `agents/marketing-social-platform-specialist.md` (Marketing) | Multi-platform social execution | Ported | tier: sonnet |
 | `agents/testing-api-tester.md` (Testing) | API validation and testing | Ported | tier: sonnet |
-| `agents/testing-code-polisher.md` (Testing) | Code clarity and consistency (polish) | Ported | tier: sonnet; its mechanical polish passes are delegated to Haiku helpers |
+| `agents/testing-code-polisher.md` (Testing) | Code clarity and consistency (polish) | Ported | tier: sonnet; runs the four polish passes itself |
 | `agents/testing-performance-benchmarker.md` (Testing) | Performance measurement and tuning | Ported | tier: sonnet |
 | `agents/testing-qa-verification-specialist.md` (Testing) | Evidence-based verification and certification | Ported | tier: sonnet |
 | `agents/testing-test-results-analyzer.md` (Testing) | Test result evaluation and quality metrics | Improved | tier: haiku (user decision); Sonnet reviews its output |
@@ -199,7 +199,7 @@ All personas are ported as compact files with a `tier:` field that `agent.spawn`
 | Post-build notification (2.2, PostToolUse `Agent`) | Opt-in hook that only echoes "Agent task completed" | Improved | Always-on; records outcome to memory and the token ledger |
 | Pre-ship security gate (2.3, PreToolUse `Bash` on `gh pr create`) | Opt-in hook; runs `npm audit --audit-level=critical`, blocks on criticals | Improved | Always-on `tool.call` hook on PR creation; same blocking rule |
 | Post-commit STATE.md update (2.1 overview item 4) | Listed as a 4th hook but no configuration is given | Improved | Execution tracker code updates STATE.md after each atomic commit |
-| State File Quick Validation (`workflow-common-core`) | Per-command prompt-level format checks on PROJECT/ROADMAP/STATE | Improved | Code check at command start, warnings once per session |
+| State File Quick Validation (`workflow-common-core`) | Per-command prompt-level format checks on PROJECT/ROADMAP/STATE | Improved | `planning_status`, called at the start of each workflow command, appends the `validate --ci` summary computed in code |
 | Context Budget Ceilings (`workflow-common-core`, `release-check.js`) | Soft/hard KB caps on always-load skills per command | Replaced | Exact per-agent token ledger plus deferred skills and compression; byte caps kept as a CI check |
 
 ---
@@ -335,9 +335,9 @@ All personas are ported as compact files with a `tier:` field that `agent.spawn`
 | `.planning/logs/authority-decisions-{date}.log` | Authority decision log | Improved | Written by the hook |
 | `.planning/security-review-{ts}.md`, `security-audit-{ts}.md` | Security outputs | Ported | Same |
 | `.planning/templates/agent-prompt.md` | Agent prompt template with authority injection | Improved | Becomes the brief builder (stable prefix plus per-task tail) |
-| `.planning/templates/two-wave-manifest.md` | Two-wave phase plan template | Ported | Same |
-| `.planning/templates/exploration-summary.md` | Exploration summary template | Ported | Same |
-| `.planning/templates/auto-update-manifest.md` | Manifest for auto-updating generated artifacts | Ported | Same |
+| `.planning/templates/two-wave-manifest.md` | Two-wave phase plan template | Replaced | Not bundled; the executor writes WAVE-A/B manifests in an inline format in code |
+| `.planning/templates/exploration-summary.md` | Exploration summary template | Replaced | Not bundled; `/triad:explore` writes the design doc in its own inline format |
+| `.planning/templates/auto-update-manifest.md` | Manifest for auto-updating generated artifacts | Replaced | Not bundled; Triad keeps generated artifacts fresh with `map check` and `/triad validate` |
 | `.triad/` (new) | Triad-only output (`.triad/out/<id>.txt`) | Improved | New, does not touch the `.planning/` contract |
 
 ---
@@ -455,7 +455,7 @@ Spec: port schema conformance, cross-reference validation and `lint-commands` as
 | Full personality injection ("Personality-first", "Full injection") | Whole persona file per spawn | Improved | Distilled core, full file on request |
 | Hybrid agent selection (recommend, user confirms) | User confirms agents | Ported | Same gate (skipped only in `autonomous`/`--auto`) |
 | Confidence-gated findings (HIGH 80%+, MEDIUM, LOW discarded) and skeptical-by-default review | Review quality rules | Improved | 80% filter applied in code |
-| Anti-sycophancy and anti-rationalization rules | Prompt rules | Ported | In reviewer and coder prompts |
+| Anti-sycophancy and anti-rationalization rules | Prompt rules | Ported | In the reviewer and fix briefs (`review.ts`, `reviewrun.ts`) and the persona cores |
 | BLOCKER/ENVIRONMENT error classification with one auto-retry (`workflow-common`) | Error handling | Improved | Classification by pattern in code; retry cap 1 enforced |
 | Manual-edit detection (diffs stored as corrective preferences) | Learns from user edits | Ported | Code diffs agent-modified files; writes PREFERENCES.md |
 | Wave handoff conventions (forward-only, no runtime messaging, escalation inheritance, discovery) | Inter-wave communication | Improved | Executor code |
@@ -479,7 +479,7 @@ Spec: port schema conformance, cross-reference validation and `lint-commands` as
 | `package-lock.json` | Lockfile | Not applicable | No npm package |
 | `.codex-plugin/plugin.json` | Codex plugin manifest | Not applicable | Codex runtime |
 | `.kilo/plans/1778433176734-proud-planet.md` | Kilo dev plan for installer fix | Not applicable | Other-runtime dev note |
-| `.gitignore` | Ignore rules | Ported | Triad adds `.triad/` |
+| `.gitignore` | Ignore rules | Improved | The mod writes `.triad/.gitignore` (`*`) at session start, so Triad's output never needs a root entry |
 | `README.md` | User docs (says 19 commands, 33 skills, 49 agents) | Replaced | Triad docs (phase 7) |
 | `CHANGELOG.md` | Legion release history | Not applicable | Legion history |
 | `CONTRIBUTING.md` | Contribution guide | Replaced | Triad's own guide |

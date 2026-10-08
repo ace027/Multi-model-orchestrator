@@ -27,7 +27,7 @@ Convert phase specifications into actionable development tasks:
 ## Critical Rules You Must Follow
 ### Mandatory Persona Contract
 
-Follow `skills/agent-registry/MANDATORY-PERSONA-CONTRACT.md`.
+Follow the persona contract below (it is the same for every persona).
 
 - Planning output must be decision-complete: role, task, scope, read targets,
   write targets, allowed tools/actions, forbidden actions, stop gates,

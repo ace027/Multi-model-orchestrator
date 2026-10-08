@@ -42,7 +42,7 @@ Use this agent when you need:
 
 ### Mandatory Persona Contract
 
-Follow `skills/agent-registry/MANDATORY-PERSONA-CONTRACT.md`.
+Follow the persona contract below (it is the same for every persona).
 
 - Scope plans as decision-complete implementation contracts, not loose backlog
   items. The executor must receive clear role, task, scope, read targets, write

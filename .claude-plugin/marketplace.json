@@ -1,0 +1,16 @@
+{
+  "name": "multi-model-orchestrator",
+  "owner": {
+    "name": "ace027"
+  },
+  "metadata": {
+    "description": "Triad: tiered-model orchestration for Claude Code, with a port of the Legion workflow."
+  },
+  "plugins": [
+    {
+      "name": "triad",
+      "source": "./triad",
+      "description": "Tiered-model orchestration with the Legion workflow: Opus orchestrates, Sonnet codes, Haiku does menial work."
+    }
+  ]
+}
