@@ -1,0 +1,63 @@
+{
+  "task": "pacman",
+  "config": "triad",
+  "options": {},
+  "seconds": 363,
+  "exit": 0,
+  "success": true,
+  "check": "score 44/44 rules 32/32 ui 8/8 replay 4/4 own-tests pass tests-added True failed=[]",
+  "score": [
+    44.0,
+    44.0
+  ],
+  "cost": 1.0973922,
+  "turns": 8,
+  "tokens": {
+    "inputTokens": 54,
+    "outputTokens": 46554,
+    "cacheReadInputTokens": 954081,
+    "cacheCreationInputTokens": 107466
+  },
+  "totalTokens": 1108155,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 4990,
+      "cacheReadInputTokens": 124155,
+      "cacheCreationInputTokens": 48934,
+      "costUSD": 0.369357
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 40,
+      "outputTokens": 41564,
+      "cacheReadInputTokens": 829926,
+      "cacheCreationInputTokens": 58532,
+      "costUSD": 0.7280352000000001
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 7
+    },
+    "ab8085f93105981e3": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 20
+    }
+  },
+  "work": "/tmp/bench-triad-pacman-jgs8susg/repo"
+}

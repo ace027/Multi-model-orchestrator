@@ -1,0 +1,35 @@
+{
+  "task": "csvimport",
+  "config": "opus",
+  "options": null,
+  "seconds": 102,
+  "exit": 0,
+  "success": true,
+  "check": "score 30/30 own-tests pass tests-added True failed=[]",
+  "score": [
+    30.0,
+    30.0
+  ],
+  "cost": 0.3677446,
+  "turns": 8,
+  "tokens": {
+    "inputTokens": 16,
+    "outputTokens": 10827,
+    "cacheReadInputTokens": 192628,
+    "cacheCreationInputTokens": 22523
+  },
+  "totalTokens": 225994,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 16,
+      "outputTokens": 10827,
+      "cacheReadInputTokens": 192628,
+      "cacheCreationInputTokens": 22523,
+      "costUSD": 0.3677446
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-csvimport-i2ylqovu/repo"
+}
