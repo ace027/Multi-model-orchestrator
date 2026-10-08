@@ -1,7 +1,0 @@
-22:42:55 start: /triad:start The project is fully specified in TASK.md and docs/spec.md: read both; they are the requirements, so take every answer from them.
-22:43:48 plan1: /triad:plan 1 --auto
-22:46:18 build1: /triad:build 1 --auto
-22:49:12 review1: /triad:review 1 --auto
-22:49:15 plan2: /triad:plan 2 --auto
-22:49:18 build2: /triad:build 2 --auto
-22:49:22 review2: /triad:review 2 --auto
