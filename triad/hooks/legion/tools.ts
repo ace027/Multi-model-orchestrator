@@ -122,6 +122,49 @@ export const LEGION_TOOLS = [
       required: ['runs'],
     },
   },
+  {
+    name: 'memory',
+    description: 'Project memory (.planning/memory/) in code. record: save a /triad:learn lesson (type pattern|pitfall|preference, summary <=80 chars, 2-5 tags from the text). recall: search lessons, retros and outcomes for a topic. list: all lessons. prune: archive old low-importance outcomes (ask the user first when under the threshold). outcomes: decay-ranked outcome records (filters tags/agent/task_type/branch). scores: per-agent memory scores for task types. briefing: session summary.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['record', 'recall', 'list', 'prune', 'outcomes', 'scores', 'briefing'] },
+        type: { type: 'string', enum: ['pattern', 'pitfall', 'preference'] },
+        summary: str(''), text: str('The full lesson.'), tags: strs(''), topic: str('Recall topic.'),
+        agent: str(''), task_type: str(''), branch: str('all | current | a branch name'), limit: { type: 'integer' }, task_types: strs(''),
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'milestone',
+    description: 'Milestones in ROADMAP.md (## Milestones) in code. status: dashboard with progress and the actions available. define: write (or redefine) the groupings you and the user agreed. facts: what a milestone delivered, to write its key deliverables and decisions. complete: write MILESTONE-N.md, mark it Complete, commit (all its phases must be Complete). archive: move its phase directories to .planning/archive/milestone-N/ and commit (ask the user first).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['status', 'define', 'facts', 'complete', 'archive'] },
+        n: { type: 'integer', description: 'Milestone number.' },
+        milestones: { type: 'array', items: { type: 'object', properties: { name: str(''), start: { type: 'integer' }, end: { type: 'integer' }, goal: str('') }, required: ['name', 'start', 'end', 'goal'] } },
+        deliverables: { type: 'object', description: 'Phase number -> one-line key deliverable.', additionalProperties: { type: 'string' } },
+        decisions: strs('Key decisions for the summary.'),
+        overwrite: { type: 'boolean' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'retro',
+    description: 'Retrospective support. gather: resolve the scope (default the last completed phase; or phase / milestone) and return computed metrics plus the evidence (summaries, reviews, outcomes) to write the report from. save: append the agreed findings, action items and metrics to .planning/memory/RETRO.md.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['gather', 'save'] },
+        phase: { type: 'integer' }, milestone: { type: 'integer' },
+        scope: str('Scope line, e.g. "Phase 3: Restock Orders".'), findings: str('Condensed went well / did not work.'), action_items: str('The action items table.'), metrics: str('The metrics lines.'),
+      },
+      required: ['action'],
+    },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)

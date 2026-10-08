@@ -6,6 +6,8 @@ import { critique, renderCritique } from './critique.ts'
 import { nextAction, renderStatus } from './status.ts'
 import { renderValidate, runValidate } from './validate.ts'
 import { BY_ID, ROSTER, findPersona, rank } from './registry.ts'
+import { agentScores, briefing } from './memory.ts'
+import { deriveStatus, parseMilestones } from './milestone.ts'
 
 export async function statusText(io: Io): Promise<string> {
   const p = await loadProject(io)
@@ -16,7 +18,16 @@ export async function statusText(io: Io): Promise<string> {
     const ph = await loadPhase(io, p, n)
     plans.set(n, [ph.plans.length > 0, Object.keys(ph.summaries).length > 0])
   }
-  return renderStatus(p, nextAction(p, n => plans.get(n)?.[0] ?? false, n => plans.get(n)?.[1] ?? false))
+  const extra: string[] = []
+  const ms = p.roadmap && p.roadmapText ? parseMilestones(p.roadmapText).map(m => ({ ...m, status: deriveStatus(m, p.roadmap!) })) : []
+  const cur = ms.find(m => m.status === 'In Progress') ?? ms.find(m => m.status === 'Pending') ?? ms.find(m => m.status === 'Complete')
+  if (cur) {
+    extra.push('', '## Current Milestone', `**Milestone ${cur.n}: ${cur.name}** — ${cur.status}`)
+    if (cur.status === 'Complete') extra.push('Run `/triad:milestone` to generate a summary and optionally archive.')
+  }
+  const b = await briefing(io, p.settings)
+  if (b) extra.push('', '## Memory', b)
+  return renderStatus(p, nextAction(p, n => plans.get(n)?.[0] ?? false, n => plans.get(n)?.[1] ?? false)) + (extra.length ? '\n' + extra.join('\n') : '')
 }
 
 export async function validateText(io: Io, args: string): Promise<{ text: string; exitCode: number }> {
@@ -83,6 +94,17 @@ export async function planCheck(io: Io, phase: number): Promise<string> {
   const ph = await loadPhase(io, p, phase)
   if (!ph.plans.length) return `No plans found for Phase ${phase}.`
   return renderCritique(critique(ph.plans, p.settings.planning?.max_tasks_per_plan ?? 3, ROSTER))
+}
+
+// With a task: registry scores plus the memory boost (agents with 2+ outcome
+// records, added only to a persona that already matches).
+export async function personaRank(io: Io, input: { task?: string; agent?: string }): Promise<string> {
+  if (input.agent || !input.task) return personaQuery(input)
+  const p = await loadProject(io)
+  const boost = await agentScores(io, p.settings).catch(() => ({} as Record<string, number>))
+  const top = rank(input.task, x => x.tier !== 'opus').map(r => ({ ...r, mem: r.score > 0 ? boost[r.persona.id] ?? 0 : 0 }))
+    .sort((a, b) => b.score + b.mem - (a.score + a.mem) || a.persona.id.localeCompare(b.persona.id)).slice(0, 6)
+  return top.map(r => `${r.persona.id} (${r.persona.division}, tier ${r.persona.tier}): score ${r.score}${r.mem ? ` + memory ${r.mem}` : ''} — ${r.persona.description}`).join('\n')
 }
 
 export function personaQuery(input: { task?: string; agent?: string }): string {

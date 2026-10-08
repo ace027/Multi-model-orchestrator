@@ -1,6 +1,7 @@
 // The review loop (review-loop, review-panel) in mod code: reviewers in
 // parallel, triage in code, fix agents routed by file, scoped re-review, cycle
 // cap, stale-loop abort, REVIEW.md, STATE/ROADMAP, commits.
+import { OUTCOMES, storeKnowledge, storeOutcome } from './memory.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
 import { checkPhase, getSection, overlaps, pad2, setRoadmapRow, updateState, verificationCommands } from './planning.ts'
 import { BY_ID, classicReviewers, composePanel, divisionsOf, fixAgentFor, personaBrief, rubricOf } from './registry.ts'
@@ -190,8 +191,26 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   }
   await io.write('.planning/STATE.md', state)
   await io.write('.planning/ROADMAP.md', roadmap)
+  // Memory: an outcome per reviewer; a pattern on a first-cycle pass; the verdict as a preference signal.
+  const memo: string[] = []
+  try {
+    const cycles = Math.min(cycle, maxCycles)
+    const blockerCount = findings.filter(f => f.severity === 'blocker' || f.severity === 'critical').length
+    for (const r of reviewers) {
+      const rec = await storeOutcome(io, settings, {
+        phase: n, plan: `${pad2(n)}-00`, agent: r.id, task_type: 'quality-review', tags: ['review', r.division.toLowerCase()],
+        outcome: result === 'PASSED' ? 'success' : 'partial', cycles, escalated: result !== 'PASSED', blockers: blockerCount,
+        summary: `Phase ${n} review ${result} in ${cycles} cycle(s), ${findings.length} finding(s)`,
+      })
+      if (rec) memo.push(OUTCOMES)
+    }
+    if (result === 'PASSED' && cycles === 1 && await storeKnowledge(io, settings, 'pattern', [`Phase ${n} (${name}) passed review in one cycle`, `plans by ${[...new Set(ph.plans.map(x => x.fm.agents[0]).filter(Boolean))].join(', ')}`, 'similar phase scope and plan shape', `${pad2(n)}-REVIEW.md`, 'review, first-pass']))
+      memo.push('.planning/memory/PATTERNS.md')
+    if (result === 'PASSED' && await storeKnowledge(io, settings, 'preference', ['review-verdict', `Phase ${n} review`, 'PASS', 'accepted', 'positive', 'system', 'review']))
+      memo.push('.planning/memory/PREFERENCES.md')
+  } catch { /* memory never blocks the review */ }
   if (settings.execution.auto_commit !== false) {
-    await io.run(['git', 'add', '-A', '--', '.planning/STATE.md', '.planning/ROADMAP.md', `${ph.rel}/${pad2(n)}-REVIEW.md`])
+    await io.run(['git', 'add', '-A', '--', '.planning/STATE.md', '.planning/ROADMAP.md', `${ph.rel}/${pad2(n)}-REVIEW.md`, ...new Set(memo)])
     await io.run(['git', 'commit', '-q', '-m', result === 'PASSED' ? `chore(${prefix}): phase ${n} review passed — ${name}` : `chore(${prefix}): phase ${n} review ${result === 'ESCALATED' ? 'escalated' : 'stale'} — ${name}`])
   }
   const summary = [

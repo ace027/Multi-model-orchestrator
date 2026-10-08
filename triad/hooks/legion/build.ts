@@ -14,6 +14,7 @@ import type { Persona } from './personas.ts'
 import { critique } from './critique.ts'
 import { parseReply } from '../policy.ts'
 import { profileOf, type Mode, type Scope } from './settings.ts'
+import { OUTCOMES, storeOutcome, taskTypeOf } from './memory.ts'
 
 export type AgentRun = { agentId?: string; answer?: string; deny?: string }
 export interface Agents {
@@ -60,7 +61,7 @@ export async function dirtyFiles(io: Io): Promise<Set<string>> {
   return out
 }
 
-async function commit(io: Io, files: string[], message: string): Promise<string | undefined> {
+export async function commit(io: Io, files: string[], message: string): Promise<string | undefined> {
   if (!files.length) return undefined
   const add = await io.run(['git', 'add', '-A', '--', ...files])
   if (add.exitCode !== 0) return `git add failed: ${add.stderr.trim()}`
@@ -286,8 +287,14 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           const okNow = succeeded(status)
           state = appendToSection(state, resultsHeading, `- Plan ${plan.id} (Wave ${w.wave}): ${plan.title} — ${okNow ? status : `${status.toUpperCase()}: ${(s.error ?? reply.blockedReason ?? reply.summary[0] ?? '').slice(0, 200)}`}`)
           await saveState({ status: `Phase ${n} executing — Plan ${plan.id} ${okNow ? 'complete' : 'failed'}`, lastActivity: `Plan ${plan.id} execution (${date})` })
+          // Memory: one outcome record per plan (memory-manager Store Outcome).
+          const rec = await storeOutcome(io, settings, {
+            phase: n, plan: plan.id, agent: persona.id, task_type: taskTypeOf(persona), tags: [ph.dir!.replace(/^\d+-/, ''), persona.division.toLowerCase()],
+            outcome: status === 'Complete' ? 'success' : status === 'Complete with Warnings' ? 'partial' : 'failed',
+            summary: `${plan.title}: ${status}${s.error ? ` — ${s.error.slice(0, 120)}` : ''}`,
+          }).catch(() => undefined)
           if (okNow && autoCommit) {
-            const err = await commit(io, [...files, `${ph.rel}/${plan.id}-SUMMARY.md`], commitPlan(prefix, plan.id, plan.title, n, phaseName, w.wave, plan.fm.requirements))
+            const err = await commit(io, [...files, `${ph.rel}/${plan.id}-SUMMARY.md`, ...(rec ? [OUTCOMES] : [])], commitPlan(prefix, plan.id, plan.title, n, phaseName, w.wave, plan.fm.requirements))
             if (err) warnings.push(`${plan.id}: ${err}`)
           }
           outcomes.push({ id: plan.id, status, agent: persona.id, files, failedChecks: verify.filter(v => !v.passed).map(v => v.command) })

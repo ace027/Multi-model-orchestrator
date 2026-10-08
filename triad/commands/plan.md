@@ -6,6 +6,7 @@ Plan a phase of the Triad project in `.planning/`. Phase: $ARGUMENTS (default: t
 
 1. Load the tools: ToolSearch with query `select:mcp__triad__planning_status,mcp__triad__plan_write,mcp__triad__plan_check,mcp__triad__persona_brief`.
 2. Call `planning_status` for the position. Read the phase's block in `.planning/ROADMAP.md` (goal, requirements, success criteria, recommended agents), `.planning/PROJECT.md`, and the SUMMARY.md handoffs of the previous phase. If the phase already has plan files, ask the user: re-plan from scratch, or keep them and stop.
+   Memory, when `.planning/memory/` exists: load `mcp__triad__memory` and call it with action `recall` on the phase's main topics (patterns, pitfalls, preferences). Read the latest entry of `.planning/memory/RETRO.md`: its High-priority action items are constraints on this plan, and "prefer {agent} for {task_type}" lines are agent-selection hints. `persona_brief` already adds agents' memory scores.
 3. Ground the plan in the code: give a triad:triad-helper a narrow read-only brief to report the files, interfaces and test commands the phase touches. Do not read the codebase at length yourself.
 4. Decompose the phase into plans. Each plan:
    - has at most 3 tasks (`planning.max_tasks_per_plan` in settings.json), each with exact files, decision-complete actions, `verification` shell commands that exit 0 when it is done, and a done sentence;
