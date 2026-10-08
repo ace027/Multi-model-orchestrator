@@ -4,9 +4,10 @@
 import { splitFrontmatter } from '../hooks/legion/yaml.ts'
 
 // Byte budgets: today's sizes plus headroom. The guide is in every main-loop
-// prompt (1,385 bytes at 0.6.0); a command file loads when it runs (largest
+// prompt (1,385 bytes at 0.6.0, 3,057 once it carried Legion's divisions,
+// authority, escalation and mode rules and the knowledge index pointer); a command file loads when it runs (largest
 // plan.md, 6,858 bytes at 0.6.0). Raise a budget only with a reason in the PR.
-export const BUDGETS = { guide: 2048, command: 9216 }
+export const BUDGETS = { guide: 3584, command: 9216 }
 
 const bytes = (s: string) => new TextEncoder().encode(s).length
 

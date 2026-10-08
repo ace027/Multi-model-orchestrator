@@ -114,6 +114,8 @@ Live `/triad:plan` (`bench/run_legion_plan.sh`, evidence in `bench/results/phase
 
 ## Phase 6: the rest of Legion
 
+Version 0.6.0.
+
 Every Legion workflow now has a Triad equivalent (`PARITY.md`). Judgment work is a plugin command; anything deterministic (parsing, scoring, formulas, file layout, checks, git and `gh`) is mod code behind a deferred `mcp__triad__*` tool, so it costs no tokens and cannot drift. Persona agents run through `persona_run`: in parallel, at the persona's tier, with its distilled core on top of the brief, and read-only unless the command names writable files.
 
 | Command | Does (code / agents) |

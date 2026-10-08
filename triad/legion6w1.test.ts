@@ -225,6 +225,10 @@ describe('decision log and directory mappings', () => {
     expect((await checkMapping(memIo({ '.planning/config/directory-mappings.yaml': MAP('warn') }), 'src/a.test.ts')).action).toBe('warn')
     expect((await checkMapping(memIo({ '.planning/config/directory-mappings.yaml': MAP('off') }), 'src/a.test.ts')).action).toBe('ok')
     expect((await checkMapping(memIo(), 'src/a.test.ts')).action).toBe('ok')
+    // Legion's mapper skill wrote `rules:`; its template and enforcer read `enforcement:`.
+    const rules = memIo({ '.planning/config/directory-mappings.yaml': MAP('strict').replace('enforcement:', 'rules:') })
+    expect((await checkMapping(rules, 'src/a.test.ts')).action).toBe('deny')
+    expect((await checkMapping(rules, 'e2e/login.test.ts')).action).toBe('ok')
     const auto = memIo({ '.planning/config/directory-mappings.yaml': MAP('strict'), 'settings.json': JSON.stringify({ control_mode: 'autonomous' }) })
     expect((await checkMapping(auto, 'src/a.test.ts')).action).toBe('warn')
     // the parse is cached by content: an edited file takes effect at once

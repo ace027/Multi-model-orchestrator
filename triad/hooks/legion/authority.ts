@@ -265,9 +265,10 @@ export async function checkMapping(io: Io, rel: string): Promise<MappingCheck> {
     mapCache = { text, y }
   }
   const y = mapCache.y
-  const strictness = String(y.enforcement?.strictness ?? y.strictness ?? 'warn')
+  const strictness = String(y.enforcement?.strictness ?? y.rules?.strictness ?? y.strictness ?? 'warn')
   if (strictness === 'off') return { action: 'ok' }
-  const exceptions: string[] = (Array.isArray(y.enforcement?.exceptions) ? y.enforcement.exceptions : []).map(String)
+  const ex = y.enforcement?.exceptions ?? y.rules?.exceptions
+  const exceptions: string[] = (Array.isArray(ex) ? ex : []).map(String)
   if (exceptions.some(x => globMatch(rel, x) || (x.endsWith('/**') && rel.startsWith(x.slice(0, -2))))) return { action: 'ok' }
   const category = inferCategory(rel)
   const allowed: string[] = (Array.isArray(y.mappings?.[category]?.paths) ? y.mappings[category].paths : []).map((a: unknown) => String(a).replace(/\/+$/, ''))

@@ -530,7 +530,8 @@ export function mappingsYaml(d: MapData): string {
   for (const m of d.mappings) mappings[m.category] = { paths: m.paths, priority: m.priority, pattern: m.pattern, description: `${m.category} files` }
   return emitYaml({
     generated: d.date, source: 'CODEBASE.md', version: '1.0', mappings, packages: {},
-    rules: { strictness: 'warn', exceptions: [] },
+    // Legion's template and enforcer read `enforcement` (its mapper skill wrote `rules`).
+    enforcement: { strictness: 'warn', exceptions: ['.planning/**'] },
     autoUpdate: { enabled: true, mode: 'prompt', threshold: { newDirectoryFiles: 3, newCategoryFiles: 10, categoryChangePercent: 20 }, backup: { enabled: true, keepCount: 5 } },
   })
 }
