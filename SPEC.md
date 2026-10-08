@@ -112,7 +112,7 @@ Every turn of an agent resends its whole conversation, so a Haiku agent's prompt
 - **Prefer many short Haiku agents over one long one:** the parent splits work so each Haiku job is narrow.
 - **One-shot calls** (`$.model.complete` for compression and summaries): inputs over 60k are chunked and merged map-reduce style. Never `$.model.fork` to Haiku when the conversation is near the ceiling, since fork carries the whole conversation.
 - **Model rerouting:** a `turn.step` hook never moves a request to Haiku if its prompt is above the act-at threshold. It stays on its current model.
-- **Counting:** until spike item 9 is answered, count every token sent in the request, including cache reads and writes. Output tokens are not limited.
+- **Counting:** count every input token sent in the request, including cache reads and writes; spike item 9 measured that both count toward the line. Output tokens are not limited.
 - Opus and Sonnet are never limited or stopped on token grounds.
 
 ## 5. Phases
@@ -146,7 +146,7 @@ Do not delete Legion until Triad matches it on the benchmark. Then disable Legio
 
 ## 9. Open questions for the user
 
-- The pricing docs don't say whether cache read and write tokens count toward Haiku's 100k line. Triad assumes they do until the spike measures it (Appendix A has run; the result is waiting on Console billing data, see `SPIKE.md`).
+- The pricing docs don't say whether cache read and write tokens count toward Haiku's 100k line. Answered by the spike: they do, both reads and writes (see `SPIKE.md`).
 - Resolved at the Phase 0 gate: Legion's runtime adapters and installer don't apply to a Claude Code mod (Not applicable), and cross-CLI dispatch (Gemini, Codex, Copilot) is dropped. The other decisions are recorded in `PARITY.md` section 14.
 
 ## 10. Legion parity and improvements
