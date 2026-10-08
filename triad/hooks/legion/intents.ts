@@ -34,7 +34,7 @@ const PRIMARY = new Set(['harden', 'document', 'security-only'])
 export const COMMAND_FLAGS: Record<string, string[]> = {
   build: ['--phase', '--wave', '--rerun', '--dry-run', '--two-wave', '--single-wave', '--skip-gates', '--skip-architecture', '--skip-security'],
   review: ['--phase', '--panel', '--classic', '--security', '--dry-run'],
-  plan: ['--phase', '--auto', '--skip-board', '--skip-security', '--security', '--dry-run'],
+  plan: ['--phase', '--auto', '--auto-refine', '--skip-board', '--skip-security', '--security', '--spec', '--domain', '--dry-run'],
   quick: ['--dry-run'],
 }
 

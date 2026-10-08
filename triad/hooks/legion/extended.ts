@@ -15,9 +15,10 @@ import { retroGather, retroSave } from './retro.ts'
 import { filterPlans, loadIntentConfig, parseIntentFlags, parseNaturalLanguage, renderNl, renderValidation, resolveTeam, validateFlagCombination } from './intents.ts'
 import { dryRunReport, renderDryRun } from './dryrun.ts'
 import { renderSpecCheck, specAssess, specCheck, specGather, specTrigger } from './spec.ts'
+import { designGrade, designTeam, detectDomain, domainCheck, marketingTeam, passSummary, setStatus, slopGrade, wavePattern, writeDoc } from './domain.ts'
 import { boardCompose, boardDecide, boardMeet, boardReview } from './board.ts'
 
-export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run', 'board', 'spec'])
+export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run', 'board', 'spec', 'domain'])
 
 export type Ctx = { agents: () => Agents; ioAt: (root: string) => Io; registry: () => Promise<Io>; schedule?: (ms: number, fn: () => void) => void; notify?: (text: string) => void }
 
@@ -65,6 +66,25 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
         case 'assess': return specAssess(io, input.phase)
       }
       return 'spec: unknown action'
+    case 'domain':
+      switch (input.action) {
+        case 'detect': { const d = await detectDomain(io, input.phase, input.flag); return [`domain: ${d.domain ?? 'none'} (${d.reason})`, d.supporting ? `supporting: ${d.supporting}` : '', d.hint ?? '', d.domain ? `Waves:\n${wavePattern(d.domain, input.options ?? {}).map(w => `- ${w}`).join('\n')}` : ''].filter(Boolean).join('\n') }
+        case 'team': { const t = input.domain === 'marketing' ? marketingTeam(input.answers ?? {}) : designTeam(input.answers ?? {}); return t.map(m => `- ${m.agent}: ${m.role}`).join('\n') }
+        case 'write': return writeDoc(io, { kind: input.kind, name: String(input.name ?? ''), fields: input.fields, overwrite: input.overwrite })
+        case 'status': return setStatus(io, String(input.path ?? ''), String(input.status ?? ''))
+        case 'check': return domainCheck(io, String(input.path ?? ''))
+        case 'grade': return `Design Score: ${designGrade(Number(input.high ?? 0), Number(input.medium ?? 0))}; AI Slop Score: ${slopGrade(Number(input.slop ?? 0))}`
+        case 'passes': {
+          const text = passSummary(input.scores ?? [])
+          if (input.phase) {
+            const p = await loadProject(io)
+            const ph = await loadPhase(io, p, Number(input.phase))
+            if (ph.rel) { const c = (await io.read(`${ph.rel}/CONTEXT.md`)) ?? ''; await io.write(`${ph.rel}/CONTEXT.md`, `${c.trimEnd()}\n\n${text}\n`) }
+          }
+          return text
+        }
+      }
+      return 'domain: unknown action'
     case 'dry_run': return renderDryRun(await dryRunReport(io, String(input.command), input.phase, input.target))
     case 'memory':
       switch (input.action) {

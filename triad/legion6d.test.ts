@@ -37,6 +37,7 @@ describe('intent router', () => {
     expect(wrong.errors).toEqual(['--just-harden is only valid for /triad:build (used with review)'])
     expect(wrong.suggestions).toEqual(['Use /triad:build instead'])
     expect(check('--just-security', 'review').valid).toBe(true)
+    expect(check('--auto --auto-refine --spec --domain=design', 'plan').valid).toBe(true)
     expect(check('--just-hardne').errors).toEqual(['Unknown flag: --just-hardne. Did you mean --just-harden?'])
     expect(check('--frobnicate').errors[0]).toContain('Valid flags for /triad:build')
     const unsafe = check('--frobnicate --unsafe-unknown-flags')
@@ -370,5 +371,63 @@ describe('spec pipeline', () => {
     expect(doc).toContain('| Deliverables | 2 (new: 2, modify: 0, config: 0) |')
     expect(doc).toContain('**Critique verdict:** PASS')
     expect(doc.match(/## Complexity Assessment/g)!.length).toBe(1)
+  })
+})
+
+import { designGrade, designTeam, detectDomain, docPath, domainCheck, marketingTeam, passSummary, setStatus, slopGrade, wavePattern, writeDoc } from './hooks/legion/domain.ts'
+
+describe('domain workflows', () => {
+  async function domainProject(reqs: string[]) {
+    const io = memIo()
+    await projectInit(io, { name: 'Demo', description: 'A demo.', requirements: reqs.map(r => `${r}: something`), phases: [{ name: 'Launch Campaign', goal: 'Announce the product', requirements: reqs, plans: 2 }] } as any)
+    return io
+  }
+
+  test('detection: flag, requirement ids, precedence, keyword hint only', async () => {
+    expect((await detectDomain(await domainProject(['MKT-01']), 1)).domain).toBe('marketing')
+    expect((await detectDomain(await domainProject(['DSN-01']), 1)).domain).toBe('design')
+    const both = await detectDomain(await domainProject(['MKT-01', 'DSN-02']), 1)
+    expect([both.domain, both.supporting]).toEqual(['marketing', 'design'])
+    expect((await detectDomain(await domainProject(['DSN-01']), 1, '--domain=marketing')).domain).toBe('marketing')
+    const none = await detectDomain(await domainProject(['REQ-01']), 1)
+    expect(none.domain).toBeUndefined()
+    expect(none.hint).toContain('marketing')
+  })
+
+  test('teams, roster ids and wave patterns', () => {
+    const m = marketingTeam({ objective: 'User acquisition / Growth', channels: ['twitter', 'blog', 'linkedin'] })
+    expect(m.map(x => x.agent)).toEqual(['marketing-content-social-strategist', 'marketing-social-platform-specialist', 'marketing-growth-hacker'])
+    const d = designTeam({ disciplines: ['brand-identity'], brand: 'Yes, established brand', platforms: ['Web (responsive)'] })
+    expect(d.map(x => x.agent)).toEqual(['design-ui-designer', 'design-ux-researcher', 'design-brand-guardian', 'engineering-frontend-developer'])
+    expect(wavePattern('design', { backend: true, frontend: true }).map(w => w.split(' —')[0])).toEqual(['Wave 1', 'Wave 2A', 'Wave 2B', 'Wave 3'])
+    expect(wavePattern('marketing').length).toBe(2)
+  })
+
+  test('documents: scaffold, lifecycle, completion check', async () => {
+    const io = await domainProject(['MKT-01'])
+    expect(docPath('campaign', 'Product Launch Q2!')).toBe('.planning/campaigns/product-launch-q2.md')
+    expect(docPath('system', 'Dashboard Redesign')).toBe('.planning/designs/dashboard-redesign-system.md')
+    expect(await writeDoc(io, { kind: 'campaign', name: 'Product Launch Q2', fields: { objective: 'Brand awareness', channels: ['twitter'], message: 'Ship faster' } })).toBe('Wrote .planning/campaigns/product-launch-q2.md.')
+    const path = '.planning/campaigns/product-launch-q2.md'
+    expect(await writeDoc(io, { kind: 'campaign', name: 'Product Launch Q2' })).toContain('exists')
+    const c = await domainCheck(io, path)
+    expect(c).toContain('INCOMPLETE')
+    expect(c).toContain('Content Calendar is empty')
+    expect(await setStatus(io, path, 'active')).toBe(`${path}: Planning → Active`)
+    expect(await setStatus(io, path, 'draft')).toContain('only moves forward')
+    expect(io.files.get(path)).toContain('| twitter | marketing-social-platform-specialist |')
+    await writeDoc(io, { kind: 'system', name: 'Demo', fields: { color: [['color-primary', '#0a0', 'actions']] } })
+    const sys = await domainCheck(io, '.planning/designs/demo-system.md')
+    expect(sys).not.toContain('Color tokens')
+    expect(sys).toContain('Typography tokens without values: font-family-primary')
+    expect(sys).toContain('no atoms defined')
+  })
+
+  test('grades and the 7-pass summary', () => {
+    expect([designGrade(0, 0), designGrade(1, 1), designGrade(5, 0), slopGrade(0), slopGrade(4), slopGrade(5)]).toEqual(['A', 'B', 'F', 'A', 'D', 'F'])
+    const s = passSummary([{ pre: 6, post: 8 }, { pre: 9 }, { pre: 7 }, { pre: 10 }, { pre: 8 }, { pre: 7 }, { pre: 4, deferred: true }])
+    expect(s).toContain('| 1 | Information Architecture | 6 | 8 | REMEDIATED |')
+    expect(s).toContain('| 7 | Unresolved Design Decisions | 4 | 4 | DEFERRED |')
+    expect(s).toContain('**Overall Design Readiness:** 7.6/10')
   })
 })

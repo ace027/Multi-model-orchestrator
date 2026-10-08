@@ -280,6 +280,18 @@ export const LEGION_TOOLS = [
     description: 'Spec pipeline, deterministic stages. trigger: run / offer / skip for a phase (--spec flag, CONTEXT spec_required, 4+ requirements at high complexity, or a new surface with 3+ requirements or plans). gather: stage 1 requirements summary and the spec path. check: the machine-checkable critique (required sections, requirement coverage, contracts, acceptance checks, Blocking open questions, defaults, path validation against directory-mappings.yaml) with verdict PASS / CAUTION / REWORK. assess: stage 5 complexity rating written into the spec.',
     inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['trigger', 'gather', 'check', 'assess'] }, phase: { type: 'integer' }, flag: { type: 'boolean', description: 'the user passed --spec' } }, required: ['action'] },
   },
+  {
+    name: 'domain',
+    description: 'Design and marketing workflows in code. detect: the phase domain (MKT-/DSN- ids, CONTEXT workflow_type, --domain flag; keywords are only a hint) and its wave pattern. team: the team from the questioning answers. write: scaffold a design system (kind system), UX research report (research) or campaign (campaign) document from the answers. status: move a document forward through its lifecycle. check: completion check of a document. grade: design audit grade from HIGH/MEDIUM counts and the AI-slop grade. passes: the 7-pass plan-stage design review summary (appended to the phase CONTEXT.md when phase is given).',
+    inputSchema: { type: 'object', properties: {
+      action: { type: 'string', enum: ['detect', 'team', 'write', 'status', 'check', 'grade', 'passes'] }, phase: { type: 'integer' }, flag: str('--domain=design|marketing'),
+      options: { type: 'object', description: 'wave options: backend, frontend, execution, polish (booleans)' },
+      domain: { type: 'string', enum: ['design', 'marketing'] }, answers: { type: 'object', description: 'design: focus, disciplines[], brand, platforms[], backend, visual, polish, feedback. marketing: objective, channels[], visual, tracking.' },
+      kind: { type: 'string', enum: ['system', 'research', 'campaign'] }, name: str('project, research or campaign name'), fields: { type: 'object', description: 'document fields from the answers (scope, platforms, accessibility, principles, color/typography/spacing/atoms rows; goals, methods; objective, audience, channels, message, tone, hashtags, cta, timeline, metrics, calendar rows)' }, overwrite: { type: 'boolean' },
+      path: str('document path'), status: str('new lifecycle status'), high: { type: 'integer' }, medium: { type: 'integer' }, slop: { type: 'integer' },
+      scores: { type: 'array', items: { type: 'object', properties: { pre: { type: 'number' }, post: { type: 'number' }, deferred: { type: 'boolean' } } } },
+    }, required: ['action'] },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)
