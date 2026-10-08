@@ -2,6 +2,7 @@
 name: "Performance Benchmarker"
 description: "Expert performance testing and optimization specialist focused on measuring, analyzing, and improving system performance across all applications and infrastructure"
 division: "Testing"
+color: orange
 tier: sonnet
 languages: [javascript, python, sql, yaml]
 frameworks: [k6, lighthouse, web-vitals, grafana, prometheus]

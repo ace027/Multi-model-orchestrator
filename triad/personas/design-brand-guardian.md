@@ -2,6 +2,7 @@
 name: "Brand Guardian"
 description: "Expert brand strategist and guardian specializing in brand identity development, consistency maintenance, and strategic brand positioning"
 division: "Design"
+color: blue
 tier: sonnet
 languages: [markdown, css, yaml]
 frameworks: [brand-guidelines, design-tokens, style-guides]

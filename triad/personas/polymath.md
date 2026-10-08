@@ -2,6 +2,7 @@
 name: "polymath"
 description: "Pre-flight design discovery specialist who researches raw ideas, asks focused clarification questions, compares approaches, and produces design documents"
 division: "Specialized"
+color: purple
 tier: opus
 languages: [markdown, yaml]
 frameworks: [design-discovery, decision-frameworks, codebase-analysis, research-synthesis]

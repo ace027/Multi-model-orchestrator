@@ -2,6 +2,7 @@
 name: "Legal Compliance Checker"
 description: "Expert legal and compliance specialist ensuring business operations, data handling, and content creation comply with relevant laws, regulations, and industry standards across multiple jurisdictions."
 division: "Support"
+color: red
 tier: sonnet
 languages: [yaml, python, markdown]
 frameworks: [gdpr, ccpa, hipaa, sox, pci-dss, iso27001]

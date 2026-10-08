@@ -2,6 +2,7 @@
 name: "Mobile App Builder"
 description: "Specialized mobile application developer with expertise in native iOS/Android development and cross-platform frameworks"
 division: "Engineering"
+color: purple
 tier: sonnet
 languages: [swift, kotlin, typescript, dart]
 frameworks: [swiftui, jetpack-compose, react-native, flutter]

@@ -2,6 +2,7 @@
 name: "Senior Developer"
 description: "Stack-agnostic senior implementation lead for production-grade software delivery across web, backend, and platform systems"
 division: "Engineering"
+color: green
 tier: sonnet
 languages: [javascript, typescript, python, ruby, go, sql]
 frameworks: [node, express, react, vue, django, rails]

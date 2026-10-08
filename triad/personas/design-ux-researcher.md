@@ -2,6 +2,7 @@
 name: "UX Researcher"
 description: "Expert user experience researcher specializing in user behavior analysis, usability testing, and data-driven design insights. Provides actionable research findings that improve product usability and user satisfaction"
 division: "Design"
+color: green
 tier: sonnet
 languages: [markdown, yaml, python, r]
 frameworks: [usability-testing, a-b-testing, analytics-platforms, survey-tools]

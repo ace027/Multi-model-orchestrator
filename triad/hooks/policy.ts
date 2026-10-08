@@ -75,11 +75,33 @@ export function parseReply(text: string): Reply {
   }
 }
 
+// Work handed back instead of done (Legion's no-agent-deferrals rule): planned
+// work is completed, blocked with a reason, or returned partial; never deferred.
+const DEFERRALS: RegExp[] = [
+  /\b(?:I(?:'ll| will| am going to)|let me) leave\b[^.\n]{0,40}\b(?:for|to) (?:you|the user|the orchestrator|later|a later|a future|another)\b/i,
+  /\bleav(?:e|ing) (?:this|that|it|these|those|the rest) (?:for|to) (?:you|the user|the orchestrator|later|a later|a future|another)\b/i,
+  /\byou(?:'ll| will)? (?:should|need to|have to|must|may want to|can now) (?:still |then |now )?(?:add|implement|write|fix|update|create|finish|complete|wire|handle|change|edit|refactor|port|migrate)\b/i,
+  /\bTODO\b[^.\n]{0,20}\b(?:for|by) (?:the )?(?:user|you|orchestrator|caller)\b/i,
+  /\b(?:deferred|parked|punted)\b[^.\n]{0,40}\b(?:later|future|follow-?up|next phase|another (?:task|phase|agent))\b/i,
+  /\b(?:left|leave) (?:as )?(?:an exercise|for (?:a )?(?:future|later|follow-?up)(?: phase| task| work)?)\b/i,
+  /\b(?:can|could|will|should) be (?:done|handled|addressed|implemented|finished) (?:later|in a follow-?up|in a (?:future|later|next) (?:phase|task)|separately)\b/i,
+]
+
+export function deferralIn(text: string): string | undefined {
+  for (const re of DEFERRALS) {
+    const m = text.match(re)
+    if (m) return m[0]
+  }
+  return undefined
+}
+
 // Returns the problems with a reply, empty when it follows the schema.
 export function schemaProblems(text: string): string[] {
   const r = parseReply(text)
   const out: string[] = []
   if (!r.status) out.push('no "status: done|blocked|partial" line')
+  const deferral = r.status === 'blocked' || r.status === 'partial' ? undefined : deferralIn(text)
+  if (deferral) out.push(`reply defers work back ("${deferral}"); finish it, or return status blocked with a blocked_reason, or partial naming what is left`)
   if (!r.summary.length) out.push('no "summary:"')
   else if (r.summary.length > 5) out.push(`summary is ${r.summary.length} lines (max 5)`)
   if (!r.hasChanges) out.push('no "changes:" (use "changes: none")')

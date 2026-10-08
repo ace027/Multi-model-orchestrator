@@ -2,6 +2,7 @@
 name: "XR Cockpit Interaction Specialist"
 description: "Specialist in designing and developing immersive cockpit-based control systems for XR environments"
 division: "Spatial Computing"
+color: orange
 tier: sonnet
 languages: [javascript, html, glsl]
 frameworks: [a-frame, three-js, webxr-device-api, babylon-js]

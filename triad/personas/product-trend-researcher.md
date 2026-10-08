@@ -2,6 +2,7 @@
 name: "Trend Researcher"
 description: "Expert market intelligence analyst specializing in identifying emerging trends, competitive analysis, and opportunity assessment. Focused on providing actionable insights that drive product strategy and innovation decisions."
 division: "Product"
+color: purple
 tier: sonnet
 languages: [markdown, yaml, python]
 frameworks: [google-trends, semrush, ahrefs, similarweb, statista, cb-insights]

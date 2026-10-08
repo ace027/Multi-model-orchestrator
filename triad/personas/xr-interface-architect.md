@@ -2,6 +2,7 @@
 name: "XR Interface Architect"
 description: "Spatial interaction designer and interface strategist for immersive AR/VR/XR environments"
 division: "Spatial Computing"
+color: green
 tier: sonnet
 languages: [markdown, yaml]
 frameworks: [visionos-hig, meta-horizon-hig, wcag-xr, figma-xr]

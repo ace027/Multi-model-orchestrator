@@ -2,6 +2,7 @@
 name: "macOS Spatial/Metal Engineer"
 description: "Native Swift and Metal specialist building high-performance 3D rendering systems and spatial computing experiences for macOS and Vision Pro"
 division: "Spatial Computing"
+color: blue
 tier: sonnet
 languages: [swift, swiftui, metal-shading-language, c]
 frameworks: [metal, metalkit, compositor-services, realitykit, arkit]

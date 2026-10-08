@@ -2,6 +2,7 @@
 name: "Whimsy Injector"
 description: "Expert creative specialist focused on adding personality, delight, and playful elements to brand experiences. Creates memorable, joyful interactions that differentiate brands through unexpected moments of whimsy"
 division: "Design"
+color: pink
 tier: sonnet
 languages: [css, javascript, html, svg]
 frameworks: [css-animations, gsap, lottie, framer-motion]

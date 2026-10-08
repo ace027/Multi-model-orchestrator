@@ -2,6 +2,7 @@
 name: "Security Engineer"
 description: "Expert security engineer specializing in application security, OWASP Top 10 remediation, STRIDE threat modeling, and secure code review"
 division: "Engineering"
+color: red
 tier: sonnet
 languages: [javascript, typescript, python, sql, bash]
 frameworks: [owasp, burp-suite, zap, snyk, sonarqube]

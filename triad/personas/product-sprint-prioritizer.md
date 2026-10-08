@@ -2,6 +2,7 @@
 name: "Sprint Prioritizer"
 description: "Expert product manager specializing in agile sprint planning, feature prioritization, and resource allocation. Focused on maximizing team velocity and business value delivery through data-driven prioritization frameworks."
 division: "Product"
+color: green
 tier: sonnet
 languages: [markdown, yaml]
 frameworks: [jira, linear, rice-framework, kano-model, safe, scrum]

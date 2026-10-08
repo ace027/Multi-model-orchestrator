@@ -1,0 +1,734 @@
+# Authority Matrix for Legion
+# Defines exclusive domain ownership to prevent agent conflicts during parallel execution
+version: "1.0"
+description: "Exclusive domain ownership — when an agent with a domain is active, other agents must respect that domain owner"
+
+# ============================================================================
+# ENGINEERING DIVISION (8 agents)
+# ============================================================================
+
+agents:
+  engineering-security-engineer:
+    name: "Security Engineer"
+    division: "engineering"
+    exclusive_domains:
+      - "security"
+      - "owasp"
+      - "stride"
+      - "vulnerability-assessment"
+      - "pentest"
+      - "threat-modeling"
+      - "secure-coding"
+    deferred_by: ["*"]
+    description: "All security findings, vulnerability assessments, and threat modeling"
+
+  engineering-infrastructure-devops:
+    name: "Infrastructure & DevOps Engineer"
+    division: "engineering"
+    exclusive_domains:
+      - "ci-cd"
+      - "deployment"
+      - "infrastructure-as-code"
+      - "containers"
+      - "orchestration"
+      - "docker"
+      - "kubernetes"
+      - "infrastructure"
+      - "system-reliability"
+      - "monitoring"
+      - "cloud-management"
+      - "cost-optimization"
+    deferred_by: ["*"]
+    description: "Infrastructure decisions, CI/CD pipelines, container orchestration, system reliability, and cloud operations"
+
+  engineering-backend-architect:
+    name: "Backend Architect"
+    division: "engineering"
+    exclusive_domains:
+      - "backend-architecture"
+      - "database-design"
+      - "api-design"
+      - "microservices"
+      - "system-design"
+      - "data-modeling"
+    deferred_by: ["*"]
+    description: "Backend design authority, database architecture, API contracts"
+
+  engineering-frontend-developer:
+    name: "Frontend Developer"
+    division: "engineering"
+    exclusive_domains:
+      - "frontend-architecture"
+      - "ui-components"
+      - "state-management"
+      - "client-side-routing"
+      - "react"
+      - "vue"
+      - "angular"
+    deferred_by: ["*"]
+    description: "Frontend implementation authority, component architecture"
+
+  engineering-ai-engineer:
+    name: "AI Engineer"
+    division: "engineering"
+    exclusive_domains:
+      - "ai-integration"
+      - "llm-prompts"
+      - "model-selection"
+      - "ai-testing"
+      - "ml-ops"
+      - "data-pipelines"
+    deferred_by: ["*"]
+    description: "AI-related decisions, model selection, LLM integration"
+
+  engineering-mobile-app-builder:
+    name: "Mobile Developer"
+    division: "engineering"
+    exclusive_domains:
+      - "mobile-architecture"
+      - "ios"
+      - "android"
+      - "react-native"
+      - "flutter"
+      - "cross-platform"
+    deferred_by: ["*"]
+    description: "Mobile-specific concerns, native and cross-platform development"
+
+  engineering-rapid-prototyper:
+    name: "Rapid Prototyper"
+    division: "engineering"
+    exclusive_domains:
+      - "rapid-prototyping"
+      - "spike-solutions"
+      - "proof-of-concept"
+      - "mvp"
+      - "experimentation"
+    deferred_by: ["*"]
+    description: "Quick validation work, proof-of-concept development"
+
+  engineering-laravel-specialist:
+    name: "Laravel Specialist"
+    division: "engineering"
+    exclusive_domains:
+      - "laravel"
+      - "php"
+      - "eloquent"
+      - "blade"
+      - "artisan"
+      - "livewire"
+      - "fluxui"
+    deferred_by: ["*"]
+    description: "Laravel-specific implementations and PHP ecosystem"
+
+  engineering-senior-developer:
+    name: "Senior Developer"
+    division: "engineering"
+    exclusive_domains:
+      - "full-stack"
+      - "refactoring"
+      - "code-quality"
+      - "reliability"
+    deferred_by: ["*"]
+    description: "Stack-agnostic implementation lead for production-grade delivery"
+
+  # ============================================================================
+  # TESTING DIVISION (6 agents)
+  # ============================================================================
+
+  testing-qa-verification-specialist:
+    name: "QA Verification Specialist"
+    division: "testing"
+    exclusive_domains:
+      - "production-readiness"
+      - "edge-cases"
+      - "failure-modes"
+      - "risk-assessment"
+      - "verification"
+      - "test-coverage"
+      - "proof-artifacts"
+      - "evidence-gathering"
+    deferred_by: ["*"]
+    description: "Evidence-based verification, reality-checks outputs, edge case identification, collects proof artifacts"
+
+  testing-api-tester:
+    name: "API Tester"
+    division: "testing"
+    exclusive_domains:
+      - "api-testing"
+      - "contract-testing"
+      - "endpoint-validation"
+    deferred_by: ["*"]
+    description: "API contract validation, endpoint testing authority"
+
+  testing-performance-benchmarker:
+    name: "Performance Benchmarker"
+    division: "testing"
+    exclusive_domains:
+      - "performance"
+      - "load-testing"
+      - "benchmarking"
+      - "optimization"
+    deferred_by: ["*"]
+    description: "Performance decisions, load testing, optimization recommendations"
+
+  testing-workflow-optimizer:
+    name: "Workflow Optimizer"
+    division: "testing"
+    exclusive_domains:
+      - "workflow-efficiency"
+      - "process-automation"
+      - "execution-optimization"
+    deferred_by: ["*"]
+    description: "Process improvements, workflow efficiency optimization"
+
+  testing-test-results-analyzer:
+    name: "Test Results Analyzer"
+    division: "testing"
+    exclusive_domains:
+      - "test-analysis"
+      - "failure-diagnosis"
+      - "root-cause-analysis"
+    deferred_by: ["*"]
+    description: "Interprets test failures, diagnoses root causes"
+
+  testing-tool-evaluator:
+    name: "Tool Evaluator"
+    division: "testing"
+    exclusive_domains:
+      - "tool-evaluation"
+      - "dependency-assessment"
+      - "technology-selection"
+    deferred_by: ["*"]
+    description: "Tool selection authority, dependency assessment"
+
+  # ============================================================================
+  # DESIGN DIVISION (6 agents)
+  # ============================================================================
+
+  design-brand-guardian:
+    name: "Brand Guardian"
+    division: "design"
+    exclusive_domains:
+      - "brand-consistency"
+      - "visual-identity"
+      - "tone-voice"
+      - "brand-strategy"
+    deferred_by: ["*"]
+    description: "Brand-related decisions, visual identity maintenance"
+
+  design-ux-architect:
+    name: "UX Architect"
+    division: "design"
+    exclusive_domains:
+      - "accessibility"
+      - "wcag"
+      - "information-architecture"
+      - "navigation"
+      - "css-systems"
+      - "layout-frameworks"
+    deferred_by: ["*"]
+    description: "A11y and IA authority, technical architecture guidance"
+
+  design-ux-researcher:
+    name: "UX Researcher"
+    division: "design"
+    exclusive_domains:
+      - "usability-testing"
+      - "user-research"
+      - "heuristics"
+      - "behavior-analysis"
+    deferred_by: ["*"]
+    description: "UX research findings, user behavior analysis"
+
+  design-visual-storyteller:
+    name: "Visual Storyteller"
+    division: "design"
+    exclusive_domains:
+      - "visual-design"
+      - "illustration"
+      - "motion"
+      - "visual-narratives"
+      - "multimedia-content"
+    deferred_by: ["*"]
+    description: "Visual design, illustration, multimedia content"
+
+  design-ui-designer:
+    name: "UI Designer"
+    division: "design"
+    exclusive_domains:
+      - "ui-design"
+      - "component-design"
+      - "design-systems"
+      - "component-libraries"
+    deferred_by: ["*"]
+    description: "Design system authority, component design"
+
+  design-whimsy-injector:
+    name: "Whimsy Injector"
+    division: "design"
+    exclusive_domains:
+      - "microinteractions"
+      - "delight-design"
+      - "animation"
+      - "creative-direction"
+      - "personality"
+    deferred_by: ["*"]
+    description: "Delight and personality design, microinteractions"
+
+  # ============================================================================
+  # MARKETING DIVISION (4 agents)
+  # ============================================================================
+
+  marketing-content-social-strategist:
+    name: "Content & Social Strategist"
+    division: "marketing"
+    exclusive_domains:
+      - "cross-platform-strategy"
+      - "platform-selection"
+      - "content-mix"
+      - "channel-allocation"
+      - "content-strategy"
+      - "copywriting"
+      - "editorial-calendar"
+      - "brand-storytelling"
+    deferred_by: ["*"]
+    description: "Cross-platform strategy, content mix decisions, editorial calendar, copywriting"
+
+  marketing-growth-hacker:
+    name: "Growth Hacker"
+    division: "marketing"
+    exclusive_domains:
+      - "growth-hacking"
+      - "user-acquisition"
+      - "viral-loops"
+      - "conversion-funnels"
+      - "experimentation"
+    deferred_by: ["*"]
+    description: "Growth strategies, user acquisition, conversion optimization"
+
+  marketing-social-platform-specialist:
+    name: "Social Platform Specialist"
+    division: "marketing"
+    exclusive_domains:
+      - "twitter"
+      - "real-time-engagement"
+      - "thought-leadership"
+      - "social-listening"
+      - "instagram"
+      - "visual-content"
+      - "community-building"
+      - "reels"
+      - "aesthetic-curation"
+    deferred_by: ["*"]
+    description: "Platform-specific social media execution, community building, visual content"
+
+  marketing-app-store-optimizer:
+    name: "App Store Optimizer"
+    division: "marketing"
+    exclusive_domains:
+      - "aso"
+      - "app-store"
+      - "conversion-optimization"
+      - "app-marketing"
+      - "keyword-optimization"
+    deferred_by: ["*"]
+    description: "App store optimization, mobile app marketing"
+
+  # ============================================================================
+  # PRODUCT DIVISION (4 agents)
+  # ============================================================================
+
+  product-sprint-prioritizer:
+    name: "Sprint Prioritizer"
+    division: "product"
+    exclusive_domains:
+      - "sprint-planning"
+      - "prioritization"
+      - "backlog-grooming"
+      - "resource-allocation"
+    deferred_by: ["*"]
+    description: "Sprint planning and backlog prioritization authority"
+
+  product-feedback-synthesizer:
+    name: "Feedback Synthesizer"
+    division: "product"
+    exclusive_domains:
+      - "user-feedback"
+      - "sentiment-analysis"
+      - "product-insights"
+      - "feature-requests"
+      - "feedback-triage"
+    deferred_by: ["*"]
+    description: "User feedback analysis and synthesis"
+
+  product-trend-researcher:
+    name: "Trend Researcher"
+    division: "product"
+    exclusive_domains:
+      - "market-research"
+      - "competitive-analysis"
+      - "trend-identification"
+      - "opportunity-assessment"
+      - "industry-intelligence"
+    deferred_by: ["*"]
+    description: "Market intelligence and competitive analysis"
+
+  product-technical-writer:
+    name: "Technical Writer"
+    division: "product"
+    exclusive_domains:
+      - "api-documentation"
+      - "user-guides"
+      - "readme-generation"
+      - "developer-docs"
+      - "tutorials-and-examples"
+      - "release-notes"
+      - "documentation-clarity"
+      - "stale-doc-detection"
+    deferred_by: ["*"]
+    description: "Technical documentation, API docs, user guides, README generation, and developer-facing content"
+
+  # ============================================================================
+  # PROJECT MANAGEMENT DIVISION (5 agents)
+  # ============================================================================
+
+  project-manager-senior:
+    name: "Senior Project Manager"
+    division: "project-management"
+    exclusive_domains:
+      - "task-breakdown"
+      - "spec-to-tasks"
+      - "scope-management"
+      - "sprint-execution"
+      - "implementation-planning"
+    deferred_by: ["*"]
+    description: "Task-level planning and execution management"
+
+  project-management-project-shepherd:
+    name: "Project Shepherd"
+    division: "project-management"
+    exclusive_domains:
+      - "project-coordination"
+      - "timeline-management"
+      - "stakeholder-alignment"
+      - "risk-management"
+      - "cross-functional"
+    deferred_by: ["*"]
+    description: "Cross-functional coordination, timeline management"
+
+  project-management-studio-producer:
+    name: "Studio Producer"
+    division: "project-management"
+    exclusive_domains:
+      - "portfolio-management"
+      - "creative-direction"
+      - "resource-allocation"
+      - "strategic-planning"
+      - "executive-oversight"
+    deferred_by: ["*"]
+    description: "Portfolio management and strategic oversight"
+
+  project-management-studio-operations:
+    name: "Studio Operations"
+    division: "project-management"
+    exclusive_domains:
+      - "studio-ops"
+      - "process-optimization"
+      - "resource-coordination"
+      - "productivity"
+      - "operational-excellence"
+    deferred_by: ["*"]
+    description: "Studio operations and process optimization"
+
+  project-management-experiment-tracker:
+    name: "Experiment Tracker"
+    division: "project-management"
+    exclusive_domains:
+      - "experiment-design"
+      - "ab-testing"
+      - "hypothesis-validation"
+      - "data-driven-decisions"
+      - "experiment-tracking"
+    deferred_by: ["*"]
+    description: "Experiment design and A/B testing authority"
+
+  # ============================================================================
+  # SUPPORT DIVISION (6 agents)
+  # ============================================================================
+
+  # support-analytics-reporter: CONSOLIDATED into data-analytics-engineer (Specialized division)
+
+  support-finance-tracker:
+    name: "Finance Tracker"
+    division: "support"
+    exclusive_domains:
+      - "financial-planning"
+      - "budget-management"
+      - "cash-flow"
+      - "investment-analysis"
+      - "financial-risk"
+    deferred_by: ["*"]
+    description: "Financial planning and budget management"
+
+  support-legal-compliance-checker:
+    name: "Legal Compliance Checker"
+    division: "support"
+    exclusive_domains:
+      - "legal-compliance"
+      - "risk-assessment"
+      - "policy-development"
+      - "regulatory"
+      - "gdpr-privacy"
+    deferred_by: ["*"]
+    description: "Legal compliance and regulatory assessment"
+
+  support-executive-summary-generator:
+    name: "Executive Summary Generator"
+    division: "support"
+    exclusive_domains:
+      - "executive-summaries"
+      - "strategy-consulting"
+      - "c-suite-reporting"
+      - "business-communication"
+      - "frameworks"
+    deferred_by: ["*"]
+    description: "Executive summary generation and C-suite reporting"
+
+  support-support-responder:
+    name: "Support Responder"
+    division: "support"
+    exclusive_domains:
+      - "customer-support"
+      - "ticket-management"
+      - "issue-resolution"
+      - "user-onboarding"
+    deferred_by: ["*"]
+    description: "Customer support and issue resolution"
+
+  # ============================================================================
+  # SPATIAL COMPUTING DIVISION (6 agents)
+  # ============================================================================
+
+  visionos-spatial-engineer:
+    name: "visionOS Spatial Engineer"
+    division: "spatial-computing"
+    exclusive_domains:
+      - "visionos"
+      - "spatial-computing"
+      - "swiftui-volumetric"
+      - "liquid-glass"
+      - "realitykit"
+    deferred_by: ["*"]
+    description: "Native visionOS spatial computing and SwiftUI"
+
+  macos-spatial-metal-engineer:
+    name: "macOS Metal Engineer"
+    division: "spatial-computing"
+    exclusive_domains:
+      - "metal"
+      - "swift"
+      - "3d-rendering"
+      - "macos"
+      - "vision-pro"
+    deferred_by: ["*"]
+    description: "Metal and 3D rendering for macOS and Vision Pro"
+
+  xr-interface-architect:
+    name: "XR Interface Architect"
+    division: "spatial-computing"
+    exclusive_domains:
+      - "spatial-ux"
+      - "xr-interfaces"
+      - "comfort-design"
+      - "3d-navigation"
+      - "presence-optimization"
+    deferred_by: ["*"]
+    description: "Spatial interaction design and XR interfaces"
+
+  xr-immersive-developer:
+    name: "XR Immersive Developer"
+    division: "spatial-computing"
+    exclusive_domains:
+      - "webxr"
+      - "ar-vr"
+      - "browser-3d"
+      - "immersive-apps"
+      - "cross-platform-xr"
+    deferred_by: ["*"]
+    description: "WebXR and browser-based immersive applications"
+
+  xr-cockpit-interaction-specialist:
+    name: "XR Cockpit Specialist"
+    division: "spatial-computing"
+    exclusive_domains:
+      - "xr-cockpit"
+      - "spatial-controls"
+      - "immersive-ui"
+      - "cockpit-design"
+      - "high-presence"
+    deferred_by: ["*"]
+    description: "Cockpit-based control systems for XR environments"
+
+  terminal-integration-specialist:
+    name: "Terminal Integration Specialist"
+    division: "spatial-computing"
+    exclusive_domains:
+      - "terminal-emulation"
+      - "swiftterm"
+      - "text-rendering"
+      - "swift-ui"
+      - "vt100"
+    deferred_by: ["*"]
+    description: "Terminal emulation and text rendering optimization"
+
+  # ============================================================================
+  # SPECIALIZED DIVISION (4 agents)
+  # ============================================================================
+
+  agents-orchestrator:
+    name: "Agents Orchestrator"
+    division: "specialized"
+    exclusive_domains:
+      - "orchestration"
+      - "pipeline-management"
+      - "workflow-automation"
+      - "agent-coordination"
+      - "dev-qa-loops"
+      - "agent-communication"
+    deferred_by: ["*"]
+    description: "Cross-division agent coordination, orchestration, and communication routing"
+
+  data-analytics-engineer:
+    name: "Data Analytics Engineer"
+    division: "specialized"
+    exclusive_domains:
+      - "data-pipelines"
+      - "etl"
+      - "data-quality"
+      - "data-warehouse"
+      - "data-engineering"
+      - "dashboards"
+      - "kpi-reporting"
+      - "business-intelligence"
+      - "statistical-analyses"
+    deferred_by: ["*"]
+    description: "Full-stack data analytics — infrastructure through executive delivery"
+
+  lsp-index-engineer:
+    name: "LSP Index Engineer"
+    division: "specialized"
+    exclusive_domains:
+      - "lsp"
+      - "code-intelligence"
+      - "semantic-indexing"
+      - "language-servers"
+      - "developer-tooling"
+    deferred_by: ["*"]
+    description: "Language Server Protocol and code intelligence"
+
+  polymath:
+    name: "Polymath"
+    division: "specialized"
+    exclusive_domains:
+      - "exploration"
+      - "clarification"
+      - "research-first"
+      - "structured-questions"
+      - "gap-detection"
+    deferred_by: ["*"]
+    description: "Pre-flight alignment and idea crystallization"
+
+# ============================================================================
+# CONFLICT RESOLUTION RULES
+# ============================================================================
+
+conflict_resolution:
+  same_domain_multiple_agents:
+    rule: "Use agent with higher specificity (more specific domain beats general)"
+    example: "security-engineer beats general-engineer on 'security' domain"
+  
+  overlapping_domains:
+    rule: "Both agents active — findings merged, severity escalation applies"
+    note: "If both agents have partial authority, both findings are kept and merged"
+  
+  out_of_domain_critique:
+    rule: "Discard finding when domain owner is present on panel"
+    exception: "Severity BLOCKER from any agent overrides WARNING from domain owner"
+  
+  severity_override:
+    rule: "BLOCKER from any agent overrides WARNING from domain owner"
+    rationale: "Critical issues cannot be ignored regardless of domain authority"
+
+# ============================================================================
+# DOMAIN SPECIFICITY HIERARCHY
+# ============================================================================
+
+specificity_hierarchy:
+  - level: 1
+    pattern: "specific-tool-framework"
+    examples: ["laravel", "react", "visionos", "swiftui-volumetric"]
+    description: "Specific technology or framework"
+  
+  - level: 2
+    pattern: "domain-subcategory"
+    examples: ["api-design", "database-design", "accessibility"]
+    description: "Subdomain within a larger domain"
+  
+  - level: 3
+    pattern: "broad-domain"
+    examples: ["security", "performance", "frontend-architecture"]
+    description: "Broad domain category"
+  
+  - level: 4
+    pattern: "general"
+    examples: ["full-stack", "code-quality"]
+    description: "General concerns without specific domain"
+
+# ============================================================================
+# USAGE NOTES
+# ============================================================================
+
+usage:
+  - "Load this matrix at the start of wave execution"
+  - "Build domain ownership map from active agents"
+  - "Inject authority constraints into agent prompts"
+  - "Filter out-of-domain findings during review synthesis"
+  - "Log conflicts for post-mortem analysis"
+
+maintenance:
+  - "Update when adding new agents"
+  - "Update when agents gain new specialties"
+  - "Version bump on breaking changes"
+  - "Keep human-readable — this is the source of truth"
+
+# ============================================================================
+# COMPLETION GATE (for consumers of this matrix)
+# ============================================================================
+#
+# A consumer (wave-executor, review-loop, cli-dispatch, authority-enforcer)
+# has COMPLETED its "apply authority matrix" step only when ALL hold:
+#
+# 1. This file was loaded and parsed without error; schema version recorded
+#    in the consumer's SUMMARY.md so drift between runs can be audited.
+# 2. Every active agent in the current wave is mapped to at least one
+#    `domain` entry in this matrix; unmapped agents are either (a) rejected
+#    with an explicit error OR (b) assigned `domain: generalist` fallback —
+#    the choice is logged, never silent.
+# 3. Domain ownership map built: for each domain, the set of owning agents
+#    is resolved and non-empty; domains with no owning agent present in the
+#    wave produce a structured warning (not a silent skip).
+# 4. Authority constraints injected into every agent prompt (the matrix
+#    text or its derived summary must appear in the dispatched prompt).
+# 5. Out-of-domain findings filtered during review synthesis per the rules
+#    in this file; the filter decision (kept / dropped) is recorded per
+#    finding with the rule that fired.
+# 6. Any conflict between two agents' domains logged with resolution to
+#    the consumer's SUMMARY.md `## Authority Conflicts` sub-section.
+#
+# If ANY condition is unmet, the consumer step is NOT complete — continue
+# working or escalate via <escalation> block (type: quality).
+#
+# Validators MUST fail closed: if the file cannot be parsed or a required
+# top-level key is missing, agents MUST NOT proceed with implementation
+# tasks — they must escalate. This matrix is load-bearing for authority
+# enforcement; silent fallback is not acceptable.

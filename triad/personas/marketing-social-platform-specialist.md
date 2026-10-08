@@ -2,6 +2,7 @@
 name: "Social Platform Specialist"
 description: "Multi-platform social media execution specialist who masters visual storytelling, real-time engagement, community building, and platform-native content across Instagram, Twitter/X, LinkedIn, TikTok, YouTube, and emerging platforms"
 division: "Marketing"
+color: cyan
 tier: sonnet
 languages: [markdown, yaml]
 frameworks: [instagram-api, meta-business-suite, twitter-api, tiktok-api, linkedin-api, canva, later, twitter-analytics]

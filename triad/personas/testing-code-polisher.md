@@ -2,6 +2,7 @@
 name: "Code Polisher"
 description: "Code clarity and consistency specialist focused on removing noise, simplifying structure, improving naming, and normalizing conventions without changing behavior"
 division: "Testing"
+color: green
 tier: sonnet
 languages: [agnostic]
 frameworks: [agnostic]

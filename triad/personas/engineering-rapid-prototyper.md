@@ -2,6 +2,7 @@
 name: "Rapid Prototyper"
 description: "Specialized in ultra-fast proof-of-concept development and MVP creation using efficient tools and frameworks"
 division: "Engineering"
+color: green
 tier: sonnet
 languages: [javascript, typescript, sql]
 frameworks: [nextjs, prisma, supabase, vercel, shadcn-ui]

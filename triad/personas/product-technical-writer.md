@@ -2,6 +2,7 @@
 name: "Technical Writer"
 description: "Expert technical writer specializing in API documentation, user guides, README generation, and developer documentation"
 division: "Product"
+color: blue
 tier: sonnet
 languages: [markdown, yaml, javascript, python, html]
 frameworks: [openapi, swagger, jsdoc, docusaurus, mkdocs]

@@ -1,0 +1,408 @@
+# Production-Grade Role Definitions
+# Defines production-grade roles for gap analysis against Legion roster
+# Version: 1.0.0
+# Requirements: ROSTER-01, ROSTER-02, ROSTER-03, ROSTER-04, ROSTER-05, ROSTER-06
+
+metadata:
+  version: "1.0.0"
+  source_references:
+    - "Google SRE Book - Site Reliability Engineering"
+    - "OWASP Testing Guide v4.2"
+    - "STRIDE Threat Model - Microsoft SDL"
+    - "ISO/IEC 27001 - Information Security Management"
+    - "AWS Well-Architected Framework"
+    - "The Data Engineering Handbook"
+  last_updated: "2026-03-05"
+  total_roles: 18
+
+# SRE/DevOps Roles
+roles:
+  sre-reliability-engineer:
+    name: "SRE Reliability Engineer"
+    category: "sre-devops"
+    priority: critical
+    required_capabilities:
+      - "Service Level Objective (SLO) definition and monitoring"
+      - "Error budget management and policy enforcement"
+      - "Incident response and post-mortem facilitation"
+      - "Capacity planning and performance optimization"
+      - "Blameless culture advocacy"
+    coverage_indicators:
+      - agent_name_patterns: ["sre", "reliability", "infrastructure", "ops"]
+      - task_type_overlaps: ["incident-response", "monitoring", "performance"]
+      - skill_keywords: ["slo", "error-budget", "observability", "on-call"]
+    related_divisions:
+      - "Support"
+      - "Engineering"
+    gap_severity_if_missing: critical
+
+  chaos-engineer:
+    name: "Chaos Engineer"
+    category: "sre-devops"
+    priority: important
+    required_capabilities:
+      - "Failure injection and chaos testing design"
+      - "Resilience validation and blast radius containment"
+      - "Game day coordination and execution"
+      - "System stress testing and degradation modeling"
+      - "Chaos engineering tool expertise (Chaos Monkey, Gremlin)"
+    coverage_indicators:
+      - agent_name_patterns: ["chaos", "resilience", "testing"]
+      - task_type_overlaps: ["chaos-testing", "failure-injection"]
+      - skill_keywords: ["game-day", "blast-radius", "failure-mode"]
+    related_divisions:
+      - "Testing"
+      - "Engineering"
+    gap_severity_if_missing: important
+
+  platform-engineer:
+    name: "Platform Engineer"
+    category: "sre-devops"
+    priority: important
+    required_capabilities:
+      - "Internal developer platform (IDP) design and maintenance"
+      - "Self-service infrastructure provisioning"
+      - "Golden path definition and enforcement"
+      - "Developer experience optimization"
+      - "Platform-as-a-Product mindset"
+    coverage_indicators:
+      - agent_name_patterns: ["platform", "devops", "infrastructure"]
+      - task_type_overlaps: ["platform", "developer-experience", "tooling"]
+      - skill_keywords: ["idp", "golden-path", "self-service"]
+    related_divisions:
+      - "Engineering"
+      - "Support"
+    gap_severity_if_missing: important
+
+  observability-engineer:
+    name: "Observability Engineer"
+    category: "sre-devops"
+    priority: important
+    required_capabilities:
+      - "Distributed tracing implementation and analysis"
+      - "Metrics pipeline design and optimization"
+      - "Log aggregation and analysis at scale"
+      - "Alert design and noise reduction"
+      - "OpenTelemetry or vendor-specific tooling expertise"
+    coverage_indicators:
+      - agent_name_patterns: ["observability", "monitoring", "analytics"]
+      - task_type_overlaps: ["monitoring", "logging", "tracing"]
+      - skill_keywords: ["opentelemetry", "metrics", "alerts", "dashboards"]
+    related_divisions:
+      - "Support"
+      - "Data"
+    gap_severity_if_missing: important
+
+# Security Roles
+  security-engineer:
+    name: "Security Engineer"
+    category: "security"
+    priority: critical
+    required_capabilities:
+      - "OWASP Top 10 vulnerability assessment and remediation"
+      - "STRIDE threat modeling and security architecture review"
+      - "Secure coding practice education and enforcement"
+      - "Security tool integration (SAST/DAST)"
+      - "Incident response for security breaches"
+    coverage_indicators:
+      - agent_name_patterns: ["security", "appsec", "secure"]
+      - task_type_overlaps: ["security-audit", "vulnerability-assessment"]
+      - skill_keywords: ["owasp", "stride", "sast", "dast", "penetration"]
+    related_divisions:
+      - "Engineering"
+      - "Testing"
+    gap_severity_if_missing: critical
+
+  compliance-auditor:
+    name: "Compliance Auditor"
+    category: "security"
+    priority: critical
+    required_capabilities:
+      - "Regulatory compliance assessment (GDPR, HIPAA, SOC2)"
+      - "Policy documentation and enforcement"
+      - "Audit trail maintenance and evidence collection"
+      - "Risk assessment and mitigation planning"
+      - "Third-party vendor security assessment"
+    coverage_indicators:
+      - agent_name_patterns: ["compliance", "legal", "audit"]
+      - task_type_overlaps: ["compliance", "audit", "risk-assessment"]
+      - skill_keywords: ["gdpr", "soc2", "hipaa", "audit-trail"]
+    related_divisions:
+      - "Support"
+    gap_severity_if_missing: critical
+
+  penetration-tester:
+    name: "Penetration Tester"
+    category: "security"
+    priority: nice-to-have
+    required_capabilities:
+      - "Authorized offensive security testing"
+      - "Vulnerability exploitation and proof-of-concept"
+      - "Social engineering simulation"
+      - "Physical security assessment"
+      - "Red team exercise participation"
+    coverage_indicators:
+      - agent_name_patterns: ["penetration", "pentest", "red-team"]
+      - task_type_overlaps: ["penetration-testing", "red-team"]
+      - skill_keywords: ["exploitation", "vulnerability", "offensive"]
+    related_divisions:
+      - "Testing"
+      - "Engineering"
+    gap_severity_if_missing: nice-to-have
+    note: "Optional for most projects; critical for high-security environments"
+
+  pii-specialist:
+    name: "PII/Data Privacy Specialist"
+    category: "security"
+    priority: important
+    required_capabilities:
+      - "Personally Identifiable Information (PII) identification and classification"
+      - "Data masking and anonymization techniques"
+      - "Privacy by design implementation"
+      - "Data retention policy enforcement"
+      - "Subject access request (SAR) fulfillment"
+    coverage_indicators:
+      - agent_name_patterns: ["privacy", "pii", "data-protection"]
+      - task_type_overlaps: ["privacy", "data-protection", "gdpr"]
+      - skill_keywords: ["pii", "anonymization", "data-masking", "retention"]
+    related_divisions:
+      - "Support"
+      - "Data"
+    gap_severity_if_missing: important
+
+# Data/AI Roles
+  data-scientist:
+    name: "Data Scientist"
+    category: "data-ai"
+    priority: important
+    required_capabilities:
+      - "Statistical modeling and hypothesis testing"
+      - "Machine learning algorithm selection and tuning"
+      - "Predictive analytics and forecasting"
+      - "Experimental design and A/B testing"
+      - "Data visualization and insight communication"
+    coverage_indicators:
+      - agent_name_patterns: ["data-scientist", "scientist", "statistician"]
+      - task_type_overlaps: ["data-science", "statistics", "modeling"]
+      - skill_keywords: ["statistics", "hypothesis", "predictive", "ml"]
+    related_divisions:
+      - "Data"
+    gap_severity_if_missing: important
+
+  ml-engineer:
+    name: "Machine Learning Engineer"
+    category: "data-ai"
+    priority: important
+    required_capabilities:
+      - "ML model deployment and serving infrastructure"
+      - "Feature engineering pipeline development"
+      - "Model versioning and experiment tracking"
+      - "ML monitoring and drift detection"
+      - "MLOps tooling (Kubeflow, MLflow, etc.)"
+    coverage_indicators:
+      - agent_name_patterns: ["ml-engineer", "ml-ops", "ai-engineer"]
+      - task_type_overlaps: ["ml-ops", "model-deployment", "feature-engineering"]
+      - skill_keywords: ["mlflow", "kubeflow", "model-serving", "feature-store"]
+    related_divisions:
+      - "Engineering"
+      - "Data"
+    gap_severity_if_missing: important
+
+  data-engineer:
+    name: "Data Engineer"
+    category: "data-ai"
+    priority: important
+    required_capabilities:
+      - "ETL/ELT pipeline design and implementation"
+      - "Data warehouse and lake architecture"
+      - "Stream processing (Kafka, Flink, Spark Streaming)"
+      - "Data quality and validation frameworks"
+      - "Schema evolution and data governance"
+    coverage_indicators:
+      - agent_name_patterns: ["data-engineer", "etl", "pipeline"]
+      - task_type_overlaps: ["data-engineering", "etl", "pipelines"]
+      - skill_keywords: ["etl", "elt", "kafka", "spark", "data-warehouse"]
+    related_divisions:
+      - "Data"
+      - "Engineering"
+    gap_severity_if_missing: important
+
+  ai-ethics-reviewer:
+    name: "AI Ethics Reviewer"
+    category: "data-ai"
+    priority: nice-to-have
+    required_capabilities:
+      - "Algorithmic bias detection and mitigation"
+      - "Fairness metrics and demographic parity assessment"
+      - "Explainability and interpretability review"
+      - "AI impact assessment and stakeholder consultation"
+      - "Responsible AI guideline development"
+    coverage_indicators:
+      - agent_name_patterns: ["ethics", "ai-ethics", "fairness"]
+      - task_type_overlaps: ["ethics-review", "bias-audit"]
+      - skill_keywords: ["bias", "fairness", "explainability", "responsible-ai"]
+    related_divisions:
+      - "Data"
+      - "Product"
+    gap_severity_if_missing: nice-to-have
+    note: "Critical for AI-heavy products; advisory for standard projects"
+
+# Engineering Roles
+  senior-developer:
+    name: "Senior Developer"
+    category: "engineering"
+    priority: critical
+    required_capabilities:
+      - "Production-grade code implementation"
+      - "Code review and mentorship"
+      - "Architecture decision participation"
+      - "Technical debt identification and remediation"
+      - "Cross-functional collaboration"
+    coverage_indicators:
+      - agent_name_patterns: ["senior-developer", "senior", "lead"]
+      - task_type_overlaps: ["implementation", "code-review", "refactoring"]
+      - skill_keywords: ["production", "mentorship", "architecture", "quality"]
+    related_divisions:
+      - "Engineering"
+    gap_severity_if_missing: critical
+
+  backend-architect:
+    name: "Backend Architect"
+    category: "engineering"
+    priority: critical
+    required_capabilities:
+      - "System design and scalability planning"
+      - "API design and contract specification"
+      - "Database schema design and optimization"
+      - "Service boundary definition"
+      - "Performance and reliability trade-off analysis"
+    coverage_indicators:
+      - agent_name_patterns: ["backend", "architect", "system-design"]
+      - task_type_overlaps: ["architecture", "api-design", "database-design"]
+      - skill_keywords: ["scalability", "api", "microservices", "database"]
+    related_divisions:
+      - "Engineering"
+    gap_severity_if_missing: critical
+
+  frontend-specialist:
+    name: "Frontend Specialist"
+    category: "engineering"
+    priority: important
+    required_capabilities:
+      - "Modern frontend framework expertise (React, Vue, Angular)"
+      - "Component library and design system implementation"
+      - "Web performance optimization"
+      - "Accessibility (WCAG) compliance"
+      - "State management and data flow architecture"
+    coverage_indicators:
+      - agent_name_patterns: ["frontend", "ui-developer", "react"]
+      - task_type_overlaps: ["frontend", "ui-implementation", "react"]
+      - skill_keywords: ["react", "vue", "angular", "accessibility", "performance"]
+    related_divisions:
+      - "Engineering"
+      - "Design"
+    gap_severity_if_missing: important
+
+  full-stack-developer:
+    name: "Full-Stack Developer"
+    category: "engineering"
+    priority: important
+    required_capabilities:
+      - "End-to-end feature implementation"
+      - "Frontend and backend integration"
+      - "Database interaction and API consumption"
+      - "Deployment and DevOps basics"
+      - "Rapid prototyping and MVP development"
+    coverage_indicators:
+      - agent_name_patterns: ["full-stack", "fullstack", "generalist"]
+      - task_type_overlaps: ["full-stack", "mvp", "prototyping"]
+      - skill_keywords: ["frontend", "backend", "database", "api"]
+    related_divisions:
+      - "Engineering"
+    gap_severity_if_missing: important
+
+# Operations Roles
+  incident-responder:
+    name: "Incident Responder"
+    category: "operations"
+    priority: critical
+    required_capabilities:
+      - "24/7 incident detection and acknowledgment"
+      - "Triage and severity classification"
+      - "War room coordination and communication"
+      - "Runbook execution and improvisation"
+      - "Stakeholder notification and status updates"
+    coverage_indicators:
+      - agent_name_patterns: ["incident", "responder", "on-call"]
+      - task_type_overlaps: ["incident-response", "on-call", "escalation"]
+      - skill_keywords: ["triage", "war-room", "escalation", "runbook"]
+    related_divisions:
+      - "Support"
+      - "Engineering"
+    gap_severity_if_missing: critical
+
+  runbook-maintainer:
+    name: "Runbook Maintainer"
+    category: "operations"
+    priority: important
+    required_capabilities:
+      - "Operational procedure documentation"
+      - "Runbook testing and validation"
+      - "Knowledge base maintenance"
+      - "Post-incident runbook updates"
+      - "Automation opportunity identification"
+    coverage_indicators:
+      - agent_name_patterns: ["runbook", "documentation", "procedures"]
+      - task_type_overlaps: ["documentation", "procedures", "knowledge-base"]
+      - skill_keywords: ["runbook", "documentation", "procedures", "knowledge"]
+    related_divisions:
+      - "Support"
+      - "Product"
+    gap_severity_if_missing: important
+
+  cost-optimizer:
+    name: "Cost Optimization Specialist"
+    category: "operations"
+    priority: nice-to-have
+    required_capabilities:
+      - "Cloud spend analysis and trending"
+      - "Reserved instance and savings plan management"
+      - "Resource right-sizing recommendations"
+      - "Tagging policy and cost allocation"
+      - "FinOps practice implementation"
+    coverage_indicators:
+      - agent_name_patterns: ["cost", "finops", "optimizer", "finance"]
+      - task_type_overlaps: ["cost-optimization", "finops", "budget"]
+      - skill_keywords: ["finops", "savings", "rightsizing", "allocation"]
+    related_divisions:
+      - "Support"
+      - "Finance"
+    gap_severity_if_missing: nice-to-have
+    note: "Advisory role; covered by infrastructure agents for basic needs"
+
+# Coverage Analysis Summary
+coverage_summary:
+  total_roles: 18
+  by_priority:
+    critical: 6
+    important: 9
+    nice-to-have: 3
+  by_category:
+    sre-devops: 4
+    security: 4
+    data-ai: 4
+    engineering: 4
+    operations: 3
+  expected_gaps:
+    - role: security-engineer
+      reason: "Referenced in intent-teams.yaml but no dedicated agent"
+      impact: "OWASP/STRIDE expertise missing"
+    - role: data-scientist
+      reason: "No formal statistical modeling agent"
+      impact: "Advanced analytics capabilities limited"
+    - role: penetration-tester
+      reason: "Intentionally excluded for cost optimization"
+      impact: "Minimal - covered by security reviews"
+    - role: product-technical-writer
+      reason: "Referenced in intent-teams.yaml but no dedicated agent"
+      impact: "Documentation workflows incomplete"

@@ -2,6 +2,7 @@
 name: "Terminal Integration Specialist"
 description: "Terminal emulation, text rendering optimization, and SwiftTerm integration for modern Swift applications"
 division: "Spatial Computing"
+color: green
 tier: sonnet
 languages: [swift, swiftui, c, objective-c]
 frameworks: [swiftterm, swiftnio-ssh, core-text, core-graphics]

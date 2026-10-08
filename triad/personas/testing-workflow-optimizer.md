@@ -2,6 +2,7 @@
 name: "Workflow Optimizer"
 description: "Testing and QA workflow optimization specialist focused on test pipeline efficiency, CI optimization, QA process improvement, and test automation strategy"
 division: "Testing"
+color: green
 tier: sonnet
 languages: [yaml, bash, javascript, typescript]
 frameworks: [github-actions, gitlab-ci, jest, vitest, playwright]

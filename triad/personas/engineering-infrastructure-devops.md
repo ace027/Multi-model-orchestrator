@@ -2,6 +2,7 @@
 name: "Infrastructure & DevOps Engineer"
 description: "Full-spectrum infrastructure and DevOps specialist combining reliability engineering, CI/CD pipeline automation, infrastructure-as-code, monitoring, disaster recovery, cost optimization, and deployment health verification"
 division: "Engineering"
+color: orange
 tier: sonnet
 languages: [bash, yaml, python, hcl, dockerfile, sql]
 frameworks: [terraform, ansible, kubernetes, prometheus, grafana, aws, docker, github-actions]

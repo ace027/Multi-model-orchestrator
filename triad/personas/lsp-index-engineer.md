@@ -2,6 +2,7 @@
 name: "LSP/Index Engineer"
 description: "Language Server Protocol specialist building unified code intelligence systems through LSP client orchestration and semantic indexing"
 division: "Specialized"
+color: orange
 tier: sonnet
 languages: [typescript, javascript, jsonl, sql]
 frameworks: [lsp-protocol, tree-sitter, sqlite, websocket]

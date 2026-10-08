@@ -2,6 +2,7 @@
 name: "Content & Social Strategist"
 description: "Unified content and social media strategist who architects editorial calendars, brand voice systems, cross-platform content strategy, and performance-driven resource allocation across all digital channels"
 division: "Marketing"
+color: purple
 tier: sonnet
 languages: [markdown, yaml]
 frameworks: [editorial-calendars, seo-tools, analytics-platforms, cms, hootsuite, sprout-social, google-analytics, meta-business-suite]
