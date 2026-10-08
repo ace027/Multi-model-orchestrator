@@ -49,6 +49,9 @@ export type Ledger = {
   rejectedReplies: number
   measuredUsd?: number
   contextInjections?: number
+  compression: { calls: number; rawTokens: number; outTokens: number }
+  deferredTools: string[]
+  options?: Record<string, unknown>
 }
 
 const zero = (): Totals => ({ requests: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 })
@@ -60,6 +63,8 @@ export const emptyLedger = (): Ledger => ({
   haiku: { requests: 0, maxPrompt: 0, overLine: 0 },
   refusals: [],
   rejectedReplies: 0,
+  compression: { calls: 0, rawTokens: 0, outTokens: 0 },
+  deferredTools: [],
 })
 
 export function ensureAgent(l: Ledger, id: string, init: Partial<AgentRow>): AgentRow {
@@ -94,6 +99,14 @@ export function recordStep(l: Ledger, agentId: string | undefined, model: string
   }
 }
 
+// A `$.model.complete` call to Haiku (compression summaries).
+export function recordCompletion(l: Ledger, u: Usage) {
+  recordStep(l, 'compressor', 'claude-haiku-5-5', u)
+  l.agents.compressor.role = 'compressor'
+  l.agents.compressor.depth = 0
+  l.agents.compressor.parent = undefined
+}
+
 const usd = (n: number) => '$' + n.toFixed(n < 1 ? 4 : 2)
 const k = (n: number) => (n >= 10_000 ? Math.round(n / 1000) + 'k' : String(n))
 
@@ -123,6 +136,9 @@ export function render(l: Ledger, budgets: { coders: [number, number]; helpers: 
   out.push(`  coders running ${budgets.coders[0]}/${budgets.coders[1]}, helpers running ${budgets.helpers[0]}/${budgets.helpers[1]}, max depth ${budgets.maxDepth}`)
   out.push(`  Haiku: ${l.haiku.requests} requests, largest prompt ${k(l.haiku.maxPrompt)} of ${k(HAIKU_LINE)}, ${l.haiku.overLine} over the line`)
   out.push(`  replies sent back for the return schema: ${l.rejectedReplies}; spawns refused: ${l.refusals.length}`)
-  out.push('', 'Compression savings: none yet (Phase 3)')
+  const c = l.compression ?? { calls: 0, rawTokens: 0, outTokens: 0 }
+  const comp = l.agents.compressor
+  out.push('', `Compression: ${c.calls} outputs, ~${k(c.rawTokens)} tokens in, ~${k(c.outTokens)} out` + (comp ? ` (summaries cost ${usd(comp.cost)})` : ''))
+  if (l.deferredTools?.length) out.push(`Deferred tool descriptions: ${l.deferredTools.join(', ')}`)
   return out.join('\n')
 }

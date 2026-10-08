@@ -9,9 +9,15 @@ export type Options = {
   maxHelpers: number
   maxRetries: number
   strictMenu: boolean
+  compress: boolean
+  compressThreshold: number
+  deferTools: boolean
 }
 
-export const DEFAULTS: Options = { maxDepth: 2, maxCoders: 4, maxHelpers: 6, maxRetries: 1, strictMenu: true }
+export const DEFAULTS: Options = {
+  maxDepth: 2, maxCoders: 4, maxHelpers: 6, maxRetries: 1, strictMenu: true,
+  compress: true, compressThreshold: 4_000, deferTools: true,
+}
 
 // Plugin agent types are namespaced (`triad:triad-coder`); match the suffix.
 export function roleOfType(subagentType: string | undefined): Role | undefined {

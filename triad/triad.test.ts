@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import { mayWrite, pathsInBrief, schemaProblems } from './hooks/policy.ts'
 import { costOf, emptyLedger, recordStep } from './hooks/ledger.ts'
+import { chunks, errorLines, eligible } from './hooks/compress.ts'
 
 const GOOD = 'status: done\nsummary: added the parser\nchanges:\n- src/a.ts | added | parser\nverify: npm test => 4 passed'
 const usage = (input: number, output: number, read = 0, write = 0, model = 'claude-haiku-5-5') => ({
@@ -164,5 +165,71 @@ describe('hooks', () => {
     expect(String(a.deny ?? a.text)).toMatch(/only coders/)
     const b: any = await $.tool.call({ tool: 'mcp__triad__delegate_menial', brief: 'x' } as any)
     expect(String(b.deny ?? b.text)).toMatch(/Agent tool/)
+  })
+
+  test('compresses long Bash output to its error lines plus a summary, saving the original', async ($, on) => {
+    const log = { writes: {} as Record<string, string>, spawns: [] as any[] }
+    world(on, log)
+    const prompts: string[] = []
+    on('model.complete', (_$: any, e: any) => { prompts.push(e.prompt); return { value: { isAnswered: true, text: 'SUMMARY: 300 passed, 1 failed (test_total)', usage: usage(5_000, 60) } } })
+    const big = Array.from({ length: 3000 }, (_, i) => `test_${i} ... ok`).join('\n') + '\nFAIL: test_total (tests.test_cart.CartTest)\nAssertionError: 560 != 561'
+    on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: big, stderr: '', interrupted: false }, text: big }) as any)
+    await start($)
+    const r: any = await $.tool.call({ tool: 'Bash', command: 'python3 -m unittest -v' } as any)
+    expect(r.result.stdout).toMatch(/output compressed/)
+    expect(r.result.stdout).toMatch(/AssertionError: 560 != 561/)
+    expect(r.result.stdout).toMatch(/SUMMARY: 300 passed/)
+    expect(r.result.stdout.length < 2_000).toBe(true)
+    const saved = Object.keys(log.writes).find(k => k.startsWith('/repo/.triad/out/'))!
+    expect(log.writes[saved]).toMatch(/test_2999 \.\.\. ok/)
+    expect(prompts[0]).toMatch(/python3 -m unittest -v/)
+  })
+
+  test('leaves short output, source reads and edits alone', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const long = 'x = 1\n'.repeat(5_000)
+    on('tool.call', (_$: any, e: any) => ({ result: e.tool === 'Read' ? { type: 'text', file: { filePath: e.file_path, content: long, numLines: 5000, startLine: 1, totalLines: 5000 } } : { stdout: 'ok', stderr: '', interrupted: false }, text: e.tool === 'Read' ? long : 'ok' }) as any)
+    await start($)
+    const read: any = await $.tool.call({ tool: 'Read', file_path: '/repo/shop/cart.py' } as any)
+    expect(read.result.file.content).toBe(long)
+    const bash: any = await $.tool.call({ tool: 'Bash', command: 'echo ok' } as any)
+    expect(bash.result.stdout).toBe('ok')
+  })
+
+  test('defers engine tools the tiers do not use every turn', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    on('tool.describe', (_$: any, e: any) => ({ description: e.description }))
+    await start($)
+    const engine = { plugin: 'engine', tier: 'core' } as any
+    expect((await $.tool.describe({ tool: 'Workflow', description: 'w', provider: engine })).isDeferred).toBe(true)
+    expect((await $.tool.describe({ tool: 'Read', description: 'r', provider: engine })).isDeferred).toBeFalsy()
+    expect((await $.tool.describe({ tool: 'mcp__github__x', description: 'g', provider: { plugin: 'github', tier: 'user' } as any })).isDeferred).toBeFalsy()
+  })
+
+  test('puts the orchestrator guidance in the main system prompt', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    on('prompt.section', (_$: any, e: any) => ({ text: e.text }))
+    await start($)
+    expect((await $.prompt.section({ name: 'communication', text: 'base' })).text).toMatch(/^base\n\n# Triad orchestration/)
+    expect((await $.prompt.section({ name: 'env_info_model', text: 'model' })).text).toBe('model')
+  })
+})
+
+describe('compression helpers', () => {
+  test('compresses Bash and Grep, and only log-like reads', () => {
+    expect(eligible('Bash', {})).toBe(true)
+    expect(eligible('Read', { file_path: '/r/logs/app.log' })).toBe(true)
+    expect(eligible('Read', { file_path: '/r/src/app.py' })).toBe(false)
+    expect(eligible('Edit', {})).toBe(false)
+  })
+  test('keeps distinct error lines once', () => {
+    expect(errorLines('ok\nERROR db timeout after 30s\nERROR db timeout after 31s\nTraceback (most recent call last):\nfine')).toEqual(['ERROR db timeout after 30s', 'Traceback (most recent call last):'])
+  })
+  test('chunks on line boundaries and keeps the ends of very long output', () => {
+    const { parts } = chunks('aaaa\nbbbb\ncccc\n', 6)
+    expect(parts).toEqual(['aaaa\n', 'bbbb\n', 'cccc\n'])
+    const many = chunks('x\n'.repeat(100), 4)
+    expect(many.parts.length).toBe(8)
+    expect(many.skipped).toBe(42)
   })
 })

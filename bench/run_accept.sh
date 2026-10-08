@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Usage: bench/run_accept.sh <work dir> [prompt]
-# Copies the shop fixture into <work dir>, runs the Opus orchestrator headless
+# Copies the discounts fixture (bench/tasks/discounts/repo) into <work dir>, runs the Opus orchestrator headless
 # with the triad plugin, and leaves the ledger in <work dir>/.triad/ledger.json.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 W=$1
 PROMPT=${2:-"Implement the feature described in TASK.md."}
-rm -rf "$W" && cp -r "$ROOT/bench/shop" "$W"
+rm -rf "$W" && cp -r "$ROOT/bench/tasks/discounts/repo" "$W"
 cd "$W" && git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm fixture
 export ANTHROPIC_API_KEY="${ORCHESTRATOR_API_KEY:?set ORCHESTRATOR_API_KEY}"
 # A fresh session id: a child of another Claude Code session would inherit its id.

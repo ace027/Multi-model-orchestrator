@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, schemaProblems, type Options, type Role } from './policy.ts'
-import { emptyLedger, ensureAgent, recordStep, render, type Ledger } from './ledger.ts'
+import { emptyLedger, ensureAgent, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
+import { COMPRESS_TOOLS, SUMMARY_SYSTEM, chunks, describeCall, eligible, errorLines, headTail, mergePrompt, overThreshold, render as renderCompressed, summaryPrompt } from './compress.ts'
 
 // Triad, Mode B (routed flat; see SPIKE.md). Only the orchestrator (main loop)
 // has the Agent tool. Coders reach Haiku through the `delegate_menial` tool,
@@ -11,6 +12,9 @@ const DELEGATE = 'mcp__triad__delegate_menial'
 const DELEGATE_MARK = 'triad delegate from '
 const PREFLIGHT_TOKENS = 40_000
 const WRITE_TOOLS = ['Edit', 'Write', 'NotebookEdit', 'MultiEdit']
+// Tools the tiers use every turn stay loaded; other engine tools are deferred
+// (still reachable through ToolSearch). Subagents' own tool lists are all here.
+const KEEP_LOADED = new Set(['Agent', 'Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep', 'ToolSearch', 'Skill', DELEGATE, 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet'])
 
 let opts: Options = { ...DEFAULTS }
 let cwd = ''
@@ -21,18 +25,20 @@ const parents: Record<string, string | undefined> = {}
 const writable: Record<string, string[]> = {}
 const byToolUse: Record<string, string> = {}
 const retries: Record<string, number> = {}
+const tasks: Record<string, string> = {}
 const running = { coder: new Set<string>(), helper: new Set<string>() }
 const reserved = { coder: 0, helper: 0 }
 const waiting: Record<string, { marker: string; resolve: (answer: string) => void }> = {}
 let seq = 0
 
 // Byte-stable (no dates, no per-session data) so it caches with the prefix.
-const ORCHESTRATOR_GUIDE = `Triad orchestration. This applies to the main session only; subagents ignore this block.
+const ORCHESTRATOR_GUIDE = `# Triad orchestration
 You are the orchestrator. Decompose the work, make the architecture decisions, review results and decide retries. Do not implement, or read files at length, yourself.
 - Implementation goes to triad:triad-coder (Sonnet), one well-scoped task per agent. Brief it with file paths, acceptance criteria, constraints and the verify command; no pasted code. Launch independent tasks in parallel (several Agent calls in one message).
 - Menial work (search, running a test suite and summarizing failures, log triage, a checklist, boilerplate you have designed) goes to triad:triad-helper (Haiku). Name the files it may write.
 - Every agent returns status, summary, changes and verify. On blocked, rebrief, split the task, or take it over; retry a task at most once.
 - Check results with the verify commands and git diff --stat, not by reading whole files.
+- Long tool output may come back compressed, with the path of the full text in .triad/out/.
 - /triad shows the agent tree and the tokens and cost per tier.`
 
 const depthOf = (id: string | undefined): number => (id ? 1 + depthOf(parents[id]) : 0)
@@ -73,6 +79,46 @@ async function waitForAnswer($: any, agentId: string, ms: number): Promise<strin
   return answer
 }
 
+// One Haiku one-shot; its usage goes to the ledger. Undefined when the call fails.
+async function summarize($: any, prompt: string): Promise<string | undefined> {
+  const r = await $.model.complete({ model: 'haiku', system: SUMMARY_SYSTEM, prompt, maxTokens: 700 })
+  if (!r.isAnswered) return undefined
+  recordCompletion(ledger, r.usage)
+  return r.text
+}
+
+// Saves the full output, then returns the verbatim error lines plus a Haiku summary
+// (map-reduce over 60k-token chunks), or head and tail when Haiku fails.
+async function compress($: any, agentId: string | undefined, tool: string, input: Record<string, unknown>, raw: string): Promise<string> {
+  const what = describeCall(tool, input)
+  const path = `${cwd}/.triad/out/${Date.now().toString(36)}-${++seq}.txt`
+  await $.fs.write(path, `# ${tool} ${what}\n${raw}`)
+  const task = (tasks[agentId ?? 'main'] ?? '').slice(0, 1500)
+  const { parts, skipped } = chunks(raw)
+  const pieces = await Promise.all(parts.map((text, i) =>
+    summarize($, summaryPrompt({ tool, what, task, text, part: parts.length > 1 ? [i + 1, parts.length] : undefined }))))
+  let summary: string | undefined
+  if (pieces.every(p => p !== undefined)) summary = pieces.length === 1 ? pieces[0] : await summarize($, mergePrompt(task, what, pieces as string[]))
+  const out = renderCompressed({ path, lines: raw.split('\n').length, tokens: approxTokens(raw), errors: errorLines(raw), summary: summary ?? headTail(raw), skipped })
+  ledger.compression.calls++
+  ledger.compression.rawTokens += approxTokens(raw)
+  ledger.compression.outTokens += approxTokens(out)
+  return out
+}
+
+// The tool's own result with its text replaced, or undefined when the shape is unknown.
+function rewrite(tool: string, result: any, text: string, isError: boolean): unknown {
+  // A failed Bash call reaches hooks with its text as the result, but an answer
+  // must take the tool's object shape (spike, Phase 3 smoke test).
+  if (tool === 'Bash' && typeof result === 'string') return { stdout: `${isError ? 'The command failed (nonzero exit).\n' : ''}${text}`, stderr: '', interrupted: false }
+  if (typeof result === 'string') return undefined
+  if (!result || typeof result !== 'object') return undefined
+  if (tool === 'Bash' && 'stdout' in result) return { ...result, stdout: text, stderr: '' }
+  if (tool === 'Grep') return { ...result, mode: 'content', content: text, filenames: [], numLines: text.split('\n').length }
+  if (tool === 'Read' && result.type === 'text' && result.file) return { ...result, file: { ...result.file, content: text, numLines: text.split('\n').length } }
+  return undefined
+}
+
 async function cancelWait($: any, agentId: string) {
   const w = waiting[agentId]
   if (!w) return
@@ -87,7 +133,8 @@ export const register: Register = (on, options) => {
     const r = await next(e)
     cwd = r.cwd ?? e.cwd
     sessionId = await $.session.id()
-    ledger = ((await $.store.get(`ledger:${sessionId}`)) as Ledger | undefined) ?? emptyLedger()
+    ledger = { ...emptyLedger(), ...((await $.store.get(`ledger:${sessionId}`)) as Partial<Ledger> | undefined) }
+    ledger.options = { ...opts }
     await $.fs.write(`${cwd}/.triad/.gitignore`, '*\n')
     await $.tool.register({
       name: 'delegate_menial',
@@ -108,10 +155,19 @@ export const register: Register = (on, options) => {
     return r
   })
 
-  on('prompt.context', async ($, e, next) => {
+  // System prompt sections other than env_info_model are built for the main loop
+  // only, so the guidance never reaches subagents (unlike prompt.context blocks).
+  on('prompt.section', { name: 'communication' }, async ($, e, next) => {
     const r = await next(e)
     ledger.contextInjections = (ledger.contextInjections ?? 0) + 1
-    return { ...r, blocks: [...r.blocks, { name: 'triad', text: ORCHESTRATOR_GUIDE }] }
+    return { text: (r.text ? r.text + '\n\n' : '') + ORCHESTRATOR_GUIDE }
+  })
+
+  on('tool.describe', async ($, e, next) => {
+    const r = await next(e)
+    if (!opts.deferTools || r.isDeferred || KEEP_LOADED.has(e.tool) || (e.provider as any)?.plugin !== 'engine') return r
+    if (!ledger.deferredTools.includes(e.tool)) ledger.deferredTools.push(e.tool)
+    return { ...r, isDeferred: true }
   })
 
   // Only the main loop has the Agent tool (SPIKE.md #6), so this menu is the orchestrator's.
@@ -147,6 +203,7 @@ export const register: Register = (on, options) => {
       running[role].add(id)
       byToolUse[e.tool_use_id] = id
       if (role === 'helper') writable[id] = writableFrom(e.prompt)
+      tasks[id] = e.prompt
       ensureAgent(ledger, id, { role, type, parent: parent ?? 'main', depth, status: 'running' })
     }
     return r
@@ -236,6 +293,22 @@ export const register: Register = (on, options) => {
     if (!target || mayWrite(target, allowed, cwd)) return next(e)
     return { deny: `triad: a helper may write only the files its brief names (${allowed.join(', ') || 'none'}); ${target} is not one. Return blocked if the job needs it.` }
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the write check failed, so the write was refused.' }))
+
+  // Long Bash/Grep output (and log-like files read) is saved to .triad/out and
+  // replaced by its error lines plus a Haiku summary. Edits and writes never are.
+  on('tool.call', { tool: COMPRESS_TOOLS }, async ($, e, next) => {
+    const r: any = await next(e)
+    const input = e as unknown as Record<string, unknown>
+    if (!opts.compress || r.deny || typeof r.text !== 'string' || !eligible(e.tool, input)) return r
+    let raw: string = r.text
+    const persisted = r.result?.persistedOutputPath ?? r.result?.rawOutputPath
+    if (persisted) {
+      try { raw = String(await $.fs.read(persisted)) } catch { /* keep the text core gave */ }
+    }
+    if (!overThreshold(raw, opts.compressThreshold)) return r
+    const result = rewrite(e.tool, r.result, await compress($, e.agentId, e.tool, input, raw), !!r.isError)
+    return result === undefined ? r : { result, ...(r.isError ? { isError: true } : {}) }
+  }).catch(($, e, next) => next(e))
 
   on('session.measure', async ($, e, next) => {
     if (e.cost) ledger.measuredUsd = e.cost.usd

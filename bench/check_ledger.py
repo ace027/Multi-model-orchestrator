@@ -6,7 +6,7 @@ Exits 1 when a check fails.
 import json
 import sys
 
-WANT = {"orchestrator": "opus", "coder": "sonnet", "helper": "haiku"}
+WANT = {"orchestrator": "opus", "coder": "sonnet", "helper": "haiku", "compressor": "haiku"}
 
 
 def main(path: str) -> int:
@@ -21,7 +21,7 @@ def main(path: str) -> int:
             failures.append(f"{agent_id}: unknown role {a['role']}")
         elif wrong:
             failures.append(f"{agent_id} ({a['role']}) ran on {wrong}, expected {want}")
-        if a["role"] != "orchestrator" and a["depth"] > 2:
+        if a["role"] not in ("orchestrator", "compressor") and a["depth"] > 2:
             failures.append(f"{agent_id} is at depth {a['depth']}")
     print()
     total = 0.0
