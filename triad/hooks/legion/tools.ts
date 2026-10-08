@@ -37,6 +37,7 @@ const PLAN = {
     edge_cases: strs('Named boundary, failure and empty cases.'),
     tasks: { type: 'array', items: TASK, description: 'At most planning.max_tasks_per_plan tasks (default 3).' },
     success_criteria: strs('Testable outcomes.'),
+    model: { type: 'string', enum: ['opus'], description: 'Set opus for open-ended work (a game AI, architecture, tuning, visual polish): the plan then runs on triad:triad-opus-coder instead of its persona\'s Sonnet tier. Leave it out for well-specified work.' },
     wave_role: { type: 'string', enum: ['build', 'analysis', 'execution', 'remediation'], description: 'Two-wave role: build and analysis run in Wave A (analysis read-only), execution and remediation in Wave B (remediation read-only).' },
   },
   required: ['plan', 'title', 'wave', 'agents', 'files_modified', 'verification_commands', 'objective', 'tasks'],

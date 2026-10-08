@@ -282,7 +282,9 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           })
           const at = (fs: string[]) => (wt ? fs.map(f => `${wt.path}/${f}`) : fs)
           const scope: Scope = { planId: plan.id, mode, files_modified: at(writableOf(plan)), files_forbidden: at(plan.fm.files_forbidden ?? []) }
-          const r = await agents.run({ persona, brief, scope, label: `plan ${plan.id}` })
+          // A plan marked `model: opus` (open-ended work) runs on the Opus coder.
+          const runAs = plan.fm.model === 'opus' && persona.tier === 'sonnet' ? { ...persona, tier: 'opus' as const } : persona
+          const r = await agents.run({ persona: runAs, brief, scope, label: `plan ${plan.id}` })
           // User decision 1: a haiku-tier persona's work gets a Sonnet review that fixes
           // errors and omissions in the same files, then answers in the return schema.
           if (persona.tier !== 'haiku' || r.deny || r.answer === undefined) return { plan, persona, r, reviewerId: undefined as string | undefined }
