@@ -179,7 +179,7 @@ Principles:
 | `ship` | Pre-ship checks and PR creation via `gh`, deployment verification, canary monitor on `$.clock.every`, security gate hook |
 | `learn` (+ `--prune`) | Memory manager in code: outcomes, preference capture, four-bracket decay weighting (1.0 down to 0.1), archive-not-delete pruning |
 | `polish` | 4-pass cleanup. Haiku runs the mechanical passes, Sonnet the judgment passes. Non-blocking, reverts any file whose tests regress, capped at 50 files, scope `changed`/`dependents`/`directory` |
-| `validate` (+ `--ci`, `--fix`) | Pure code against `docs/schemas/`, no model |
+| `validate` (+ `--ci`, `--fix`) | Pure code with the schemas built in, no model |
 | `update` | Replaced by plugin update |
 
 ### Agents (49 personalities, nine divisions) and skills

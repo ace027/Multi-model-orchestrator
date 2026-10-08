@@ -1,6 +1,6 @@
 # Control modes
 
-A control mode sets how much freedom the agents in a Triad build, review or plan have. Set it with `control_mode` in `settings.json` at the project root. There are four modes: `guarded` (the default), `surgical`, `advisory` and `autonomous`. An unknown value is reported by `/triad:validate` and treated as `guarded`.
+A control mode sets how much freedom the agents in a Triad build, review or plan have. Set it with `control_mode` in `settings.json` at the project root. There are four modes: `guarded` (the default), `surgical`, `advisory` and `autonomous`. An unknown value is reported by `/triad validate` and treated as `guarded`.
 
 ## The five flags
 

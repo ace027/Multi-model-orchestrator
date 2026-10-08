@@ -32,6 +32,6 @@ Check each item below. A "no" blocks the merge unless the pull request explains 
 ## Docs and parity
 
 - `PARITY.md` rows and counts match the change.
-- If user-facing behavior changed, `triad/README.md` is updated, including the version on a release.
+- If user-facing behavior changed, `triad/README.md` and `docs/commands.md` are updated, including the version on a release.
 - Comments, commit messages and docs name models only by tier.
 - Nothing was written to or run from the Legion checkout.
