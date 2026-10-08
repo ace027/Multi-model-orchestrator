@@ -165,6 +165,19 @@ export const LEGION_TOOLS = [
       required: ['action'],
     },
   },
+  {
+    name: 'map',
+    description: 'Codebase map in code. build: inventory, languages, stack, conventions, complexity, debt, hotspots, import graph, tests, routes, env names, symbols; writes .planning/CODEBASE.md, .planning/codebase/ (index.jsonl, symbols.json, search.md) and directory-mappings.yaml, keeps earlier narrative sections and returns the facts for the pending ones. check: freshness (absent/partial/stale/fresh) without writing. narrate: write narrative sections (Architecture Overview, Functionality Inventory, Module Ownership, Risk Areas, Agent Guidance, Setup / Runbook, Pattern Library, Confidence). query: ranked chunks from the index for a question.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['build', 'check', 'narrate', 'query'] },
+        scope: str('Limit the map to this directory.'), query: str('Search terms.'),
+        sections: { type: 'object', description: 'Section heading -> markdown body.', additionalProperties: { type: 'string' } },
+      },
+      required: ['action'],
+    },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)

@@ -8,6 +8,7 @@ import { OUTCOMES, agentScores, decayScore, importanceOf, learnList, learnRecall
 import { milestoneArchive, milestoneComplete, milestoneDefine, milestoneStatus, parseMilestones, validateMilestones } from './hooks/legion/milestone.ts'
 import { retroGather, retroSave } from './hooks/legion/retro.ts'
 import { runPersonas } from './hooks/legion/personarun.ts'
+import { ARTIFACTS, freshness, mapBuild, mapNarrate, mapQuery } from './hooks/legion/map.ts'
 import type { PlanInput } from './hooks/legion/render.ts'
 
 const settings = loadSettings('{"control_mode":"guarded"}').settings
@@ -180,5 +181,46 @@ describe('persona_run', () => {
     const w = await runPersonas(io, agents as any, { read_only: false, runs: [{ agent: 'product-technical-writer', brief: 'docs', writable: ['README.md'] }] })
     expect(w[0]!.error).toBeUndefined()
     expect(seen[1].scope.files_modified).toEqual(['README.md'])
+  })
+})
+
+describe('map', () => {
+  const src = () => memIo({
+    'package.json': JSON.stringify({ name: 'shop', main: 'src/index.ts', dependencies: { express: '^4' }, devDependencies: { vitest: '^1' } }),
+    'src/index.ts': "import { orders } from './orders'\nimport express from 'express'\nconst app = express()\napp.get('/orders', orders)\nexport function start() { return process.env.API_TOKEN }\n",
+    'src/orders.ts': "// TODO: paginate\nexport function orders() { return [] }\nexport class OrderStore {}\n",
+    'src/orders.test.ts': "import { orders } from './orders'\n",
+    'README.md': '# shop\n',
+  })
+
+  test('build writes every artifact and query ranks by path and symbol', async () => {
+    const io = src()
+    const out = await mapBuild(io)
+    expect(out).toContain('Codebase map generated')
+    for (const a of ARTIFACTS) expect(io.files.has(a)).toBe(true)
+    const cb = io.files.get('.planning/CODEBASE.md')!
+    expect(cb).toContain('**Map Schema Version:** 2.0')
+    expect(cb).toContain('API_TOKEN')
+    expect(cb).toContain('_Pending:')
+    const q = await mapQuery(io, 'OrderStore')
+    expect(q).toContain('src/orders.ts')
+    expect((await freshness(io)).status).toBe('fresh')
+  })
+
+  test('narrate fills sections and a refresh keeps them; changed source goes stale', async () => {
+    const io = src()
+    await mapBuild(io)
+    const n = await mapNarrate(io, { 'Architecture Overview': 'An express app.', Confidence: 'HIGH' })
+    expect(n).toContain('Wrote Architecture Overview, Confidence')
+    io.files.set('src/orders.ts', io.files.get('src/orders.ts')! + 'export const x = 1\n')
+    expect((await freshness(io)).status).toBe('stale')
+    const out = await mapBuild(io)
+    expect(out).toContain('refreshed')
+    expect(io.files.get('.planning/CODEBASE.md')).toContain('An express app.')
+  })
+
+  test('no source code means no map; bad scope is refused', async () => {
+    expect(await mapBuild(memIo({ 'notes.txt': 'hi' }))).toContain('No source code detected')
+    expect(await mapBuild(src(), { scope: '../x' })).toContain('--scope must be a path inside the project')
   })
 })

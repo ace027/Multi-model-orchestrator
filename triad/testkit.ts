@@ -21,6 +21,7 @@ export function memIo(seed: Record<string, string> = {}) {
     },
     run: async argv => {
       if (argv[0] === 'rm') { files.delete(argv[2]!); return ok() }
+      if (argv[0] === 'bash' && /git ls-files/.test(argv[2]!)) return ok([...files.keys()].join('\n'))
       if (argv[0] === 'bash') { const m = argv[2]!.match(/^test -f (\S+)$/); return m ? { exitCode: files.has(m[1]!) ? 0 : 1, stdout: '', stderr: '' } : ok() }
       const mv = argv[0] === 'mv' ? argv.slice(1) : argv[0] === 'git' && argv[1] === 'mv' ? argv.slice(2) : undefined
       if (mv) {
