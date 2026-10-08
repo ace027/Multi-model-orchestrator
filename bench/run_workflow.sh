@@ -4,6 +4,7 @@
 #   /triad:start (from TASK.md), then per roadmap phase /triad:plan N, /triad:build N, /triad:review N,
 # all with --auto and control mode autonomous. Grades with tasks/<task>/check.py and writes
 # <out dir>/result.json (cost summed over the commands) and the per-command JSON next to it.
+# OPTS (JSON) sets Triad's options, e.g. OPTS='{"allOpus":true}' for the all-Opus baseline.
 set -uo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TASK=$1 OUT=$(mkdir -p "$2" && cd "$2" && pwd)
@@ -22,6 +23,7 @@ run() {
   echo "$(date +%T) $name: $*" >> "$OUT/log"
   HOME=$HOME_DIR timeout 2400 "$ROOT/bench/hermetic.sh" claude -p --model opus --plugin-dir "$ROOT/triad" \
     --session-id "$(python3 -c 'import uuid; print(uuid.uuid4())')" \
+    --settings "{\"pluginConfigs\":{\"triad@inline\":{\"options\":${OPTS:-{\}}}}}" \
     --append-system-prompt "$NOTE" --allowedTools "$TOOLS" --output-format json "$*" \
     < /dev/null > "$OUT/$name.json" 2> "$OUT/$name.err" || echo "exit $?" >> "$OUT/$name.err"
   cp .triad/ledger.json "$OUT/$name.ledger.json" 2>/dev/null || true

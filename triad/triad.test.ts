@@ -88,6 +88,15 @@ describe('hooks', () => {
     expect(((await $.agent.spawn({ subagentType: 'general-purpose', prompt: 'p', description: 'd' })) as any).deny).toMatch(/bypasses the tiers/)
   })
 
+  test('allOpus runs coders and helpers on Opus', { options: { allOpus: true } }, async ($, on) => {
+    const log = { writes: {}, spawns: [] as any[] }
+    world(on, log)
+    await start($)
+    await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'do it', description: 'c' })
+    await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'list files in src/', description: 'h' })
+    expect(log.spawns.map(s => s.model)).toEqual(['opus', 'opus'])
+  })
+
   test('runs the Opus coder on Opus, counted against the coder cap', async ($, on) => {
     const log = { writes: {}, spawns: [] as any[] }
     world(on, log)

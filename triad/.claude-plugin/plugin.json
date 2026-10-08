@@ -28,6 +28,12 @@
       "description": "After this long a coder is told to stop tuning, check its work and report. 0 turns it off.",
       "default": 20
     },
+    "allOpus": {
+      "type": "boolean",
+      "title": "Run every agent on Opus",
+      "description": "A comparison baseline: the same workflow and limits, with coders and helpers on Opus instead of Sonnet and Haiku.",
+      "default": false
+    },
     "maxRetries": {
       "type": "number",
       "title": "Max automatic retries per task",

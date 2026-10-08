@@ -321,6 +321,9 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
 
 export const register: Register = (on, options) => {
   opts = { ...DEFAULTS, ...(options as Partial<Options>) }
+  // Comparison baseline: the same workflow with every agent on Opus. The Haiku
+  // ceiling exists for Haiku's pricing line, so it is off too.
+  if (opts.allOpus) opts.haikuCeiling = 0
   registerPane(on)
 
   on('session.start', async ($, e, next) => {
@@ -405,7 +408,7 @@ export const register: Register = (on, options) => {
     reserved[role]++
     let r
     try {
-      r = await next({ ...e, model: modelFor[e.description] ?? modelOfType(type) ?? MODEL_FOR[role], background: false })
+      r = await next({ ...e, model: opts.allOpus ? 'opus' : modelFor[e.description] ?? modelOfType(type) ?? MODEL_FOR[role], background: false })
     } finally {
       reserved[role]--
     }

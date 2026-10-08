@@ -72,6 +72,7 @@ Set them in `/plugin` settings, or for a headless run with `--settings '{"plugin
 | `haikuCeiling` | 95000 | A helper whose next request is projected above this many tokens is stopped and returns `partial`. Keep it under 100,000, where Haiku's higher rate starts. |
 | `haikuWrapAt` | 80000 | At this prompt size a helper is told to finish. |
 | `coderMinutes` | 20 | After this long a coder is told to stop tuning, check its work and report (0: off). |
+| `allOpus` | false | Comparison baseline: every agent runs on Opus (and the Haiku ceiling is off). |
 | `openPane` | false | Open the Triad pane at session start. A pane opened this way seats from 144 terminal columns; `/triad pane` opens it at any width. |
 
 A helper brief over 40k tokens is refused at spawn: give the job to a coder, or split it.
