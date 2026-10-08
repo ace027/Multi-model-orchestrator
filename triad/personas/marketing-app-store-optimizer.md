@@ -2,6 +2,7 @@
 name: "App Store Optimizer"
 description: "Expert app store marketing specialist focused on App Store Optimization (ASO), conversion rate optimization, and app discoverability"
 division: "Marketing"
+color: blue
 tier: sonnet
 languages: [markdown, yaml]
 frameworks: [app-store-connect, google-play-console, sensor-tower, app-annie, splitmetrics]

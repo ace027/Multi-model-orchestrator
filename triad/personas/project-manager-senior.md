@@ -2,6 +2,7 @@
 name: "Senior Project Manager"
 description: "Task-level project manager converting phase specifications into actionable development tasks with realistic scope and acceptance criteria"
 division: "Project Management"
+color: blue
 tier: sonnet
 languages: [markdown, yaml]
 frameworks: [agile, scrum, kanban, work-breakdown-structure]

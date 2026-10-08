@@ -113,10 +113,8 @@ export async function runValidate(io: Io, opts: { fix?: boolean } = {}): Promise
   for (const f of (await io.list('.planning/config')).filter(e => !e.dir && /\.ya?ml$/.test(e.name))) {
     const rel = `.planning/config/${f.name}`
     let doc: any
-    try { doc = parseYaml((await io.read(rel)) ?? '') } catch (e) { add(rel, 'FAIL', `not valid YAML: ${(e as Error).message}`); continue }
-    const refs: string[] = []
-    if (f.name === 'authority-matrix.yaml') refs.push(...Object.keys(doc?.agents ?? {}))
-    if (f.name === 'intent-teams.yaml') for (const i of Object.values<any>(doc?.intents ?? {})) refs.push(...(i?.agents?.primary ?? []), ...(i?.agents?.secondary ?? []), ...(i?.filter?.exclude_agents ?? []))
+    try { doc = parseYaml(((await io.read(rel)) ?? '').replace(/^---\s*$/m, '')) } catch (e) { add(rel, 'FAIL', `not valid YAML: ${(e as Error).message}`); continue }
+    const refs = agentRefs(f.name, doc)
     const unknown = [...new Set(refs.map(String))].filter(a => !ROSTER.has(a))
     if (unknown.length) add(rel, 'FAIL', `names agents not in the roster: ${unknown.join(', ')}`)
     else add(rel, 'PASS', refs.length ? `parses; ${new Set(refs).size} agent references resolve` : 'parses')
@@ -130,6 +128,21 @@ export async function runValidate(io: Io, opts: { fix?: boolean } = {}): Promise
   if (!pos(s.review?.max_cycles)) add('settings.json', 'FAIL', 'review.max_cycles must be a positive integer')
   if (!p.settingsWarnings.length) add('settings', 'PASS', `control mode ${s.control_mode}`)
   return { checks, fixed }
+}
+
+// Agent ids a Legion config file names (config-agent-references).
+export function agentRefs(file: string, doc: any): string[] {
+  const refs: string[] = []
+  if (file === 'authority-matrix.yaml') refs.push(...Object.keys(doc?.agents ?? {}))
+  if (file === 'intent-teams.yaml') for (const i of Object.values<any>(doc?.intents ?? {})) refs.push(...(i?.agents?.primary ?? []), ...(i?.agents?.secondary ?? []), ...(i?.filter?.exclude_agents ?? []))
+  if (file === 'roster-gap-config.yaml') {
+    const walk = (v: any): void => {
+      if (Array.isArray(v)) v.forEach(walk)
+      else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) (k === 'coverage_indicators' || k === 'required_agents') && Array.isArray(x) ? refs.push(...x.map(String)) : walk(x)
+    }
+    walk(doc)
+  }
+  return refs.map(String)
 }
 
 export function renderValidate(r: { checks: Check[]; fixed: string[] }, ci: boolean): { text: string; exitCode: number } {

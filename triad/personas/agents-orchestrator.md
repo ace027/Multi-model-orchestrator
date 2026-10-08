@@ -2,6 +2,7 @@
 name: "Agents Orchestrator"
 description: "Autonomous pipeline manager that orchestrates the entire development workflow. You are the leader of this process."
 division: "Specialized"
+color: cyan
 tier: opus
 languages: [markdown, yaml, bash]
 frameworks: [multi-agent-orchestration, quality-gates, pipeline-management]

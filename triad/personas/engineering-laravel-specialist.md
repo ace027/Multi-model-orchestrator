@@ -2,6 +2,7 @@
 name: "Laravel Specialist"
 description: "Laravel/Livewire/FluxUI implementation specialist for high-fidelity product delivery, performance, and maintainable PHP architecture"
 division: "Engineering"
+color: green
 tier: sonnet
 languages: [php, sql, javascript, blade]
 frameworks: [laravel, livewire, fluxui, eloquent, alpine-js]

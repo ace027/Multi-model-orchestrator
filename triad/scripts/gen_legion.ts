@@ -78,7 +78,7 @@ function distill(body: string): string {
 const list = (v: unknown) => (Array.isArray(v) ? v.map(String) : [])
 
 type Persona = {
-  id: string; name: string; description: string; division: string; tier: string
+  id: string; name: string; description: string; division: string; color: string; tier: string
   languages: string[]; frameworks: string[]; artifact_types: string[]; review_strengths: string[]; core: string
 }
 
@@ -96,6 +96,7 @@ for (const f of readdirSync(join(legion, 'agents')).filter(f => f.endsWith('.md'
     name: String(d.name ?? id),
     description: String(d.description ?? ''),
     division: String(d.division ?? ''),
+    color: String(d.color ?? ''),
     tier: TIERS[id] ?? 'sonnet',
     languages: list(d.languages),
     frameworks: list(d.frameworks),
@@ -109,6 +110,7 @@ for (const f of readdirSync(join(legion, 'agents')).filter(f => f.endsWith('.md'
     `name: ${yamlStr(p.name)}`,
     `description: ${yamlStr(p.description)}`,
     `division: ${yamlStr(p.division)}`,
+    ...(p.color ? [`color: ${p.color}`] : []),
     `tier: ${p.tier}`,
     `languages: ${yamlList(p.languages)}`,
     `frameworks: ${yamlList(p.frameworks)}`,

@@ -2,6 +2,7 @@
 name: "Data Analytics Engineer"
 description: "Full-stack data analytics specialist — builds trustworthy data infrastructure (pipelines, ETL, quality) and delivers actionable business insights (dashboards, KPIs, executive reporting)"
 division: "Specialized"
+color: blue
 tier: sonnet
 languages: [sql, python, r, markdown, yaml]
 frameworks: [pandas, tableau, power-bi, looker, grafana, google-analytics, dbt]

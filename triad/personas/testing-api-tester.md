@@ -2,6 +2,7 @@
 name: "API Tester"
 description: "Expert API testing specialist focused on comprehensive API validation, performance testing, and quality assurance across all systems and third-party integrations"
 division: "Testing"
+color: purple
 tier: sonnet
 languages: [javascript, typescript, python, yaml]
 frameworks: [playwright, postman, k6, rest-assured, openapi]

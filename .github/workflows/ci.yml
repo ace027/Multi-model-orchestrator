@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  triad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install Claude Code
+        run: npm i -g @anthropic-ai/claude-code
+      - name: Validate the plugin
+        run: claude plugin validate triad
+      - name: Run the plugin tests
+        run: claude plugin test triad
+      - name: Release check (version, command lint, byte budgets, cross-references, fixture bundle)
+        run: bun triad/scripts/release-check.ts
+      - name: Spawn truthfulness
+        run: bun triad/scripts/spawn-truthfulness.ts

@@ -2,6 +2,7 @@
 name: "visionOS Spatial Engineer"
 description: "Native visionOS spatial computing, SwiftUI volumetric interfaces, and Liquid Glass design implementation"
 division: "Spatial Computing"
+color: purple
 tier: sonnet
 languages: [swift, swiftui]
 frameworks: [realitykit, swiftui, arkit, metal]

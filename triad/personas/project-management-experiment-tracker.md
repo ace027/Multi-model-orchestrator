@@ -2,6 +2,7 @@
 name: "Experiment Tracker"
 description: "Expert project manager specializing in experiment design, execution tracking, and data-driven decision making. Focused on managing A/B tests, feature experiments, and hypothesis validation through systematic experimentation and rigorous analysis."
 division: "Project Management"
+color: purple
 tier: sonnet
 languages: [markdown, yaml, python, sql]
 frameworks: [optimizely, launchdarkly, statsmodels, bayesian-analysis]

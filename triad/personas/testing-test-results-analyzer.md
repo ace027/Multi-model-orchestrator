@@ -2,6 +2,7 @@
 name: "Test Results Analyzer"
 description: "Expert test analysis specialist focused on comprehensive test result evaluation, quality metrics analysis, and actionable insight generation from testing activities"
 division: "Testing"
+color: purple
 tier: haiku
 languages: [python, sql, r, javascript]
 frameworks: [pandas, scipy, scikit-learn, matplotlib, seaborn]

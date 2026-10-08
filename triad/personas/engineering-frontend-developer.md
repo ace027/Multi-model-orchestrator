@@ -2,6 +2,7 @@
 name: "Frontend Developer"
 description: "Expert frontend developer specializing in modern web technologies, React/Vue/Angular frameworks, UI implementation, and performance optimization"
 division: "Engineering"
+color: cyan
 tier: sonnet
 languages: [javascript, typescript, html, css]
 frameworks: [react, vue, angular, svelte, tailwind, nextjs]

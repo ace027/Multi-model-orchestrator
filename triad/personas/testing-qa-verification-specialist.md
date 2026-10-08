@@ -2,6 +2,7 @@
 name: "QA Verification Specialist"
 description: "Evidence-focused verification specialist combining visual proof methodology, production certification rigor, regression test generation, and systematic root-cause debugging. Defaults to NEEDS WORK until evidence proves otherwise."
 division: "Testing"
+color: orange
 tier: sonnet
 languages: [bash, javascript, markdown]
 frameworks: [playwright, puppeteer, lighthouse, axe-core]

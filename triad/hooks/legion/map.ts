@@ -34,6 +34,62 @@ export type MapData = {
   tests: { convention: string; files: string[]; ratio: number; level: string; coverage?: { pct: number; source: string }; untested: { path: string; lines: number; fanIn: number; risk: number; level: string }[] }
   routes: { method: string; path: string; file: string }[]; framework: string; config: string[]; env: { name: string; source: string; sensitive: boolean }[]; exposure: string[]
   symbols: Symbol[]; mappings: { category: string; paths: string[]; priority: number; pattern: string }[]; monorepo: string[]; deps: string[]
+  depRisk?: DepRisk
+}
+
+// Dependency risk (codebase-mapper 4.6.2, 4.6.5): `npm outdated --json`, each
+// package by its version gap, the whole by the share of dependencies outdated.
+export type Outdated = { name: string; current: string; wanted: string; latest: string; severity: 'major' | 'minor' | 'patch'; majorGap: number }
+export type DepRisk = { ecosystem: string; direct: number; outdated: Outdated[]; pct: number; level: 'HIGH' | 'MEDIUM' | 'LOW'; skipped?: string }
+
+const semver = (v: string) => (v.match(/(\d+)(?:\.(\d+))?(?:\.(\d+))?/)?.slice(1) ?? []).map(x => Number(x ?? 0))
+
+export function parseNpmOutdated(json: string): Outdated[] | undefined {
+  let data: unknown
+  try { data = json.trim() ? JSON.parse(json) : {} } catch { return undefined }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return undefined
+  const out: Outdated[] = []
+  for (const [name, e] of Object.entries(data as Record<string, any>)) {
+    // A workspace lists one entry per dependent; a missing install has no current version.
+    const x = Array.isArray(e) ? e[0] : e
+    if (!x || typeof x.current !== 'string' || typeof x.latest !== 'string') continue
+    const [cM, cm, cp] = semver(x.current), [lM, lm, lp] = semver(x.latest)
+    if (cM === undefined || lM === undefined) continue
+    const majorGap = Math.max(0, lM - cM)
+    const severity = majorGap ? 'major' : (lm ?? 0) > (cm ?? 0) ? 'minor' : (lp ?? 0) > (cp ?? 0) ? 'patch' : undefined
+    if (severity) out.push({ name, current: x.current, wanted: String(x.wanted ?? ''), latest: x.latest, severity, majorGap })
+  }
+  const rank = { major: 0, minor: 1, patch: 2 }
+  return out.sort((a, b) => rank[a.severity] - rank[b.severity] || b.majorGap - a.majorGap || a.name.localeCompare(b.name))
+}
+
+export function dependencyRisk(outdated: Outdated[], direct: number, ecosystem = 'Node.js (npm)'): DepRisk {
+  const pct = direct ? Math.round(outdated.length / direct * 100) : 0
+  const level = pct > 50 ? 'HIGH' : pct >= 20 ? 'MEDIUM' : 'LOW'
+  return { ecosystem, direct, outdated, pct, level }
+}
+
+// npm exits 1 when anything is outdated, so the exit code says nothing; the JSON does.
+export async function npmDependencyRisk(io: Io, direct: number): Promise<DepRisk> {
+  const r = await io.run(['npm', 'outdated', '--json'], { timeoutMs: 60_000 }).catch(() => undefined)
+  const parsed = r && (r.exitCode === 0 || r.stdout.trim()) ? parseNpmOutdated(r.stdout) : undefined
+  if (!parsed) return { ...dependencyRisk([], direct), skipped: 'Package manager not available or no lockfile found. Dependency currency check skipped.' }
+  return dependencyRisk(parsed, direct)
+}
+
+export function renderDepRisk(r: DepRisk): string {
+  if (r.skipped) return `**Ecosystem**: ${r.ecosystem}\n**Direct dependencies**: ${r.direct}\n\n${r.skipped}`
+  const major = r.outdated.filter(o => o.severity === 'major')
+  return [
+    `**Ecosystem**: ${r.ecosystem}`, `**Direct dependencies**: ${r.direct} | **Outdated**: ${r.outdated.length} (${r.pct}%)`, '',
+    '### Outdated Packages', table(['Package', 'Current', 'Latest', 'Severity'], r.outdated.slice(0, 15).map(o => [o.name, o.current, o.latest, o.severity === 'major' ? `major (${o.majorGap} behind, HIGH)` : o.severity === 'minor' ? 'minor (MEDIUM)' : 'patch (LOW)']), '_No outdated packages_'), '',
+    '### Dependency Risk Summary', table(['Metric', 'Value', 'Risk Level'], [
+      ['Outdated packages', `${r.outdated.length}/${r.direct} (${r.pct}%)`, r.level],
+      ['Major version behind', `${major.length} packages${major.length ? ` (${major.slice(0, 5).map(o => o.name).join(', ')})` : ''}`, major.length ? 'HIGH' : 'LOW'],
+      ['Heavy dependencies', 'not checked (`npm ls --all` is not run)', '-'],
+      ['Potentially unmaintained', 'not checked (needs registry publish dates)', '-'],
+    ]),
+  ].join('\n')
 }
 
 const sh = async (io: Io, cmd: string) => (await io.run(['bash', '-c', cmd]).catch(() => ({ exitCode: 1, stdout: '', stderr: '' })))
@@ -327,6 +383,7 @@ export async function collect(io: Io, opts: { scope?: string; networkChecks?: bo
     fingerprint: fingerprint([...source, ...manifests]), fingerprintKind: 'content', files, source, languages, entryPoints, stack, conventions, structure,
     complexity, debt, hotspots, hygiene, imports: { edges, external, fanOut, fanIn }, tests: { convention: dominant && dominant[1] ? dominant[0] : '', files: testFiles, ratio, level, coverage, untested },
     routes, framework, config, env, exposure, symbols, mappings, monorepo: [...new Set(monorepo)], deps: Object.keys(pkg?.dependencies ?? {}),
+    depRisk: pkg && opts.networkChecks ? await npmDependencyRisk(io, Object.keys(deps).length) : undefined,
   }
 }
 
@@ -355,7 +412,7 @@ export function renderCodebase(d: MapData, narrative: Record<string, string> = {
     '### Complexity (largest files)', table(['File', 'Lines', 'Level'], d.complexity.map(c => [`\`${c.path}\``, c.lines, c.level])), '',
     '### Git Hotspots (90 days)', d.hotspots.length ? table(['File', 'Changes'], d.hotspots.map(h => [`\`${h.path}\``, h.changes])) : '_Skipped: fewer than 10 commits in 90 days, or not a git repository._', '',
     '### Hygiene', d.hygiene.length ? d.hygiene.map(h => `- ${h}`).join('\n') : '_None detected_', '',
-    '## Dependency Risk', d.deps.length || d.files.some(f => MANIFESTS.includes(f)) ? `Direct dependencies: ${d.deps.length || 'see manifest'}. Package manager not available or no lockfile found. Dependency currency check skipped. (Network checks are off: run \`npm outdated\` or the ecosystem equivalent to check currency.)` : 'No package manifest detected (package.json, requirements.txt, Gemfile, Cargo.toml, go.mod). Dependency risk analysis requires a recognized package ecosystem.', '',
+    '## Dependency Risk', d.depRisk ? renderDepRisk(d.depRisk) : d.deps.length || d.files.some(f => MANIFESTS.includes(f)) ? `Direct dependencies: ${d.deps.length || 'see manifest'}. Package manager not available or no lockfile found. Dependency currency check skipped. (Network checks are off: run \`npm outdated\` or the ecosystem equivalent to check currency.)` : 'No package manifest detected (package.json, requirements.txt, Gemfile, Cargo.toml, go.mod). Dependency risk analysis requires a recognized package ecosystem.', '',
     '## Agent Guidance', n('Agent Guidance'), '',
     '## Dependency Graph', Object.keys(d.imports.edges).length || d.imports.external.size ? [
       `**Files analyzed**: ${d.source.length} | **Internal edges**: ${Object.values(d.imports.edges).reduce((s, v) => s + v.length, 0)} | **External deps**: ${d.imports.external.size}`, '',
@@ -510,7 +567,7 @@ export async function mapBuild(io: Io, opts: { scope?: string } = {}): Promise<s
     if (s.startsWith('/') || s.split('/').includes('..')) return `--scope must be a path inside the project (got ${opts.scope}).`
     if (!(await io.list(s)).length && (await io.read(s)) === undefined) return `--scope path ${opts.scope} does not exist.`
   }
-  const d = await collect(io, opts)
+  const d = await collect(io, { ...opts, networkChecks: true })
   if (!(await isCodebase(io, d.files))) return 'No source code detected, so no codebase map was generated.'
   const chunks = indexChunks(d)
   // Keep narrative sections from an earlier map (a refresh only replaces data sections).
@@ -529,7 +586,7 @@ export async function mapBuild(io: Io, opts: { scope?: string } = {}): Promise<s
     `Codebase map ${old ? 'refreshed' : 'generated'}${d.scope !== 'project-root' ? ` (scoped to ${d.scope}, not full-project)` : ''}: ${d.source.length} source files of ${d.files.length}.`,
     `Languages: ${d.languages.map(l => `${l.ext} ${l.pct}%`).join(', ') || 'none'}; stack: ${d.stack.map(s => s.technology).join(', ') || 'unknown'}.`,
     `Artifacts: ${ARTIFACTS.join(', ')} (${chunks.length} chunks, ${d.symbols.length} symbols).`,
-    `Top risks: ${d.tests.untested.filter(u => u.level !== 'LOW').slice(0, 3).map(u => `${u.path} (${u.level}, untested)`).join('; ') || '_None detected_'}${d.exposure.length ? `; ${d.exposure.length} secret exposure warning(s)` : ''}.`,
+    `Top risks: ${d.tests.untested.filter(u => u.level !== 'LOW').slice(0, 3).map(u => `${u.path} (${u.level}, untested)`).join('; ') || '_None detected_'}${d.exposure.length ? `; ${d.exposure.length} secret exposure warning(s)` : ''}${d.depRisk?.outdated.some(o => o.severity === 'major') ? `; ${d.depRisk.outdated.filter(o => o.severity === 'major').length} package(s) a major version behind` : ''}.`,
     '', pending.length ? `Narrative sections to write (map action narrate): ${pending.join(', ')}. Facts for them:` : 'Narrative sections kept from the previous map.',
     ...(pending.length ? [factsFor(d)] : []),
   ].join('\n')

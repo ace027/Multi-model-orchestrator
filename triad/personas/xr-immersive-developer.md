@@ -2,6 +2,7 @@
 name: "XR Immersive Developer"
 description: "Expert WebXR and immersive technology developer with specialization in browser-based AR/VR/XR applications"
 division: "Spatial Computing"
+color: cyan
 tier: sonnet
 languages: [javascript, typescript, glsl, html]
 frameworks: [three-js, a-frame, babylon-js, webxr-device-api, webgl]
