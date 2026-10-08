@@ -52,7 +52,7 @@ Triad names: judgment workflows become plugin commands (`/triad:<name>`). Determ
 | `commands/ship.md` (`/legion:ship`) | Pre-ship gates, ship report, PR via `gh`, post-ship checks, canary monitoring | Improved | Gates and PR creation in code via `gh`; canary checks scheduled with `$.clock.after` at 1, 5 and 15 minutes; always-on security gate hook on `gh pr create` |
 | `commands/learn.md` (`/legion:learn`) | Record, recall, list and prune project lessons in `.planning/memory/` | Improved | Memory manager in code; Opus classifies the lesson; four-bracket decay; archive, never delete |
 | `commands/polish.md` (`/legion:polish`) | 4-pass code cleanup, capped at 50 files, reverts files whose tests regress | Improved | One Sonnet code polisher runs the 4 passes; the 50-file cap, test and type-check baseline and per-file revert run in code |
-| `commands/validate.md` (`/legion:validate`) | Validates `.planning/` files, schemas, cross-refs, roster and config | Improved | Pure code against `docs/schemas/` and `settings.schema.json`, no model |
+| `commands/validate.md` (`/legion:validate`) | Validates `.planning/` files, schemas, cross-refs, roster and config | Improved | Pure code with the schemas (and `settings.schema.json`) built in, no model |
 | `commands/update.md` (`/legion:update [--check]`) | Detects runtime, checks npm for latest version, reinstalls | Replaced | Replaced by `claude plugin update` and the marketplace |
 
 ### 1a. Command options and modes

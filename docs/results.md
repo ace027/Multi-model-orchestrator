@@ -9,6 +9,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 4 | Haiku prompt ceiling: no request over 100k | $0.75 |
 | 5 | Legion-format build, review and plan, no migration | $1.15 |
 | 6 | Dry-run build, intent validation, board meeting | $0.56 |
+| 7 | Opus only vs Legion vs Triad, 5 tasks (incomplete, see below) | $0.40 so far |
 
 ## Phase 2 acceptance
 
@@ -92,3 +93,16 @@ Live `/triad:plan` (`bench/run_legion_plan.sh`, evidence in `bench/results/phase
 | Total | | $0.56 |
 
 The board run found a scoring bug. The everyday word "store" matched `marketing-app-store-optimizer` by its id, so it led a storage decision. Id words are now a weak signal, and database technologies (SQLite, Postgres and others) imply "database". The same topic now leads with `engineering-backend-architect`. A test covers it.
+
+## Phase 7: Opus only vs Legion vs Triad
+
+SPEC section 7 asks for the bench tasks under (a) Opus alone, (b) Legion, (c) Triad, before Legion is removed. `bench/run_phase7.sh <legion checkout>` installs Legion with its own installer into a throwaway HOME (the real `~/.claude` is never touched) and runs `bench/run_bench.py` with the configs `opus`, `legion` and `triad`. Every run gets a fresh HOME. Legion runs through `/legion:quick`, told to take the recommended option wherever it would ask; Triad and Opus get the plain prompt.
+
+**Incomplete.** One run finished before the API key reached its usage limit (the API answered "You have reached your specified API usage limits", until 2026-11-01). The other 14 runs failed before any request was sent and cost nothing.
+
+| task | config | ok | cost | tokens | notes |
+|---|---|---|---|---|---|
+| discounts | legion | Y | $0.401 | 197.3k | 4 turns, all on Opus; it picked no subagent |
+| discounts | triad (Phase 3 run, for reference) | Y | $0.156 | 106.0k | |
+
+Setting this up found a bug in `run_bench.py`: `--allowedTools` takes several values, so the `opus` config's prompt was read as a tool name. The flag is now passed as `--allowedTools=...`. Phase 3 recorded only `p2` and `p3`, which were not affected.

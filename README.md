@@ -26,6 +26,7 @@ Then work as usual, and run `/triad` (or `/triad pane`) to see the agent tree an
 | [`docs/commands.md`](docs/commands.md) | Every `/triad:*` command and its arguments. |
 | [`docs/control-modes.md`](docs/control-modes.md) | How much freedom agents get during a build or review. |
 | [`docs/results.md`](docs/results.md) | Measurements from each build phase, and the scripts that reproduce them. |
+| [`docs/legion-removal.md`](docs/legion-removal.md) | Uninstalling Legion once Triad replaces it. |
 | [`PARITY.md`](PARITY.md) | Every Legion feature and its Triad equivalent. |
 | [`SPEC.md`](SPEC.md), [`SPIKE.md`](SPIKE.md) | The design, and the engine behaviour it was checked against. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md), [`REVIEW.md`](REVIEW.md) | Checks, conventions and review rules. |

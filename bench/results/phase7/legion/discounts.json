@@ -1,0 +1,31 @@
+{
+  "task": "discounts",
+  "config": "legion",
+  "options": null,
+  "seconds": 63,
+  "exit": 1,
+  "success": true,
+  "check": "tests 0 cli 900 unknown-code exit 2",
+  "cost": 0.40116219999999997,
+  "turns": 4,
+  "tokens": {
+    "inputTokens": 14,
+    "outputTokens": 6637,
+    "cacheReadInputTokens": 142656,
+    "cacheCreationInputTokens": 47967
+  },
+  "totalTokens": 197274,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 6637,
+      "cacheReadInputTokens": 142656,
+      "cacheCreationInputTokens": 47967,
+      "costUSD": 0.40116219999999997
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-legion-discounts-fmyirlam/repo"
+}
