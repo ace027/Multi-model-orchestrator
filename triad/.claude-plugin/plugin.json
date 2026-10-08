@@ -22,6 +22,12 @@
       "description": "triad-helper agents (Haiku) running at once.",
       "default": 6
     },
+    "coderMinutes": {
+      "type": "number",
+      "title": "Coder time budget (minutes)",
+      "description": "After this long a coder is told to stop tuning, check its work and report. 0 turns it off.",
+      "default": 20
+    },
     "maxRetries": {
       "type": "number",
       "title": "Max automatic retries per task",

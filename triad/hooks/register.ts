@@ -3,7 +3,7 @@ import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, p
 import { atom, update } from 'claude-code'
 import { emptyLedger, ensureAgent, paneView, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
 import { PANE, registerPane } from './pane.tsx'
-import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
+import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, TIME_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
 import { LEGION_TOOLS } from './legion/tools.ts'
 import { personaRank, planCheck, planWrite, projectInit, statusText, validateText } from './legion/handlers.ts'
 import { buildRun } from './legion/buildrun.ts'
@@ -129,6 +129,11 @@ async function publish($: any) {
 // Waits for an agent's turn.complete without spending the hook's own budget:
 // the wait runs in a child process that polls for the marker the turn.complete
 // hook writes (SPIKE.md, hook budget).
+const startedAt: Record<string, number> = {}
+async function nowMs($: any): Promise<number> {
+  try { return Number(await $.clock.now()) } catch { return Date.now() }
+}
+
 async function waitForAnswer($: any, agentId: string, ms: number): Promise<string | undefined> {
   let answer: string | undefined = finished[agentId]
   delete finished[agentId]
@@ -416,6 +421,7 @@ export const register: Register = (on, options) => {
         written[id] = new Set()
       }
       tasks[id] = e.prompt
+      if (role === 'coder') startedAt[id] = await nowMs($)
       if (e.description.startsWith(LEGION_MARK)) legion.add(id)
       ensureAgent(ledger, id, { role, type, parent: parent ?? 'main', depth, status: 'running' })
       await publish($)
@@ -447,6 +453,13 @@ export const register: Register = (on, options) => {
     if (r?.usage) {
       recordStep(ledger, id, r.usage.model || e.model, r.usage)
       await publish($)
+    }
+    // Coder time budget: one note once the coder has worked coderMinutes, so an
+    // open-ended tuning loop ends with a report instead of running on.
+    const t0 = id && roles[id] === 'coder' && opts.coderMinutes > 0 ? startedAt[id] : undefined
+    if (t0 !== undefined && (await nowMs($)) - t0 >= opts.coderMinutes * 60_000) {
+      delete startedAt[id!]
+      try { await $.session.send({ to: { agentId: id! }, text: TIME_NOTE(opts.coderMinutes) }) } catch { /* best effort */ }
     }
     if (m && r?.usage) {
       m.lastPrompt = promptTokens(r.usage)

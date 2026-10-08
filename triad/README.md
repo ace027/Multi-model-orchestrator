@@ -71,6 +71,7 @@ Set them in `/plugin` settings, or for a headless run with `--settings '{"plugin
 | `deferTools` | true | Load only the tools the tiers use every turn; the rest stay reachable through ToolSearch. |
 | `haikuCeiling` | 95000 | A helper whose next request is projected above this many tokens is stopped and returns `partial`. Keep it under 100,000, where Haiku's higher rate starts. |
 | `haikuWrapAt` | 80000 | At this prompt size a helper is told to finish. |
+| `coderMinutes` | 20 | After this long a coder is told to stop tuning, check its work and report (0: off). |
 | `openPane` | false | Open the Triad pane at session start. A pane opened this way seats from 144 terminal columns; `/triad pane` opens it at any width. |
 
 A helper brief over 40k tokens is refused at spawn: give the job to a coder, or split it.
@@ -87,7 +88,7 @@ A helper brief over 40k tokens is refused at spawn: give the job to a coder, or 
 | `tool.call` `Agent` | Checks the reply against the return schema and sends a non-conforming reply back once (`maxRetries`), naming the agent id for SendMessage. |
 | `tool.call` `delegate_menial` | Coders only. Pre-flight size check (40k tokens), spawns a Haiku helper with the files it may write, waits for its answer in a child process (the hook budget does not count that wait), checks the schema, asks once for a resend. |
 | `tool.call` `Bash`/`Grep`/`Read` | With `compress`, output over `compressThreshold` tokens (Read: log-like files only) is saved to `.triad/out/` and replaced by its error lines, verbatim, plus a Haiku summary (chunked at 60k tokens, merged). A failed Bash call keeps its failure. A helper whose next request would pass its ceiling gets a pointer to the saved output instead of the output. |
-| `turn.step` (helpers) | Haiku ceiling. Before each helper request, projects its prompt: the previous request's exact size plus the conversation's growth at 2.5 chars a token (errs high), plus a margin. At `haikuWrapAt` (80k) the helper is told to finish; when the projection passes `haikuCeiling` (95k) the hook answers the step itself with a `status: partial` reply (done and left, from a Haiku one-shot over the transcript's tail, plus the files it wrote), so the request is never sent. Coders and the orchestrator are never stopped. |
+| `turn.step` (helpers) | Haiku ceiling. Before each helper request, projects its prompt: the previous request's exact size plus the conversation's growth at 2.5 chars a token (errs high), plus a margin. At `haikuWrapAt` (80k) the helper is told to finish; when the projection passes `haikuCeiling` (95k) the hook answers the step itself with a `status: partial` reply (done and left, from a Haiku one-shot over the transcript's tail, plus the files it wrote), so the request is never sent. Coders and the orchestrator are never stopped; a coder that has worked `coderMinutes` gets one note to wrap up and report. |
 | `tool.call` `Edit`/`Write`/... | A helper may write only the files its brief names (`Writable files:` line, or the paths in the brief). |
 | `turn.step`, `turn.complete`, `session.measure` | Feed the ledger: per request usage by agent and tier, priced per tier, including Haiku's over-100k rate (cache reads and writes count toward the line). |
 | `command.run` `/triad` | Prints the tree, tokens and cost per tier, and budgets. `/triad pane` opens the same as a live pane. |

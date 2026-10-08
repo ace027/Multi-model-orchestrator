@@ -330,6 +330,26 @@ describe('haiku ceiling', () => {
     expect(state.steps).toBe(2)
   })
 
+  test('tells a coder to wrap up once it has worked coderMinutes, once', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    let now = 0
+    on('clock.now', () => ({ value: now }))
+    await start($)
+    const c = await $.agent.spawn({ subagentType: 'triad:triad-opus-coder', prompt: 'tune the AI', description: 'c' })
+    now = 19 * 60_000
+    await step($, c.agentId!, 0)
+    expect(state.sent.length).toBe(0)
+    now = 21 * 60_000
+    await step($, c.agentId!, 1)
+    now = 30 * 60_000
+    await step($, c.agentId!, 2)
+    expect(state.sent.length).toBe(1)
+    expect(state.sent[0]).toMatch(/worked for 20 minutes/)
+    expect(state.steps).toBe(3) // a note, never a stop
+  })
+
   test('never stops a coder on token grounds', async ($, on) => {
     world(on, { writes: {}, spawns: [] })
     const state = { chars: 900_000, sent: [] as string[], steps: 0 }
