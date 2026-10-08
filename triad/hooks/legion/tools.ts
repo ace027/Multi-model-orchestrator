@@ -275,6 +275,11 @@ export const LEGION_TOOLS = [
       dir: str('board meeting directory (decide)'), decision: { type: 'string', enum: ['approve', 'approve_conditions', 'reject', 'table'] }, conditions: strs('extra user conditions'),
     }, required: ['action'] },
   },
+  {
+    name: 'spec',
+    description: 'Spec pipeline, deterministic stages. trigger: run / offer / skip for a phase (--spec flag, CONTEXT spec_required, 4+ requirements at high complexity, or a new surface with 3+ requirements or plans). gather: stage 1 requirements summary and the spec path. check: the machine-checkable critique (required sections, requirement coverage, contracts, acceptance checks, Blocking open questions, defaults, path validation against directory-mappings.yaml) with verdict PASS / CAUTION / REWORK. assess: stage 5 complexity rating written into the spec.',
+    inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['trigger', 'gather', 'check', 'assess'] }, phase: { type: 'integer' }, flag: { type: 'boolean', description: 'the user passed --spec' } }, required: ['action'] },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)

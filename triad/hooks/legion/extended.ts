@@ -14,9 +14,10 @@ import { securitySave, securityScan } from './security.ts'
 import { retroGather, retroSave } from './retro.ts'
 import { filterPlans, loadIntentConfig, parseIntentFlags, parseNaturalLanguage, renderNl, renderValidation, resolveTeam, validateFlagCombination } from './intents.ts'
 import { dryRunReport, renderDryRun } from './dryrun.ts'
+import { renderSpecCheck, specAssess, specCheck, specGather, specTrigger } from './spec.ts'
 import { boardCompose, boardDecide, boardMeet, boardReview } from './board.ts'
 
-export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run', 'board'])
+export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run', 'board', 'spec'])
 
 export type Ctx = { agents: () => Agents; ioAt: (root: string) => Io; registry: () => Promise<Io>; schedule?: (ms: number, fn: () => void) => void; notify?: (text: string) => void }
 
@@ -56,6 +57,14 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
         case 'decide': return boardDecide(io, { dir: String(input.dir ?? ''), decision: input.decision, conditions: input.conditions })
       }
       return 'board: unknown action'
+    case 'spec':
+      switch (input.action) {
+        case 'trigger': { const t = await specTrigger(io, input.phase, !!input.flag); return `${t.action}: ${t.reason}` }
+        case 'gather': return specGather(io, input.phase)
+        case 'check': return renderSpecCheck(await specCheck(io, input.phase))
+        case 'assess': return specAssess(io, input.phase)
+      }
+      return 'spec: unknown action'
     case 'dry_run': return renderDryRun(await dryRunReport(io, String(input.command), input.phase, input.target))
     case 'memory':
       switch (input.action) {

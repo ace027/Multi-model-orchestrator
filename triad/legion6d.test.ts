@@ -258,3 +258,117 @@ describe('board', () => {
     expect([...io.files.keys()].some(k => k.startsWith('.planning/board/'))).toBe(false)
   })
 })
+
+import { inferCategory, specAssess, specCheck, specGather, specPath, specTrigger } from './hooks/legion/spec.ts'
+
+const SPEC = (over: { reqs?: string; oq?: string; api?: string } = {}) => `# Spec: Phase 1 — Auth
+
+## Overview
+Login and sessions.
+
+## Requirements
+| ID | Description | Priority | Acceptance Criteria |
+|----|-------------|----------|-------------------|
+${over.reqs ?? '| REQ-01 | Login | Must | curl /login returns 200 |\n| REQ-02 | Sessions | Must | cookie set |'}
+
+## Architecture
+Express routes over a session store.
+
+### Key Decisions
+| Decision | Choice | Rationale | Alternatives Considered |
+|----------|--------|-----------|----------------------|
+| Store | Redis | Shared across instances, already deployed | Memory |
+
+## API and Type Contracts
+${over.api ?? 'POST /login {user, pass} -> 200 {token}'}
+
+## File Placement
+| Artifact | Path | Placement Rationale | Existing Pattern |
+|----------|------|---------------------|------------------|
+| Login route | src/routes/login.ts | routes live here | src/routes/health.ts |
+
+## Data and Control Flow
+Request -> route -> store.
+
+## Compatibility Constraints
+- None
+
+## Failure Modes
+| Failure Mode | Expected Behavior | Verification |
+|--------------|-------------------|--------------|
+| Store down | 503 | test |
+
+## Acceptance Checks
+| Check | Command or Evidence | Required |
+|-------|---------------------|----------|
+| tests | npm test | true |
+
+## Deliverables
+
+### Login route
+- **Path:** src/utils/login.ts
+- **Purpose:** API endpoint for login
+- **Dependencies:** none
+
+### Session store
+- **Path:** src/services/session.ts
+- **Purpose:** session service
+- **Dependencies:** Login route
+
+## Open Questions
+| # | Question | Impact | Default Chosen by Spec | Planning Effect |
+|---|----------|--------|------------------------|-----------------|
+${over.oq ?? '| 1 | Token TTL? | Non-blocking | 1 hour | use default |'}
+
+## Complexity Assessment
+`
+
+describe('spec pipeline', () => {
+  async function specProject() {
+    const io = memIo()
+    await projectInit(io, { name: 'Demo', description: 'A demo.', requirements: ['REQ-01: Users can log in', 'REQ-02: Sessions persist'], constraints: ['Node 20'],
+      phases: [{ name: 'Auth', goal: 'Log in', requirements: ['REQ-01', 'REQ-02'], success_criteria: ['login works'], plans: 2 }] } as any)
+    return io
+  }
+
+  test('gather, trigger and the spec path', async () => {
+    const io = await specProject()
+    expect(specPath(1, 'Auth')).toBe('.planning/specs/01-auth-spec.md')
+    const g = await specGather(io, 1)
+    expect(g).toContain('## Requirements Summary — Phase 1: Auth')
+    expect(g).toContain('| REQ-01 |')
+    expect(g).toContain('Users can log in')
+    expect((await specTrigger(io, 1, true)).action).toBe('run')
+    expect((await specTrigger(io, 1)).action).toBe('skip')
+    expect(await specGather(io, 9)).toContain('not in ROADMAP.md')
+  })
+
+  test('check: verdicts, blocking questions, defaults and path validation', async () => {
+    const io = await specProject()
+    io.files.set('.planning/specs/01-auth-spec.md', SPEC())
+    let c = await specCheck(io, 1)
+    expect(typeof c !== 'string' && c.verdict).toBe('PASS')
+    io.files.set('.planning/config/directory-mappings.yaml', 'enforcement:\n  strictness: warn\nmappings:\n  routes:\n    paths: [src/routes]\n')
+    c = await specCheck(io, 1)
+    expect(typeof c !== 'string' && [c.verdict, c.findings.join()]).toEqual(['CAUTION', 'Path warnings: src/utils/login.ts (routes: not in src/routes; suggested src/routes/login.ts)'])
+    io.files.set('.planning/specs/01-auth-spec.md', SPEC({ reqs: '| REQ-01 | Login | Must | ok |', oq: '| 1 | Which IdP? | Blocking | — | halt |\n| 2 | TTL? | Non-blocking | | use default |', api: '' }))
+    c = await specCheck(io, 1)
+    if (typeof c === 'string') throw new Error(c)
+    expect(c.verdict).toBe('REWORK')
+    expect(c.blocking).toEqual(['Which IdP?'])
+    expect(c.checklist.filter(x => !x.ok).map(x => x.item)).toEqual(['Every phase requirement is in the Requirements table', 'API/type contracts explicit or explicitly none', 'No Blocking open questions; every Non-blocking one has a default'])
+    expect([inferCategory('a/b.test.ts'), inferCategory('src/components/x.tsx'), inferCategory('lib/x.ts', 'business logic')]).toEqual(['tests', 'components', 'services'])
+  })
+
+  test('assess writes the complexity section', async () => {
+    const io = await specProject()
+    io.files.set('.planning/specs/01-auth-spec.md', SPEC())
+    const out = await specAssess(io, 1)
+    expect(out).toContain('**Rating:** Medium')
+    const doc = io.files.get('.planning/specs/01-auth-spec.md')!
+    expect(doc).toContain('| Estimated waves | 2 |')
+    expect(doc).toContain('| Deliverables | 2 (new: 2, modify: 0, config: 0) |')
+    expect(doc).toContain('**Critique verdict:** PASS')
+    expect(doc.match(/## Complexity Assessment/g)!.length).toBe(1)
+  })
+})

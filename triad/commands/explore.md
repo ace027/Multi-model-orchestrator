@@ -1,0 +1,15 @@
+---
+description: Research and clarify a product idea, then save a design document that can seed /triad:start
+argument-hint: "[idea]"
+---
+Design exploration. Initial idea (may be empty): $ARGUMENTS
+
+Load the tools: ToolSearch with query `select:mcp__triad__persona_run,mcp__triad__map`. You run the conversation; research is fanned out to Haiku helpers; the Polymath persona (Opus) does the synthesis. Never start the project yourself.
+
+1. Context first. Read `.planning/PROJECT.md`, `ROADMAP.md`, `STATE.md` if present. If `.planning/CODEBASE.md` exists, use map action `query` for the idea's terms (and mention a stale map only if it matters). List `.planning/explorations/*.md`; if any exist, offer to resume the latest. An existing project is context, not a reason to stop.
+2. Entry path (AskUserQuestion): Start from a fresh idea / Start from an existing exploration / Start from project context. A fresh idea is the only open free-text capture (skip it when $ARGUMENTS gives the idea). From project context, derive 2-4 candidate explorations from PROJECT/ROADMAP/CODEBASE and let the user pick.
+3. Research, bounded, before clarifying. Spawn up to 3 triad:triad-helper agents (Haiku) in parallel with narrow read-only briefs: local (similar functionality, constraints, patterns in the repo and docs, citing paths), and, when current libraries, APIs, markets or regulations matter, external (WebSearch/WebFetch, citing sources). Each returns facts, inferences and assumptions separately. If research cannot finish quickly, record the gap and ask whether to proceed with assumptions, narrow scope, or park.
+4. Clarify one decision at a time with AskUserQuestion (2-5 options each): target users, primary outcome, MVP scope, non-goals, platform/channel, data and integration dependencies, technical constraints, timeline and risk tolerance. Skip what the context already answers. No open prose questions after the idea capture.
+5. Call persona_run (read_only, agent `polymath`, label `explore-synthesis`) with the idea, the research findings and every decision so far, asking for 2-3 approaches (conservative, recommended balanced, ambitious when useful) with strengths and trade-offs, and a recommendation grounded in the findings. Present them and ask the user to choose, refine, or keep comparing.
+6. Write `.planning/explorations/{YYYY-MM-DD}-{slug}-design.md` yourself with these sections: `# Design Exploration — {title}`, Initial Ask, Research Summary (Facts / Inferences / Assumptions), Product Definition (target users, primary outcome, value proposition, non-goals), Recommended Approach, Alternatives Considered (table: Approach | Strengths | Tradeoffs | Decision), Feature Scope (MVP / Later checklists), Experience / Workflow, Technical Direction, Open Questions (each with its resolution path), Start Input (a concise summary `/triad:start` can use).
+7. Ask: Start with this design / Keep discussing / Park it. Start: tell the user to run `/triad:start {path}` (do not run it). Keep discussing: return to step 4 and update the same file. Park: print the path and the next action.
