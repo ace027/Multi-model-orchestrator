@@ -88,6 +88,16 @@ describe('hooks', () => {
     expect(((await $.agent.spawn({ subagentType: 'general-purpose', prompt: 'p', description: 'd' })) as any).deny).toMatch(/bypasses the tiers/)
   })
 
+  test('runs the Opus coder on Opus, counted against the coder cap', async ($, on) => {
+    const log = { writes: {}, spawns: [] as any[] }
+    world(on, log)
+    await start($)
+    await $.agent.spawn({ subagentType: 'triad:triad-opus-coder', prompt: 'build the AI', description: 'ai', model: 'sonnet' })
+    expect(log.spawns[0].model).toBe('opus')
+    await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'do it', description: 'y' })
+    expect(log.spawns[1].model).toBe('sonnet')
+  })
+
   test('refuses a coder over the concurrency cap until one finishes', { options: { maxCoders: 1 } }, async ($, on) => {
     world(on, { writes: {}, spawns: [] })
     on('turn.complete', (_$: any, e: any) => ({ text: e.answer }))

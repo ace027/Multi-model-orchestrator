@@ -1,5 +1,5 @@
 import type { BuiltinToolName, Register } from 'claude-code'
-import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, schemaProblems, type Options, type Role } from './policy.ts'
+import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, modelOfType, schemaProblems, type Options, type Role } from './policy.ts'
 import { atom, update } from 'claude-code'
 import { emptyLedger, ensureAgent, paneView, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
 import { PANE, registerPane } from './pane.tsx'
@@ -63,8 +63,8 @@ const LEGION_WAIT = 60 * 60_000
 const ORCHESTRATOR_GUIDE = `# Triad orchestration
 You are the orchestrator. Decompose the work, make the architecture decisions, review results and decide retries. Each of your turns rereads the whole context, so keep them few: brief fully, wait, review once.
 - A change of a few lines in files you already know: make it yourself.
-- Other implementation goes to triad:triad-coder (Sonnet). Give one coder a whole cohesive deliverable in one complete brief: file paths, acceptance criteria, constraints and the verify command; no pasted code. Split only into tasks that are independent, and launch those in parallel.
-- If the work has a quality goal tests do not capture (a game AI's strength, speed, how a page looks), name it in the brief and ask the coder to build a way to measure it and iterate until it stops improving.
+- Well-specified implementation goes to triad:triad-coder (Sonnet); open-ended pieces (a game AI, architecture, tuning, visual polish) to triad:triad-opus-coder (Opus). Give one coder a whole cohesive deliverable in one complete brief: file paths, acceptance criteria, constraints and the verify command; no pasted code. Split only into independent tasks, launched in parallel.
+- A quality goal tests do not capture (an AI's strength, speed, looks): name it in the brief with a budget (about 5 rounds or 10 minutes); the coder measures it and iterates within that budget.
 - Fixes and follow-ups go to the same coder with SendMessage (its context is kept), not to a fresh agent. Retry a task at most once.
 - Menial work (search, running a test suite and summarizing failures, log triage, a checklist, boilerplate you have designed) goes to triad:triad-helper (Haiku). Name the files it may write.
 - Every agent returns status, summary, changes and verify. On blocked, rebrief, split the task, or take it over.
@@ -245,7 +245,7 @@ function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
       const helper = persona.tier === 'haiku'
       const description = `${LEGION_MARK}${label} #${++seq}`
       if (persona.tier === 'opus') modelFor[description] = 'opus'
-      const s: any = await $.agent.spawn({ subagentType: helper ? HELPER_TYPE : 'triad:triad-coder', prompt: brief, description, model: helper ? 'haiku' : persona.tier === 'opus' ? 'opus' : 'sonnet' })
+      const s: any = await $.agent.spawn({ subagentType: helper ? HELPER_TYPE : persona.tier === 'opus' ? 'triad:triad-opus-coder' : 'triad:triad-coder', prompt: brief, description, model: helper ? 'haiku' : persona.tier === 'opus' ? 'opus' : 'sonnet' })
       delete modelFor[description]
       if (!s?.agentId) {
         log(`${label}: not started (${s?.deny ?? JSON.stringify(s)})`)
@@ -385,7 +385,7 @@ export const register: Register = (on, options) => {
     const type: string = e.subagentType ?? (e as any).subagent_type ?? 'general-purpose'
     const role = roleOfType(type)
     if (!role || role === 'orchestrator') {
-      if (opts.strictMenu) return refuse(`agent type "${type}" bypasses the tiers. Use triad:triad-coder (Sonnet, implements one task) or triad:triad-helper (Haiku, menial work).`)
+      if (opts.strictMenu) return refuse(`agent type "${type}" bypasses the tiers. Use triad:triad-coder (Sonnet, a well-specified task), triad:triad-opus-coder (Opus, open-ended design or tuning) or triad:triad-helper (Haiku, menial work).`)
       return next(e)
     }
     // A delegate_menial spawn runs in the main loop, so the caller rides in the description.
@@ -400,7 +400,7 @@ export const register: Register = (on, options) => {
     reserved[role]++
     let r
     try {
-      r = await next({ ...e, model: modelFor[e.description] ?? MODEL_FOR[role], background: false })
+      r = await next({ ...e, model: modelFor[e.description] ?? modelOfType(type) ?? MODEL_FOR[role], background: false })
     } finally {
       reserved[role]--
     }

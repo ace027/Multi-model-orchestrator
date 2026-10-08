@@ -4,6 +4,7 @@ Triad is a Claude Code plugin that splits development work across three model ti
 
 - **Orchestrator (Opus):** the main session. It decomposes the work, makes design decisions, reviews diffs and decides retries.
 - **Coders (Sonnet):** `triad:triad-coder` agents. Each implements one well-scoped task in a fresh context.
+- **Opus coders:** `triad:triad-opus-coder` agents, for open-ended pieces (a game AI, an architecture, tuning, visual polish). They share the coder cap and report format.
 - **Helpers (Haiku):** `triad:triad-helper` agents. They do menial work: search, running tests and summarizing failures, log triage, formatting, docs lookup and boilerplate. They make no design decisions.
 
 The orchestrator spawns coders and helpers directly; a Haiku job needs no Sonnet agent in between. Coders reach Haiku through the `delegate_menial` tool. Helpers never spawn. The plugin's hooks enforce all of this; they don't just ask the model to follow it.
@@ -81,7 +82,7 @@ A helper brief over 40k tokens is refused at spawn: give the job to a coder, or 
 | `session.start` | Registers `delegate_menial` and `/triad`, loads this session's ledger from `$.store`; with `openPane`, opens the Triad pane. |
 | `prompt.section` `communication` | Adds the orchestrator guidance (byte-stable, for caching) to the main loop only; a `prompt.context` block would also reach every subagent. |
 | `tool.describe` | With `deferTools`, defers engine tools the tiers do not use every turn (in a clean environment: ListAgents, ReportFindings, ScheduleWakeup, Workflow); they stay reachable through ToolSearch. |
-| `agent.offer` | Offers only `triad:triad-coder` and `triad:triad-helper` (with `strictMenu`). |
+| `agent.offer` | Offers only `triad:triad-coder`, `triad:triad-opus-coder` and `triad:triad-helper` (with `strictMenu`). |
 | `agent.spawn` | Forces the tier's model (coder Sonnet, helper Haiku) and `background: false`; refuses other agent types, spawns deeper than `maxDepth`, and spawns over the concurrency caps. Records the tree. |
 | `tool.call` `Agent` | Checks the reply against the return schema and sends a non-conforming reply back once (`maxRetries`), naming the agent id for SendMessage. |
 | `tool.call` `delegate_menial` | Coders only. Pre-flight size check (40k tokens), spawns a Haiku helper with the files it may write, waits for its answer in a child process (the hook budget does not count that wait), checks the schema, asks once for a resend. |
@@ -100,4 +101,4 @@ The ledger prices every request per tier, including Haiku's rate above 100k prom
 
 `claude plugin test triad` runs the test suites; [`../CONTRIBUTING.md`](../CONTRIBUTING.md) has the other checks and the conventions. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the `delegate_menial` round trip is covered by the live run in `bench/run_accept.sh` instead.
 
-Version 0.8.0.
+Version 0.9.0.

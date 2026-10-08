@@ -27,12 +27,19 @@ export const DEFAULTS: Options = {
 export function roleOfType(subagentType: string | undefined): Role | undefined {
   if (!subagentType) return undefined
   const name = subagentType.split(':').pop()
-  if (name === 'triad-coder') return 'coder'
+  if (name === 'triad-coder' || name === 'triad-opus-coder') return 'coder'
   if (name === 'triad-helper') return 'helper'
   return undefined
 }
 
 export const MODEL_FOR: Record<Exclude<Role, 'orchestrator'>, Tier> = { coder: 'sonnet', helper: 'haiku' }
+
+// The Opus coder shares the coder role (caps, depth, report format) but not its tier.
+export function modelOfType(subagentType: string | undefined): Tier | undefined {
+  if (subagentType?.split(':').pop() === 'triad-opus-coder') return 'opus'
+  const role = roleOfType(subagentType)
+  return role && role !== 'orchestrator' ? MODEL_FOR[role] : undefined
+}
 
 export function tierOfModel(model: string | undefined): Tier | 'other' {
   const m = (model ?? '').toLowerCase()

@@ -1,7 +1,7 @@
 {
   "name": "triad",
-  "version": "0.8.0",
-  "description": "Tiered-model orchestration: Opus orchestrates, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
+  "version": "0.9.0",
+  "description": "Tiered-model orchestration: Opus orchestrates and takes open-ended coding, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
   "types": "./types/index.d.ts",
   "userConfig": {
     "maxDepth": {
@@ -13,7 +13,7 @@
     "maxCoders": {
       "type": "number",
       "title": "Max concurrent coders",
-      "description": "triad-coder agents (Sonnet) running at once.",
+      "description": "Coder agents (triad-coder and triad-opus-coder) running at once.",
       "default": 4
     },
     "maxHelpers": {
