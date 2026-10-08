@@ -1,0 +1,63 @@
+{
+  "task": "csvimport",
+  "config": "triad",
+  "options": {},
+  "seconds": 107,
+  "exit": 0,
+  "success": true,
+  "check": "score 30/30 own-tests pass tests-added True failed=[]",
+  "score": [
+    30,
+    30
+  ],
+  "cost": 0.3773870000000001,
+  "turns": 9,
+  "tokens": {
+    "inputTokens": 26,
+    "outputTokens": 12141,
+    "cacheReadInputTokens": 184470,
+    "cacheCreationInputTokens": 43947
+  },
+  "totalTokens": 240584,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 18,
+      "outputTokens": 4897,
+      "cacheReadInputTokens": 152325,
+      "cacheCreationInputTokens": 24063,
+      "costUSD": 0.248792
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 8,
+      "outputTokens": 7244,
+      "cacheReadInputTokens": 32145,
+      "cacheCreationInputTokens": 19884,
+      "costUSD": 0.12859500000000001
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 9
+    },
+    "a050dbee3db607e82": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 4
+    }
+  },
+  "work": "/tmp/bench-triad-csvimport-0ftrc66y/repo"
+}

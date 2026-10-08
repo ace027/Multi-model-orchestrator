@@ -10,6 +10,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 5 | Legion-format build, review and plan, no migration | $1.15 |
 | 6 | Dry-run build, intent validation, board meeting | $0.56 |
 | 7 | Opus only vs Legion vs Triad, 5 tasks, plus a rerun after the guide trim | $4.95 |
+| 7 | Harder graded tasks, Opus only vs Triad | $1.26 |
 
 ## Phase 2 acceptance
 
@@ -172,7 +173,7 @@ The hidden checks are pass/fail, so the run directories were also compared by ha
 
 On these tasks the work is equivalent across Opus alone, Legion and Triad, although in Triad a Sonnet coder wrote the code for `discounts`, `logfix` and `testwrite`. The tasks are small and well specified, so quality saturates; telling the configs apart on quality would need harder, more open tasks.
 
-## Harder tasks (designed, not yet run)
+## Harder tasks
 
 The Phase 7 tasks are too small to separate the configs on quality: every run produced equivalent work. Two harder tasks with graded checks (`python3 bench/run_bench.py --tasks hard`):
 
@@ -192,3 +193,18 @@ Each check prints `score P/N`; a run succeeds at 80% with its own tests passing 
 | csvimport: no `Total` footer rule, signed debits accepted | 27/30 |
 
 Like the other tasks' checks, the hidden tests and reference solutions sit in `bench/tasks`, outside the run's working copy.
+
+### First run (`bench/results/hard1`)
+
+```
+task       config ok           cost    tokens    in+cw    out  secs  agents
+csvimport  opus   Y 30/30     0.418    266809    24256  12523   115
+csvimport  triad  Y 30/30     0.377    240584    43973  12141   107  coder:1 orchestrator:1
+refunds    opus   Y 18/18     0.209    116031    15579   5603    51
+refunds    triad  Y 18/18     0.260    156625    31287   6796    65  coder:1 orchestrator:1
+```
+
+- **Both configs scored full marks on both tasks.** Both found the unreported over-refund bug and fixed all four policy breaks the same way (cumulative rounding, record before notifying, queue failed notifications). In Triad a Sonnet coder wrote the code for both.
+- **Cost:** Triad $0.637, Opus alone $0.627. Triad was cheaper on `csvimport`, the larger task, and dearer on `refunds`.
+- **Tests:** Opus wrote more and stricter ones (`csvimport` 36 against 22; `refunds` 19 against 14). Each config's own tests caught every flawed implementation from the table above. Cross-checked, Triad's code passes all of Opus's tests but one: it accepts a single-digit slash date (`1/2/2026`), which Opus's tests reject; the spec does not say. Both configs also went past the reference solution: both reject malformed units in refund requests, and Opus's tests reject non-ASCII digits as amounts, which the reference accepts.
+- The hidden checks are saturated again, so they cannot separate the two configs. The remaining differences (test thoroughness, edge cases the spec leaves open) need either harder hidden cases or several runs per cell.
