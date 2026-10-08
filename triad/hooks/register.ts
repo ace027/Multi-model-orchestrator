@@ -290,7 +290,7 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
     case 'persona_brief': return personaRank(io, input)
     case 'build_phase': return buildRun(io, agentsOf($, log), input, log)
     case 'persona_run': return renderPersonaRuns(await runPersonas(io, agentsOf($, log), input, log))
-    case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, log })).text
+    case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, intent: input.intent, log })).text
   }
   return `unknown tool ${name}`
 }
@@ -591,7 +591,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'triad' }, async ($, e) => {
     const args = String(e.args ?? '').trim()
-    if (/^status\b/.test(args)) return { text: `${await statusText(ioOf($))}\n${controlModeLine(await controlMode(ioOf($)))}` }
+    if (/^status\b/.test(args)) return { text: `${await statusText(ioOf($), { dryRun: /--dry-run\b/.test(args) })}\n${controlModeLine(await controlMode(ioOf($)))}` }
     if (/^validate\b/.test(args)) return validateText(ioOf($), args)
     await save($)
     return {

@@ -49,6 +49,40 @@ export function critique(plans: Plan[], maxTasks = 3, knownAgents?: Set<string>)
   return { issues, verdict }
 }
 
+// CRITIQUE.md in the phase directory (plan-critique Section 3 and the
+// completion gate): the summary, schema conformance, a per-plan verdict with
+// the rule that fired, and recommended actions. The pre-mortem and assumption
+// counts belong to the judgment pass and are left for it to fill.
+export function critiqueDoc(r: { issues: Issue[]; verdict: Verdict }, plans: Plan[], phase: number, name: string, date: string): string {
+  const of = (id: string) => r.issues.filter(i => i.plan === id || i.plan.split('+').includes(id))
+  const cell = (id: string, rule: string, none = 'PASS') => { const is = of(id).filter(i => i.rule === rule); return is.some(i => i.severity === 'BLOCKER') ? 'BLOCKER' : is.length ? 'WARNING' : none }
+  const planVerdict = (id: string): [string, string] => {
+    const is = of(id)
+    const b = is.find(i => i.severity === 'BLOCKER')
+    if (b) return ['REWORK', `${b.rule}: ${b.message}`]
+    if (is.length) return ['CAUTION', `${is[0]!.rule}: ${is[0]!.message}`]
+    return ['OK', 'no rule fired']
+  }
+  const blockers = r.issues.filter(i => i.severity === 'BLOCKER')
+  return [
+    `## Plan Critique Summary — Phase ${phase}: ${name}`, '',
+    `**Verdict**: ${r.verdict}`, `**Date**: ${date}`, '',
+    '| Metric | Count |', '|--------|-------|',
+    '| Pre-mortem failure scenarios | (judgment pass) |', '| Critical risks | (judgment pass) |', '| Assumptions extracted | (judgment pass) |',
+    `| Schema and wave blockers | ${blockers.length} |`, `| Warnings | ${r.issues.length - blockers.length} |`, `| Merged findings | ${r.issues.length} |`, '',
+    '### Schema Conformance',
+    '| Plan | verification_commands | files_forbidden | expected_artifacts | Status |', '|------|----------------------|----------------|--------------------|--------|',
+    ...plans.map(p => `| ${p.id} | ${cell(p.id, 'R1')} | ${cell(p.id, 'R2')} | ${cell(p.id, 'R3')} | ${planVerdict(p.id)[0]} |`), '',
+    ...(r.issues.some(i => i.rule === 'overlap' || i.rule === 'waves') ? ['### Wave Overlap', ...r.issues.filter(i => i.rule === 'overlap' || i.rule === 'waves').map(i => `- [${i.severity}] ${i.plan}: ${i.message}`), ''] : []),
+    '### Plan Verdicts', '| Plan | Verdict | Rule fired |', '|------|---------|------------|',
+    ...plans.map(p => { const [v, why] = planVerdict(p.id); return `| ${p.id} | ${v} | ${why.replace(/\|/g, '/')} |` }), '',
+    '### Findings', ...(r.issues.length ? r.issues.map(i => `- [${i.severity}] ${i.plan} ${i.rule}: ${i.message}`) : ['(none)']), '',
+    '### Recommended Actions',
+    ...(r.issues.length ? [...blockers, ...r.issues.filter(i => i.severity === 'WARNING')].map((i, k) => `${k + 1}. ${i.plan}: fix ${i.rule} — ${i.message}`) : ['1. Proceed to execution.']),
+    '',
+  ].join('\n')
+}
+
 export function renderCritique(r: { issues: Issue[]; verdict: Verdict }): string {
   if (!r.issues.length) return 'Mechanical critique: PASS (no issues).'
   return [`Mechanical critique: ${r.verdict}`, ...r.issues.map(i => `- [${i.severity}] ${i.plan} ${i.rule}: ${i.message}`)].join('\n')

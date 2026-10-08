@@ -127,12 +127,29 @@ export function passed(reports: ReviewerReport[], t: Triage): boolean {
 // The finding as the schema's record (for validation and the JSON sidecar).
 export function asRecord(f: Finding): Record<string, unknown> {
   const r: Record<string, unknown> = { id: f.id, severity: f.severity, category: f.category, description: f.description, file: f.file, status: f.status, agent: f.agent, cycle: f.cycle }
-  if (f.line_range) r.line_range = f.line_range
+  if (f.line_range) r.line_range = `${f.line_range[0]}-${f.line_range[1]}`
   if (f.suggested_fix) r.suggested_fix = f.suggested_fix
   return r
 }
 
 export const findingErrors = (f: Finding) => validate(SCHEMAS.finding, asRecord(f))
+
+// Intent review (intent-review): a filter_review intent keeps only the findings
+// in its domains, before dedup. The rule ids are Legion's review rules.
+export const INTENT_REVIEW_RULES: Record<string, string[]> = {
+  'security-only': ['owasp-top-10', 'stride-model', 'vulnerability-assessment', 'penetration-testing', 'security-audit', 'threat-modeling', 'security', 'owasp', 'stride', 'authentication', 'authorization', 'auth', 'vulnerability', 'threat', 'injection', 'xss', 'csrf', 'secret'],
+  document: ['documentation', 'code-maintainability', 'docs'],
+  harden: ['owasp-top-10', 'test-strategy', 'test-automation', 'test-coverage', 'security', 'tests'],
+}
+
+export function intentFilter(findings: Finding[], intent: string, domains: string[] = []): Finding[] {
+  const keys = [...new Set([...(INTENT_REVIEW_RULES[intent] ?? []), ...domains])].map(k => k.toLowerCase().replace(/[-_]/g, ' '))
+  if (!keys.length) return findings
+  return findings.filter(f => {
+    const t = `${f.category} ${f.criterion ?? ''}`.toLowerCase().replace(/[-_:]/g, ' ')
+    return keys.some(k => new RegExp(`\\b${k.replace(/ /g, '\\s+')}`).test(t))
+  })
+}
 
 // Two re-reviews in a row with the same open findings: the loop is stale.
 export const signature = (fs: Finding[]) => fs.map(f => `${f.file}|${f.severity}|${f.line_range?.join('-') ?? ''}`).sort().join('\n')
@@ -144,6 +161,7 @@ export type ReviewDoc = {
   phase: number; name: string; result: 'PASSED' | 'ESCALATED' | 'STALE LOOP ABORTED'; cycles: number; reviewers: string[]; date: string
   findings: Finding[]; deferred: Finding[]; suggestions: Finding[]; verdicts: { agent: string; verdict: string; cycle: number }[]; hotSpots: string[]
   cycleDelta: string[]; fixes: string[]
+  coverage?: string[]; invalid?: { id: string; errors: string[] }[]; evaluators?: string[]; intent?: string
 }
 
 export function renderReview(d: ReviewDoc): string {
@@ -157,6 +175,8 @@ export function renderReview(d: ReviewDoc): string {
     '',
     `**Cycles Used**: ${d.cycles}`,
     `**Reviewers**: ${d.reviewers.join(', ')}`,
+    ...(d.evaluators?.length ? [`**Evaluators**: ${d.evaluators.join(', ')}`] : []),
+    ...(d.intent ? [`**Intent**: ${d.intent}`] : []),
     `**Completed**: ${d.date}`,
     '',
     '## Findings Summary',
@@ -183,6 +203,8 @@ export function renderReview(d: ReviewDoc): string {
   if (d.deferred.length) lines.push('', '## Deferred (Medium Confidence)', ...d.deferred.map(f => `- \`${f.file}\` [${f.severity}, ${f.confidence}%]: ${f.description}`))
   if (d.fixes.length) lines.push('', '## Fixes Applied', ...d.fixes.map(s => `- ${s}`))
   if (d.cycles >= 2 && d.cycleDelta.length) lines.push('', '## Cycle Delta', ...d.cycleDelta.map(s => `- ${s}`))
+  if (d.coverage) lines.push('', '## Coverage', ...d.coverage)
+  if (d.invalid?.length) lines.push('', '## Invalid Findings', 'These findings do not validate against review-finding.schema.json; they are kept above, fix or re-raise them:', ...d.invalid.map(i => `- ${i.id}: ${i.errors.join('; ')}`))
   return lines.join('\n') + '\n'
 }
 

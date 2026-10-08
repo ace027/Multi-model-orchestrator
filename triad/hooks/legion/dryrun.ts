@@ -3,14 +3,17 @@
 // and polish). Exit code 0 when every check passes, 2 when one fails, 1 for a
 // command it does not know.
 import { pad2 } from './planning.ts'
-import type { Io } from './io.ts'
+import { loadPhase, loadProject, type Io } from './io.ts'
+import { nextAction } from './status.ts'
 
 export const DRY_RUN_COMMANDS = ['plan', 'build', 'review', 'status', 'retro', 'ship', 'polish'] as const
 export type DryRunReport = {
   command: string; dryRun: true; deterministic: true; noSideEffects: true; phase: number | null
   checks: { label: string; ok: boolean; detail: string }[]
   features: string[]; plannedActions: string[]; success: boolean; exitCode: 0 | 1 | 2
+  inputs: string[]; routing?: string
 }
+const STATUS_INPUTS = ['.planning/PROJECT.md', '.planning/ROADMAP.md', '.planning/STATE.md', '.planning/config/intent-teams.yaml', '.planning/memory/OUTCOMES.md', '.planning/CODEBASE.md']
 
 const phaseFromState = (s?: string) => Number(s?.match(/Phase:\s*\**\s*(\d+)/i)?.[1] ?? 1)
 
@@ -30,7 +33,7 @@ async function features(io: Io, command: string, state: string, roadmap: string)
 }
 
 export async function dryRunReport(io: Io, command: string, phase?: number, target?: string): Promise<DryRunReport> {
-  const r: DryRunReport = { command, dryRun: true, deterministic: true, noSideEffects: true, phase: null, checks: [], features: [], plannedActions: [], success: false, exitCode: 1 }
+  const r: DryRunReport = { command, dryRun: true, deterministic: true, noSideEffects: true, phase: null, checks: [], features: [], plannedActions: [], success: false, exitCode: 1, inputs: [] }
   if (!(DRY_RUN_COMMANDS as readonly string[]).includes(command)) {
     r.checks.push({ label: `known command`, ok: false, detail: `dry-run supports ${DRY_RUN_COMMANDS.join(', ')}` })
     return r
@@ -51,16 +54,28 @@ export async function dryRunReport(io: Io, command: string, phase?: number, targ
     r.phase = phase ?? phaseFromState(state)
   }
   switch (command) {
-    case 'status':
+    case 'status': {
       check('PROJECT.md exists', !!project, '.planning/PROJECT.md')
       check('ROADMAP.md readable (optional for routing depth)', !!roadmap, '.planning/ROADMAP.md')
       check('STATE.md readable (optional for routing depth)', !!state, '.planning/STATE.md')
       r.phase = phase ?? phaseFromState(state)
+      for (const f of STATUS_INPUTS) if ((await io.read(f)) !== undefined) r.inputs.push(f)
+      const p = await loadProject(io)
+      const has = new Map<number, [boolean, boolean]>()
+      for (const d of p.phaseDirs) {
+        const k = Number(d.match(/^(\d+)/)?.[1])
+        if (!Number.isFinite(k)) continue
+        const ph = await loadPhase(io, p, k)
+        has.set(k, [ph.plans.length > 0, Object.keys(ph.summaries).length > 0])
+      }
+      const next = nextAction(p, k => has.get(k)?.[0] ?? false, k => has.get(k)?.[1] ?? false)
+      r.routing = next.command ? `${next.command} — ${next.why}` : next.why
       r.plannedActions.push('Render the progress dashboard from the planning files.', 'Route to the next /triad: command without writing files.')
       // the two optional reads do not fail status
       r.success = !!project
       r.exitCode = r.success ? 0 : 2
       return r
+    }
     case 'plan': {
       base()
       const h = `### Phase ${r.phase}:`
@@ -79,9 +94,13 @@ export async function dryRunReport(io: Io, command: string, phase?: number, targ
     case 'review':
     case 'retro': {
       base()
+      // retro defaults to the most recently completed phase and runs on completed work only
+      const done = (roadmap ?? '').split('\n').map(l => l.match(/^\|\s*(\d+)\b.*\|\s*(complete|shipped)\b/i)).filter(Boolean).map(m => Number(m![1]))
+      if (command === 'retro' && phase === undefined && done.length) r.phase = done[done.length - 1]!
       const { d, list } = await files(r.phase!, '-SUMMARY.md')
       check(`Phase ${r.phase} directory exists`, !!d, d ?? 'missing phase directory')
       check('Execution summaries discovered', list.length > 0, `${list.length} summary file(s)`)
+      if (command === 'retro') check(`Phase ${r.phase} complete`, done.includes(r.phase!), done.includes(r.phase!) ? 'ROADMAP progress row is Complete' : 'retrospectives run on completed work; finish /triad:review first')
       r.plannedActions.push(...(command === 'review'
         ? ['Select the review panel (classic or panel).', 'Run the review cycle: reviewers, triage, fixes, re-review.']
         : ['Read the phase summaries, review and outcomes.', 'Write the retrospective and action items to .planning/memory/RETRO.md.']))
@@ -99,8 +118,10 @@ export async function dryRunReport(io: Io, command: string, phase?: number, targ
     }
     case 'polish': {
       r.phase = phase ?? (state ? phaseFromState(state) : null)
-      if (target) check('Target given', true, target)
-      else {
+      if (target) {
+        const t = target.replace(/\/+$/, '')
+        check('Target exists', (await io.read(t)) !== undefined || (await io.list(t)).length > 0, t)
+      } else {
         const { d, list } = r.phase ? await files(r.phase, '-PLAN.md') : { d: undefined, list: [] }
         check('Phase plans to scope from', list.length > 0, d ? `${list.length} plan file(s) in ${d}` : 'no target and no phase plans')
       }
@@ -118,6 +139,8 @@ export function renderDryRun(r: DryRunReport): string {
     `Dry run: /triad:${r.command}${r.phase ? ` (phase ${r.phase})` : ''} — ${r.success ? 'READY' : 'NOT READY'} (exit ${r.exitCode})`,
     '', '| Check | Result | Detail |', '|-------|--------|--------|',
     ...r.checks.map(c => `| ${c.label} | ${c.ok ? 'PASS' : 'FAIL'} | ${c.detail} |`),
+    ...(r.inputs.length ? ['', `Input files: ${r.inputs.join(', ')}`] : []),
+    ...(r.routing ? [`Routing preview: ${r.routing}`] : []),
     '', `Features: ${r.features.join(', ') || 'none'}`,
     'Would do:', ...r.plannedActions.map(a => `- ${a}`),
     '', 'No files were written and no agents were spawned.',
