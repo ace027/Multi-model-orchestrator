@@ -60,9 +60,9 @@ export function parseReply(text: string): Reply {
   const s = at('summary')
   const summary: string[] = []
   if (s >= 0) {
-    const first = lines[s].replace(/^\s*summary:\s*/i, '').trim()
+    const first = lines[s]!.replace(/^\s*summary:\s*/i, '').trim()
     if (first) summary.push(first)
-    for (let i = s + 1; i < lines.length && !/^\s*[a-z_]+:/i.test(lines[i]); i++) if (lines[i].trim()) summary.push(lines[i].trim())
+    for (let i = s + 1; i < lines.length && !/^\s*[a-z_]+:/i.test(lines[i]!); i++) if (lines[i]!.trim()) summary.push(lines[i]!.trim())
   }
   const b = at('blocked_reason')
   return {
@@ -70,7 +70,7 @@ export function parseReply(text: string): Reply {
     summary,
     hasChanges: at('changes') >= 0,
     hasVerify: at('verify') >= 0,
-    blockedReason: b >= 0 ? lines[b].replace(/^\s*blocked_reason:\s*/i, '').trim() || undefined : undefined,
+    blockedReason: b >= 0 ? lines[b]!.replace(/^\s*blocked_reason:\s*/i, '').trim() || undefined : undefined,
     lines: lines.filter(l => l.trim()).length,
   }
 }
@@ -122,7 +122,7 @@ const PATHLIKE = /(?:^|[\s`'"(\[])((?:\.{0,2}\/)?[\w@.-]+(?:\/[\w@.-]+)*\.[A-Za-
 export function pathsInBrief(brief: string): string[] {
   const out = new Set<string>()
   for (const m of brief.matchAll(PATHLIKE)) {
-    const p = m[1].replace(/[.,]+$/, '')
+    const p = m[1]!.replace(/[.,]+$/, '')
     if (!/^v?\d+(\.\d+)+$/.test(p) && !/^https?:/.test(p)) out.add(p)
   }
   return [...out]

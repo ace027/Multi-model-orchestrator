@@ -21,7 +21,7 @@ export function getField(text: string, name: string): string | undefined {
   const re = fieldRe(name)
   for (const line of text.split('\n')) {
     const m = line.match(re)
-    if (m && (m[4] || m[6])) return m[7].trim()
+    if (m && (m[4] || m[6])) return m[7]!.trim()
   }
   return undefined
 }
@@ -32,7 +32,7 @@ export function setField(text: string, name: string, value: string): string {
   const re = fieldRe(name)
   const lines = text.split('\n')
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(re)
+    const m = lines[i]!.match(re)
     if (m && (m[4] || m[6])) {
       lines[i] = `${m[1]}${m[2] ?? ''}${m[3]}${m[4]}${m[5] ?? ''}${m[6]} ${value}`
       return lines.join('\n')
@@ -43,10 +43,10 @@ export function setField(text: string, name: string, value: string): string {
   const at = lines.findIndex(l => /^##\s+Current Position/i.test(l))
   if (at >= 0) {
     let j = at + 1
-    while (j < lines.length && !/^##\s/.test(lines[j]) && (lines[j].trim() === '' ? j === at + 1 : true)) j++
+    while (j < lines.length && !/^##\s/.test(lines[j]!) && (lines[j]!.trim() === '' ? j === at + 1 : true)) j++
     // after the section's last field line
     let last = at
-    for (let k = at + 1; k < j; k++) if (lines[k].trim()) last = k
+    for (let k = at + 1; k < j; k++) if (lines[k]!.trim()) last = k
     lines.splice(last + 1, 0, line)
   } else {
     const h = lines.findIndex(l => /^#\s/.test(l))
@@ -60,9 +60,9 @@ export function setField(text: string, name: string, value: string): string {
 function sectionRange(lines: string[], heading: RegExp): [number, number] | undefined {
   const s = lines.findIndex(l => heading.test(l))
   if (s < 0) return undefined
-  const level = (lines[s].match(/^#+/) ?? ['##'])[0].length
+  const level = (lines[s]!.match(/^#+/) ?? ['##'])[0].length
   let e = s + 1
-  while (e < lines.length && !(new RegExp(`^#{1,${level}}\\s`).test(lines[e]))) e++
+  while (e < lines.length && !(new RegExp(`^#{1,${level}}\\s`).test(lines[e]!))) e++
   return [s, e]
 }
 
@@ -88,7 +88,7 @@ export function appendToSection(text: string, heading: string, line: string): st
   const r = sectionRange(lines, re)
   if (!r) return text.replace(/\n*$/, '\n\n') + `${heading}\n${line}\n`
   let last = r[0]
-  for (let k = r[0] + 1; k < r[1]; k++) if (lines[k].trim()) last = k
+  for (let k = r[0] + 1; k < r[1]; k++) if (lines[k]!.trim()) last = k
   lines.splice(last + 1, 0, line)
   return lines.join('\n')
 }
@@ -146,8 +146,8 @@ const num = (s: string | undefined) => (s && /^\d+/.test(s.trim()) ? Number(s.tr
 
 function progressTable(lines: string[]): { header: string[]; at: number } | undefined {
   for (let i = 0; i < lines.length - 1; i++) {
-    if (!/^\s*\|/.test(lines[i]) || !/^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) continue
-    const h = cells(lines[i]).map(c => c.toLowerCase())
+    if (!/^\s*\|/.test(lines[i]!) || !/^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1]!)) continue
+    const h = cells(lines[i]!).map(c => c.toLowerCase())
     if (h[0] === 'phase' && h.includes('status')) return { header: h, at: i }
   }
   return undefined
@@ -159,11 +159,11 @@ export function parseRoadmap(text: string): Roadmap {
   const t = progressTable(lines)
   if (t) {
     const col = (n: string) => t.header.indexOf(n)
-    for (let i = t.at + 2; i < lines.length && /^\s*\|/.test(lines[i]); i++) {
-      const c = cells(lines[i])
-      const phase = num(c[0].replace(/^phase\s*/i, ''))
+    for (let i = t.at + 2; i < lines.length && /^\s*\|/.test(lines[i]!); i++) {
+      const c = cells(lines[i]!)
+      const phase = num(c[0]!.replace(/^phase\s*/i, ''))
       if (phase === undefined) continue
-      const name = c[0].replace(/^(phase\s*)?\d+\s*(—|-|:|–)?\s*/i, '').trim()
+      const name = c[0]!.replace(/^(phase\s*)?\d+\s*(—|-|:|–)?\s*/i, '').trim()
       rows.push({ phase, name, plans: num(c[col('plans')]), completed: num(c[col('completed')]), status: c[col('status')] ?? '', line: i })
     }
   }
@@ -171,18 +171,18 @@ export function parseRoadmap(text: string): Roadmap {
   const checked: Record<number, boolean> = {}
   for (const l of lines) {
     const m = l.match(/^\s*-\s+\[([ xX~-])\]\s+Phase\s+(\d+):/)
-    if (m) checked[Number(m[2])] = m[1].toLowerCase() === 'x'
+    if (m) checked[Number(m[2])] = m[1]!.toLowerCase() === 'x'
   }
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^###\s+Phase\s+(\d+):\s*(.*)$/)
+    const m = lines[i]!.match(/^###\s+Phase\s+(\d+):\s*(.*)$/)
     if (!m) continue
     let e = i + 1
-    while (e < lines.length && !/^#{1,3}\s/.test(lines[e])) e++
+    while (e < lines.length && !/^#{1,3}\s/.test(lines[e]!)) e++
     const block = lines.slice(i + 1, e).join('\n')
     const f = (k: string) => getField(block, k) ?? ''
     const crit = (block.split(/\*\*Success Criteria\*\*:?/i)[1] ?? '').split('\n').filter(l => /^\s*-\s/.test(l)).map(l => l.replace(/^\s*-\s+(\[[ xX]\]\s*)?/, '').trim())
     phases.push({
-      phase: Number(m[1]), name: m[2].trim(), goal: f('Goal'), requirements: f('Requirements'),
+      phase: Number(m[1]), name: m[2]!.trim(), goal: f('Goal'), requirements: f('Requirements'),
       agents: f('Recommended Agents').split(/[,\s]+/).map(s => s.replace(/[`*]/g, '')).filter(s => /^[a-z][a-z0-9-]+$/.test(s)),
       criteria: crit, plans: num(f('Plans')), checked: checked[Number(m[1])],
     })
@@ -195,9 +195,9 @@ export function setRoadmapRow(text: string, phase: number, values: { plans?: num
   const lines = text.split('\n')
   const t = progressTable(lines)
   if (!t) return text
-  for (let i = t.at + 2; i < lines.length && /^\s*\|/.test(lines[i]); i++) {
-    const c = cells(lines[i])
-    if (num(c[0].replace(/^phase\s*/i, '')) !== phase) continue
+  for (let i = t.at + 2; i < lines.length && /^\s*\|/.test(lines[i]!); i++) {
+    const c = cells(lines[i]!)
+    if (num(c[0]!.replace(/^phase\s*/i, '')) !== phase) continue
     const set = (n: string, v: string | number | undefined) => {
       const k = t.header.indexOf(n)
       if (k >= 0 && v !== undefined) c[k] = String(v)
@@ -259,7 +259,7 @@ export function parsePlan(file: string, text: string, phaseNum: number): Plan {
     plan = `${pad2(phaseNum)}-${pad2(plan as number)}`
     normalized.push(`plan ${raw.plan} read as "${plan}"`)
   }
-  if (typeof plan !== 'string' || !/^\d{2}-\d{2}$/.test(plan)) plan = pp ? `${pad2(pp[1])}-${pad2(pp[2])}` : `${pad2(phaseNum)}-00`
+  if (typeof plan !== 'string' || !/^\d{2}-\d{2}$/.test(plan)) plan = pp ? `${pad2(pp[1]!)}-${pad2(pp[2]!)}` : `${pad2(phaseNum)}-00`
   let agents = strList(raw.agents)
   if (!agents.length && raw.agent) {
     agents = strList(raw.agent)
@@ -269,7 +269,7 @@ export function parsePlan(file: string, text: string, phaseNum: number): Plan {
     // build.md: "Agent: {id}" inside <objective> or <context>
     const head = [...body.matchAll(/<(objective|context)>([\s\S]*?)<\/\1>/g)].map(x => x[2]).join('\n')
     const m = head.match(/^\s*[-*]?\s*\*{0,2}Agent\*{0,2}:\*{0,2}\s*`?([a-z]+-[a-z0-9-]+)`?\s*$/m)
-    if (m) agents = [m[1]]
+    if (m) agents = [m[1]!]
   }
   const wave = typeof raw.wave === 'number' ? raw.wave : Number(raw.wave) || 1
   const fm: PlanFm = {
@@ -322,7 +322,7 @@ export function planWaves(plans: Plan[], knownAgents?: Set<string>): Waves {
   const waves = [...byWave.entries()].sort((a, b) => a[0] - b[0]).map(([wave, ps]) => ({ wave, plans: ps }))
   if (!plans.length) errors.push('no plans')
   const nums = waves.map(w => w.wave)
-  for (let i = 1; i < nums.length; i++) if (nums[i] !== nums[i - 1] + 1) errors.push(`wave numbers skip from ${nums[i - 1]} to ${nums[i]}`)
+  for (let i = 1; i < nums.length; i++) if (nums[i] !== nums[i - 1]! + 1) errors.push(`wave numbers skip from ${nums[i - 1]} to ${nums[i]}`)
   const waveOf = new Map(plans.map(p => [p.id, p.fm.wave]))
   for (const p of plans) {
     for (const d of p.fm.depends_on) {
@@ -339,8 +339,8 @@ export function planWaves(plans: Plan[], knownAgents?: Set<string>): Waves {
   }
   for (const w of waves) {
     for (let i = 0; i < w.plans.length; i++) for (let j = i + 1; j < w.plans.length; j++) {
-      const shared = sharedFiles(w.plans[i].fm.files_modified, w.plans[j].fm.files_modified)
-      if (shared.length) warnings.push(`wave ${w.wave}: ${w.plans[i].id} and ${w.plans[j].id} both modify ${shared.join(', ')}; they run one after the other`)
+      const shared = sharedFiles(w.plans[i]!.fm.files_modified, w.plans[j]!.fm.files_modified)
+      if (shared.length) warnings.push(`wave ${w.wave}: ${w.plans[i]!.id} and ${w.plans[j]!.id} both modify ${shared.join(', ')}; they run one after the other`)
     }
   }
   return { waves, errors, warnings }
@@ -371,7 +371,7 @@ export function runGroups(plans: Plan[]): Plan[][] {
     // first group after the last group holding a conflicting plan
     let after = -1
     groups.forEach((g, i) => { if (g.some(q => conflict(p, q))) after = i })
-    if (after + 1 < groups.length) groups[after + 1].push(p)
+    if (after + 1 < groups.length) groups[after + 1]!.push(p)
     else groups.push([p])
   }
   return groups

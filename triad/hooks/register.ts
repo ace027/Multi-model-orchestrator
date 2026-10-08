@@ -1,4 +1,4 @@
-import type { Register } from 'claude-code'
+import type { BuiltinToolName, Register } from 'claude-code'
 import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, schemaProblems, type Options, type Role } from './policy.ts'
 import { emptyLedger, ensureAgent, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
 import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
@@ -93,7 +93,7 @@ const capOf = (role: 'coder' | 'helper') => (role === 'coder' ? opts.maxCoders :
 // Paths a helper may write: an explicit "Writable files:" line, else the paths its brief names.
 function writableFrom(prompt: string): string[] {
   const line = prompt.match(/^Writable files:\s*(.*)$/im)
-  if (line) return line[1].trim().toLowerCase().startsWith('none') ? [] : line[1].split(',').map(s => s.trim()).filter(Boolean)
+  if (line) return line[1]!.trim().toLowerCase().startsWith('none') ? [] : line[1]!.split(',').map(s => s.trim()).filter(Boolean)
   return pathsInBrief(prompt)
 }
 
@@ -504,7 +504,7 @@ export const register: Register = (on, options) => {
 
   // Helpers write only the files their brief names. Agents working a Legion
   // plan are held to its files under the project's control mode.
-  on('tool.call', { tool: WRITE_TOOLS }, async ($, e, next) => {
+  on('tool.call', { tool: WRITE_TOOLS as BuiltinToolName[] }, async ($, e, next) => {
     const id = e.agentId
     const input = e as unknown as { file_path?: string; notebook_path?: string }
     const target = input.file_path ?? input.notebook_path ?? ''

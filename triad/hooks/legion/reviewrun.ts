@@ -175,7 +175,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     // Cycle Delta (review-loop): what the last fix round resolved, what is new, what is unchanged.
     const breakdown = cycle > 1 ? ` (resolved ${resolvedNow}, new ${t.mustFix.length - unchanged}, unchanged ${unchanged})` : ''
     delta.push(`cycle ${cycle}: ${t.mustFix.length} must-fix${breakdown}, ${t.niceToHave.length} suggestions, ${t.deferred.length} deferred, ${t.dropped} dropped (low confidence)`)
-    log(delta[delta.length - 1])
+    log(delta[delta.length - 1]!)
     if (passed(reports, t)) { result = 'PASSED'; open = []; break }
     open = t.mustFix
     const sig = signature(open)
@@ -188,7 +188,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     if (silent.length) {
       // No report from a reviewer: ask again next cycle; out of cycles, escalate.
       delta.push(`cycle ${cycle}: no report from ${silent.map(r => r.agent).join(', ')}`)
-      log(delta[delta.length - 1])
+      log(delta[delta.length - 1]!)
       if (!open.length) continue
     }
     if (!open.length) { result = 'PASSED'; break } // FAIL/NEEDS WORK verdicts without actionable findings

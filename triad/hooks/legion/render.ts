@@ -30,7 +30,7 @@ export function emitYaml(obj: Record<string, unknown>, indent = ''): string {
         out.push(`${indent}${k}:`)
         for (const item of v) {
           const lines = emitYaml(item as Record<string, unknown>, indent + '    ').split('\n')
-          out.push(`${indent}  - ${lines[0].trimStart()}`, ...lines.slice(1))
+          out.push(`${indent}  - ${lines[0]!.trimStart()}`, ...lines.slice(1))
         }
       }
     } else if (v && typeof v === 'object') out.push(`${indent}${k}:`, emitYaml(v as Record<string, unknown>, indent + '  '))
@@ -86,7 +86,7 @@ export function renderProject(p: ProjectInput, date: string): { project: string;
   const state = fill(TEMPLATES.state, {
     total_phases: String(p.phases.length),
     date,
-    progress_bar: progressBar(0, total).match(/^\[(.*?)\]/)![1],
+    progress_bar: progressBar(0, total).match(/^\[(.*?)\]/)![1]!,
     progress_percent: '0',
     total_plans: String(total),
     recent_decisions: bullets((p.decisions ?? []).map(d => d.decision), '(none yet)'),

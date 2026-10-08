@@ -1,7 +1,7 @@
 // Result compression helpers (Phase 3). Pure; the tool.call hook does the I/O.
 import { approxTokens } from './policy.ts'
 
-export const COMPRESS_TOOLS = ['Bash', 'Grep', 'Read']
+export const COMPRESS_TOOLS = ['Bash', 'Grep', 'Read'] as const
 // Source files are read to be edited, so their text must stay exact. Only
 // log-like files are compressed when read.
 const LOGLIKE = /\.(log|txt|out|jsonl|csv|tsv|xml|html?)$|(^|\/)(logs?|output|tmp)\//i

@@ -66,7 +66,7 @@ export async function dirtyFiles(io: Io): Promise<Set<string>> {
   for (const line of r.stdout.split('\n')) {
     if (!line.trim()) continue
     let p = line.slice(3)
-    if (p.includes(' -> ')) p = p.split(' -> ')[1]
+    if (p.includes(' -> ')) p = p.split(' -> ')[1]!
     out.add(p.replace(/^"|"$/g, ''))
   }
   return out
@@ -92,9 +92,9 @@ const listAfter = (text: string, key: string) => {
   const lines = text.split('\n')
   const i = lines.findIndex(l => new RegExp(`^\\s*${key}:`, 'i').test(l))
   if (i < 0) return []
-  const first = lines[i].replace(new RegExp(`^\\s*${key}:\\s*`, 'i'), '').trim()
+  const first = lines[i]!.replace(new RegExp(`^\\s*${key}:\\s*`, 'i'), '').trim()
   const out = first && !/^none$/i.test(first) ? [first] : []
-  for (let j = i + 1; j < lines.length && !/^\s*[a-z_]+:/i.test(lines[j]) && !/^</.test(lines[j]) && !/^\s*```/.test(lines[j]); j++) if (lines[j].trim().replace(/^-\s*/, '')) out.push(lines[j].trim().replace(/^-\s*/, ''))
+  for (let j = i + 1; j < lines.length && !/^\s*[a-z_]+:/i.test(lines[j]!) && !/^</.test(lines[j]!) && !/^\s*```/.test(lines[j]!); j++) if (lines[j]!.trim().replace(/^-\s*/, '')) out.push(lines[j]!.trim().replace(/^-\s*/, ''))
   return out
 }
 
@@ -145,7 +145,7 @@ function statusFrom(reply: ReturnType<typeof parseReply>, verify: VerifyRun[], e
 }
 
 function taskList(plan: Plan, answer: string): SummaryInput['tasks'] {
-  const names = [...plan.body.matchAll(/<name>([^<]+)<\/name>/g)].map(m => m[1].trim())
+  const names = [...plan.body.matchAll(/<name>([^<]+)<\/name>/g)].map(m => m[1]!.trim())
   const reported = listAfter(answer, 'tasks')
   return (names.length ? names : reported.map((_, i) => `Task ${i + 1}`)).map((name, i) => {
     const r = reported.find(l => new RegExp(`^(task\\s*)?${i + 1}\\b`, 'i').test(l)) ?? reported[i] ?? ''
@@ -398,7 +398,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
     }
     // After the wave: ROADMAP row and a state commit.
     const failedHere = outcomes.filter(o => todo.some(t => t.id === o.id) && !succeeded(o.status))
-    const last = w.wave === waves.waves[waves.waves.length - 1].wave
+    const last = w.wave === waves.waves[waves.waves.length - 1]!.wave
     roadmap = setRoadmapRow(roadmap, n, { plans: Math.max(p.roadmap.rows.find(r => r.phase === n)?.plans ?? 0, planned), completed: doneCount(), status: failedHere.length ? 'Partial' : last && ph.plans.every(x => ok(x.id)) ? 'Executed' : 'In Progress' })
     await io.write('.planning/ROADMAP.md', roadmap)
     // Compaction: when the phase is complete, or once the completed handoffs outgrow the budget.

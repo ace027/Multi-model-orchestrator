@@ -42,8 +42,8 @@ export function critique(plans: Plan[], maxTasks = 3, knownAgents?: Set<string>)
   for (const wave of w.waves) {
     const ps = wave.plans
     for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
-      const s = sharedFiles(ps[i].fm.files_modified, ps[j].fm.files_modified)
-      if (s.length) add(`${ps[i].id}+${ps[j].id}`, 'BLOCKER', 'overlap', `wave ${wave.wave}: both modify ${s.join(', ')}`)
+      const s = sharedFiles(ps[i]!.fm.files_modified, ps[j]!.fm.files_modified)
+      if (s.length) add(`${ps[i]!.id}+${ps[j]!.id}`, 'BLOCKER', 'overlap', `wave ${wave.wave}: both modify ${s.join(', ')}`)
     }
   }
   const blockers = issues.filter(i => i.severity === 'BLOCKER').length

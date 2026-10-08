@@ -32,7 +32,7 @@ export async function runValidate(io: Io, opts: { fix?: boolean } = {}): Promise
     else if (!/^##\s+(Requirements|Goals)\b/m.test(body)) add('PROJECT.md', 'WARN', 'has no "## Requirements" or "## Goals" section')
     else add('PROJECT.md', 'PASS', 'title and requirements present')
     if (p.project.startsWith('---\n')) {
-      try { parseYaml(p.project.split('\n---')[0].slice(4)) } catch (e) { add('PROJECT.md', 'FAIL', `frontmatter is not valid YAML: ${(e as Error).message}`) }
+      try { parseYaml(p.project.split('\n---')[0]!.slice(4)) } catch (e) { add('PROJECT.md', 'FAIL', `frontmatter is not valid YAML: ${(e as Error).message}`) }
     }
   }
 
@@ -54,7 +54,7 @@ export async function runValidate(io: Io, opts: { fix?: boolean } = {}): Promise
       add('ROADMAP.md', 'WARN', `phase ${r.phase} has status "${r.status}"`)
     }
     const nums = p.roadmap.rows.map(r => r.phase)
-    const gaps = nums.filter((n, i) => i > 0 && n !== nums[i - 1] + 1)
+    const gaps = nums.filter((n, i) => i > 0 && n !== nums[i - 1]! + 1)
     if (gaps.length) add('ROADMAP.md', 'WARN', `phase numbers are not consecutive (jumps before ${gaps.join(', ')})`)
     if (!bad && !gaps.length) add('ROADMAP.md', 'PASS', `${p.roadmap.rows.length} phases in the progress table`)
     if (roadmapText !== p.roadmapText) await io.write('.planning/ROADMAP.md', roadmapText!)
@@ -107,7 +107,7 @@ export async function runValidate(io: Io, opts: { fix?: boolean } = {}): Promise
   const outcomes = await io.read('.planning/memory/OUTCOMES.md')
   if (outcomes !== undefined) {
     if (!outcomes.trim()) add('memory', 'WARN', 'OUTCOMES.md is empty')
-    const unknown = [...new Set([...outcomes.matchAll(/agent(?:_id)?:\s*`?([a-z][a-z0-9-]+)`?/gi)].map(m => m[1]))].filter(a => !ROSTER.has(a))
+    const unknown = [...new Set([...outcomes.matchAll(/agent(?:_id)?:\s*`?([a-z][a-z0-9-]+)`?/gi)].map(m => m[1]!))].filter(a => !ROSTER.has(a))
     if (unknown.length) add('memory', 'WARN', `OUTCOMES.md names agents not in the roster: ${unknown.slice(0, 5).join(', ')}`)
   }
   for (const f of (await io.list('.planning/config')).filter(e => !e.dir && /\.ya?ml$/.test(e.name))) {

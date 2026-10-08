@@ -104,9 +104,9 @@ export function recordStep(l: Ledger, agentId: string | undefined, model: string
 // A `$.model.complete` call to Haiku (compression summaries).
 export function recordCompletion(l: Ledger, u: Usage) {
   recordStep(l, 'compressor', 'claude-haiku-5-5', u)
-  l.agents.compressor.role = 'compressor'
-  l.agents.compressor.depth = 0
-  l.agents.compressor.parent = undefined
+  l.agents.compressor!.role = 'compressor'
+  l.agents.compressor!.depth = 0
+  l.agents.compressor!.parent = undefined
 }
 
 const usd = (n: number) => '$' + n.toFixed(n < 1 ? 4 : 2)
@@ -117,7 +117,7 @@ export function render(l: Ledger, budgets: { coders: [number, number]; helpers: 
   const kids: Record<string, string[]> = {}
   for (const [id, a] of Object.entries(l.agents)) if (id !== 'main') (kids[a.parent ?? 'main'] ??= []).push(id)
   const line = (id: string, indent: string) => {
-    const a = l.agents[id]
+    const a = l.agents[id]!
     const name = id === 'main' ? 'orchestrator' : `${a.role} ${id.slice(0, 8)}`
     const st = a.status ? ` [${a.status}]` : ''
     out.push(`${indent}${name} (${a.models.join(', ') || 'no requests yet'})${st}: ${a.requests} req, in ${k(a.input)} / out ${k(a.output)} / cache r ${k(a.cacheRead)} w ${k(a.cacheWrite)}, ${usd(a.cost)}`)

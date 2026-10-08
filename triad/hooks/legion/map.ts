@@ -625,7 +625,7 @@ export async function mapNarrate(io: Io, sections: Record<string, string>): Prom
   for (const [k, v] of Object.entries(sections)) {
     if (k === 'Confidence') { text = text.replace(/^\*\*Confidence:\*\*.*$/m, `**Confidence:** ${v.trim()}`); done.push(k); continue }
     if (!NARRATIVE.includes(k)) continue
-    const lines = text.split('\n')
+    const lines: string[] = text.split('\n')
     const s = lines.findIndex(l => l.trim() === `## ${k}`)
     if (s < 0) continue
     let e = s + 1
