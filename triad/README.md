@@ -25,3 +25,14 @@ Options (`userConfig`): `maxDepth` 2, `maxCoders` 4, `maxHelpers` 6, `maxRetries
 ## Tests
 
 `claude plugin test triad` runs `triad.test.ts` (policy, ledger and hook tests). The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the helper round trip of `delegate_menial` is covered by the live acceptance run (`bench/run_accept.sh`) instead.
+
+## Phase 2 acceptance
+
+`bench/run_accept.sh <dir> [prompt]` copies the `bench/shop` fixture (add discount codes across four files plus tests, per `TASK.md`), runs `claude -p --model opus --plugin-dir triad`, and leaves the ledger in `<dir>/.triad/ledger.json`; `bench/check_ledger.py` checks it. Recorded run (`bench/results/phase2-ledger.json`, the CLI's own report beside it): the orchestrator on Opus (4 requests), 2 coders on Sonnet, 4 helpers on Haiku (one spawned by the orchestrator, three by coders through `delegate_menial`, at depth 2), all 15 fixture tests passing. Per-model tokens match the CLI's `modelUsage` exactly, and the ledger's cost ($0.4178) matches the CLI's ($0.4179); the gap is the engine's own side calls (session title), which never pass through `turn.step`. Largest Haiku prompt: 9,980 tokens.
+
+Findings from the runs:
+- The main loop writes its cache with the 1-hour TTL (2x input); subagents use the 5-minute rate. The ledger prices them that way.
+- `session.measure`'s `cost` is not the session's running total (it reported $0.0001 on a $0.42 run), so the ledger prices usage itself.
+- The orchestrator guidance (`prompt.context`) reached the main conversation only (1 injection per session).
+- Without being asked, Opus used a single coder and the coder did not delegate on this small task; the recorded run asked for the tiers in the prompt. Whether to route more work to Haiku by default is a Phase 3 measurement.
+- A `claude` started from inside another Claude Code session inherits its session id; the bench script gives each run its own.
