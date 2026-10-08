@@ -16,4 +16,5 @@ Start a new Triad project (Legion `.planning/` format). Idea from the user: $ARG
 4. Draft the phases: each a coherent, shippable slice with a goal, the requirements it covers, success criteria and an estimated plan count (2-4 plans of at most 3 tasks). For each phase call `persona_brief` with the phase goal and pick 1-3 recommended persona ids from the result.
 5. Show the user the phase list in a short table and ask for changes. Apply them.
 6. Call `project_init` with the result (set `overwrite: true` only if the user chose it in step 2).
-7. Tell the user what was written and the next command, `/triad:plan 1`. Do not commit; the user decides when.
+7. Register the project in the cross-project portfolio: load `mcp__triad__portfolio` and call it with action `register` (if the registry cannot be written, say so and continue).
+8. Tell the user what was written and the next command, `/triad:plan 1`. If the repository has code, suggest `/triad:map` first. Do not commit; the user decides when.

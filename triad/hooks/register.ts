@@ -9,6 +9,7 @@ import { review } from './legion/reviewrun.ts'
 import { checkWrite, type Scope } from './legion/settings.ts'
 import { renderPersonaRuns, runPersonas } from './legion/personarun.ts'
 import { EXTENDED, extendedTool } from './legion/extended.ts'
+import { loadCustomPersonas } from './legion/custom.ts'
 import type { Io } from './legion/io.ts'
 import type { Agents } from './legion/build.ts'
 import { COMPRESS_TOOLS, SUMMARY_SYSTEM, chunks, describeCall, eligible, errorLines, headTail, mergePrompt, overThreshold, render as renderCompressed, summaryPrompt } from './compress.ts'
@@ -177,16 +178,16 @@ async function cancelWait($: any, agentId: string) {
 
 const rel = (path: string) => (path.startsWith(cwd + '/') ? path.slice(cwd.length + 1) : path)
 
-function ioOf($: any): Io {
+function ioOf($: any, root = cwd): Io {
   return {
-    root: cwd,
-    read: async r => { try { return String(await $.fs.read(`${cwd}/${r}`)) } catch { return undefined } },
-    write: async (r, text) => { await $.fs.write(`${cwd}/${r}`, text) },
+    root,
+    read: async r => { try { return String(await $.fs.read(`${root}/${r}`)) } catch { return undefined } },
+    write: async (r, text) => { await $.fs.write(`${root}/${r}`, text) },
     list: async r => {
-      try { return ((await $.fs.list(`${cwd}/${r}`)) as any[]).filter(x => x.kind !== 'other').map(x => ({ name: x.name, dir: x.kind === 'dir' })) } catch { return [] }
+      try { return ((await $.fs.list(`${root}/${r}`)) as any[]).filter(x => x.kind !== 'other').map(x => ({ name: x.name, dir: x.kind === 'dir' })) } catch { return [] }
     },
     run: async (argv, o) => {
-      const r: any = await $.process.run(argv, { cwd, timeoutMs: Math.min(600_000, o?.timeoutMs ?? 120_000) })
+      const r: any = await $.process.run(argv, { cwd: root, timeoutMs: Math.min(600_000, o?.timeoutMs ?? 120_000) })
       return { exitCode: r.exitCode ?? 1, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') }
     },
     now: () => new Date(),
@@ -247,7 +248,11 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
     lines.push(`${new Date().toISOString().slice(11, 19)} ${line}`)
     void $.fs.write(`${cwd}/.triad/legion.log`, lines.join('\n') + '\n').catch(() => {})
   }
-  if (EXTENDED.has(name)) return extendedTool(io, () => agentsOf($, log), name, input)
+  await loadCustomPersonas(io).catch(() => [])
+  if (EXTENDED.has(name)) {
+    const registry = async () => ioOf($, `${String((await $.env.get('HOME')) ?? '~')}/.claude/legion`)
+    return extendedTool(io, { agents: () => agentsOf($, log), ioAt: root => ioOf($, root), registry }, name, input)
+  }
   switch (name) {
     case 'planning_status': {
       const v = await validateText(io, '--ci')

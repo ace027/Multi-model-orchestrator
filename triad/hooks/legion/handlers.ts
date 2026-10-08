@@ -1,4 +1,5 @@
 // Tool and command handlers over an Io (the mod passes one built on `$`).
+import { gapSummary } from './gaps.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
 import { isPlanFile, pad2, parsePlan, setRoadmapRow, slugify, updateState, findPhaseDir } from './planning.ts'
 import { renderContext, renderPlan, renderProject, type ContextInput, type PlanInput, type ProjectInput } from './render.ts'
@@ -27,6 +28,8 @@ export async function statusText(io: Io): Promise<string> {
   }
   const b = await briefing(io, p.settings)
   if (b) extra.push('', '## Memory', b)
+  const g = await gapSummary(io)
+  if (g) extra.push('', '## Roster', g)
   return renderStatus(p, nextAction(p, n => plans.get(n)?.[0] ?? false, n => plans.get(n)?.[1] ?? false)) + (extra.length ? '\n' + extra.join('\n') : '')
 }
 

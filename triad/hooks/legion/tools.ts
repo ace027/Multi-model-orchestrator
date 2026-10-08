@@ -178,6 +178,54 @@ export const LEGION_TOOLS = [
       required: ['action'],
     },
   },
+  {
+    name: 'portfolio',
+    description: 'Cross-project portfolio, registry at ~/.claude/legion/portfolio.md, in code. dashboard: health ([XX]/[!!]/[OK]), progress, dependencies (Resolved/Blocking) and agent allocation across registered projects (marks missing directories Stale). register / unregister: this project (or `project`). add_dep: a blocks|informs dependency between two registered projects\' phases. details: one project\'s STATE and progress.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['dashboard', 'register', 'unregister', 'add_dep', 'details'] },
+        project: str('Project name (or path for unregister).'),
+        from: str('Source project name.'), from_phase: { type: 'integer' }, to: str('Target project name.'), to_phase: { type: 'integer' },
+        type: { type: 'string', enum: ['blocks', 'informs'] }, notes: str(''),
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'agent',
+    description: 'Custom personas for this project (.planning/agents/). validate: run the 8 checks plus the persona contract (sections, 80-350 lines, metadata lists) and list every failure. create: validate, refuse at the roster agent limit unless force, write the persona, add it to .planning/agents/CATALOG.md, register it in the roster for plan/build/review, record the decision in STATE.md and commit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['validate', 'create'] },
+        agent: {
+          type: 'object',
+          properties: {
+            id: str('kebab-case {division}-{specialty}; the file stem.'), name: str('Display name, used in the body.'), description: str('One line, 10+ chars.'),
+            division: str('Engineering, Design, Marketing, Product, Project Management, Testing, Support, Spatial Computing, Specialized or Custom.'),
+            color: str('red, green, blue, purple, cyan, orange, yellow or pink.'), tier: { type: 'string', enum: ['sonnet', 'haiku', 'opus'] },
+            languages: strs(''), frameworks: strs(''), artifact_types: strs(''), review_strengths: strs(''), tags: strs('3-5 task-type tags.'), specialty: str('Catalog one-liner.'),
+            body: str('The persona body (80-120 lines, second person) with sections Identity, Core Mission, Critical Rules, Technical Deliverables, Workflow Process, Communication Style, Learning & Memory, Success Metrics, Anti-Patterns, Done Criteria.'),
+          },
+        },
+        force: { type: 'boolean', description: 'Create even at the agent limit (only when the user said so).' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'roster',
+    description: 'Roster gap analysis in code. gaps: coverage of production roles by the roster (bundled or .planning/config/roster-gap-config.yaml), gap severity, intent-team validation and the agent limit; writes .planning/gap-report.md (or `output`) with all numbers, leaving the recommendation prose to you. limit: agent count against the limit, with consolidation suggestions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['gaps', 'limit'] },
+        category: str('Only this role category.'), validate_intents: { type: 'boolean' }, output: str('Report path.'), overwrite: { type: 'boolean' },
+      },
+      required: ['action'],
+    },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)

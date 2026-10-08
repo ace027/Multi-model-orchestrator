@@ -186,3 +186,10 @@ writeFileSync(join(triad, 'hooks/legion/data.ts'), HEADER +
   Object.entries(data).map(([k, v]) => `export const ${k.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase()}: any = ${JSON.stringify(v, null, 1)}\n`).join('\n'))
 
 console.log(`personas ${bundled.length}, rubrics ${Object.keys(rubrics).length} + ${Object.keys(defaults).length} defaults, domains ${Object.keys(domains).length}`)
+
+// ---- Phase 6 config data: roster gap analysis and intent teams ---------------
+const gap = parseYaml(read('.planning/config/roster-gap-config.yaml').replace(/^---\s*$/m, ''))
+const intents = parseYaml(read('.planning/config/intent-teams.yaml'))
+writeFileSync(join(triad, 'hooks/legion/configdata.ts'), HEADER +
+  `export const ROSTER_GAP_CONFIG: any = ${JSON.stringify(gap, null, 1)}\n\nexport const INTENT_TEAMS: any = ${JSON.stringify(intents, null, 1)}\n`)
+console.log(`gap categories ${Object.keys(gap.gap_analysis?.role_categories ?? {}).length}, intents ${Object.keys(intents.intents ?? {}).length}`)

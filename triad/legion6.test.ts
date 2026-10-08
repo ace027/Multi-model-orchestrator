@@ -8,6 +8,10 @@ import { OUTCOMES, agentScores, decayScore, importanceOf, learnList, learnRecall
 import { milestoneArchive, milestoneComplete, milestoneDefine, milestoneStatus, parseMilestones, validateMilestones } from './hooks/legion/milestone.ts'
 import { retroGather, retroSave } from './hooks/legion/retro.ts'
 import { runPersonas } from './hooks/legion/personarun.ts'
+import { BY_ID, rank } from './hooks/legion/registry.ts'
+import { CUSTOM_CATALOG, agentCreate, loadCustomPersonas, validateAgent, type AgentInput } from './hooks/legion/custom.ts'
+import { GAP_REPORT, coverage, gapAnalysis, gapSummary, gaps, intentCheck, limitStatus, severityOf, type GapConfig } from './hooks/legion/gaps.ts'
+import { REGISTRY, parseRegistry, portfolioAddDep, portfolioDashboard, portfolioRegister, portfolioUnregister } from './hooks/legion/portfolio.ts'
 import { ARTIFACTS, freshness, mapBuild, mapNarrate, mapQuery } from './hooks/legion/map.ts'
 import type { PlanInput } from './hooks/legion/render.ts'
 
@@ -222,5 +226,122 @@ describe('map', () => {
   test('no source code means no map; bad scope is refused', async () => {
     expect(await mapBuild(memIo({ 'notes.txt': 'hi' }))).toContain('No source code detected')
     expect(await mapBuild(src(), { scope: '../x' })).toContain('--scope must be a path inside the project')
+  })
+})
+
+const agentBody = (name: string) => [
+  `# ${name} Agent Personality`, '', `You are **${name}**, a specialist in data pipelines.`, '',
+  ...['Your Identity & Memory', 'Your Core Mission', 'Critical Rules You Must Follow', 'Your Technical Deliverables', 'Your Workflow Process', 'Your Communication Style', 'Learning & Memory', 'Your Success Metrics', 'Anti-Patterns', 'Done Criteria']
+    .flatMap(h => [`## ${h}`, ...Array.from({ length: 7 }, (_, i) => `- ${h} point ${i + 1}: specific guidance for pipeline work.`), '']),
+].join('\n')
+const agentIn = (over: Partial<AgentInput> = {}): AgentInput => ({
+  id: 'engineering-pipeline-specialist', name: 'Pipeline Specialist', description: 'Builds and hardens ETL data pipelines', division: 'Engineering', color: 'blue',
+  languages: ['python', 'sql'], frameworks: ['airflow'], artifact_types: ['code', 'dags'], review_strengths: ['data-quality'], tags: ['etl', 'data-pipelines', 'scheduling'], body: agentBody('Pipeline Specialist'), ...over,
+})
+
+describe('custom agents', () => {
+  test('validation lists every failure and writes nothing', async () => {
+    const io = await project(1)
+    const bad = agentIn({ id: 'engineering-senior-developer', color: 'teal', division: 'Ops', description: 'short', body: '# x\nno sections', languages: [] })
+    const errs = await validateAgent(io, bad)
+    for (const k of ['1 name', '3 description', '4 color', '5 division', '6 body length', '8 name in body', 'contract: missing a ## Identity', 'contract: languages']) expect(errs.some(e => e.startsWith(k))).toBe(true)
+    expect(await validateAgent(io, agentIn({ id: 'Bad_Name' }))).toContain("2 name format: 'Bad_Name' must match ^[a-z][a-z0-9-]+$ (kebab-case, starting with a letter).")
+    expect(await agentCreate(io, bad)).toContain('Validation failed (nothing was written)')
+    expect([...io.files.keys()].some(k => k.startsWith('.planning/agents/'))).toBe(false)
+  })
+
+  test('create writes the persona and catalog, registers it, records and commits', async () => {
+    const io = await project(1)
+    const out = await agentCreate(io, agentIn())
+    expect(out).toContain("Your new agent 'engineering-pipeline-specialist' is ready")
+    expect(io.files.get('.planning/agents/engineering-pipeline-specialist.md')).toContain('division: "Engineering"')
+    expect(io.files.get(CUSTOM_CATALOG)).toContain('| engineering-pipeline-specialist | `.planning/agents/engineering-pipeline-specialist.md` | Engineering |')
+    expect(io.files.get('.planning/STATE.md')).toContain('Added custom agent engineering-pipeline-specialist')
+    expect(io.commits.at(-1)).toContain('feat(triad): add custom agent engineering-pipeline-specialist')
+    expect(BY_ID.get('engineering-pipeline-specialist')?.tier).toBe('sonnet')
+    expect(rank('etl data-pipelines airflow')[0]!.persona.id).toBe('engineering-pipeline-specialist')
+    expect((await validateAgent(io, agentIn()))[0]).toContain('already taken by `.planning/agents/engineering-pipeline-specialist.md`')
+    expect(await loadCustomPersonas(io)).toEqual(['engineering-pipeline-specialist'])
+    expect(await agentCreate(io, agentIn({ id: 'engineering-other' }), { limit: { count: 50, limit: 50, suggestions: ['remove x'] } })).toContain('The roster is at its agent limit (50 of 50)')
+  })
+})
+
+describe('roster gaps', () => {
+  const cfg = (): GapConfig => ({
+    agent_limit: 3,
+    role_categories: {
+      sec: { priority: 'critical', roles: { security_engineer: { required_capabilities: ['owasp_top_10', 'threat_modeling'], coverage_indicators: ['engineering-security-engineer'] } } },
+      fun: { priority: 'nice_to_have', roles: { mascot_designer: { required_capabilities: ['zzz_mascots', 'qqq_plushies'] } } },
+    },
+    scoring: { full_coverage: 1, partial_coverage: 0.5, minimal_coverage: 0.2, no_coverage: 0, weight_by_role_count: { single_agent: 1, two_agents: 1.2, three_or_more: 1.3 } },
+    severity: { critical: { min_gap_score: 0.8 }, high: { min_gap_score: 0.5 }, medium: { min_gap_score: 0.3 }, low: { min_gap_score: 0 } },
+    intent_teams_to_check: { harden: { required_agents: ['nobody-here', 'engineering-security-engineer'] } },
+    replacement_candidates: { overlapping: [{ agent_id: 'b', reason: 'dup', replacement_difficulty: 'medium' }], low_usage: [{ agent_id: 'a', reason: 'niche', replacement_difficulty: 'low' }] },
+  })
+  const P = (id: string, extra: string[]) => ({ id, name: id, description: '', division: 'Engineering', tier: 'sonnet', languages: [], frameworks: [], artifact_types: extra, review_strengths: [], core: '' }) as any
+
+  test('coverage, weights, severity with priority shift, recommendations', () => {
+    const cov = coverage(cfg(), [P('engineering-security-engineer', ['owasp-top-10']), P('x-threat', ['threat-modeling', 'owasp-top-10'])])
+    const sec = cov.find(c => c.role === 'security_engineer')!
+    expect(sec.agents.map(a => `${a.id}:${a.strength}`)).toEqual(['x-threat:full', 'engineering-security-engineer:partial'])
+    expect(sec.pct).toBe(100) // (1 + 0.5) * 1.2, capped
+    const g = gaps(cfg(), cov)
+    expect(g.map(x => `${x.role} ${x.severity} ${x.recommendation}`)).toEqual(['mascot_designer high create_agent']) // critical lowered one level
+    expect(severityOf(0.6, 'critical', cfg())).toBe('critical')
+    expect(severityOf(0.1, 'important', cfg())).toBe('low')
+  })
+
+  test('intents, limit status and suggestions', () => {
+    const i = intentCheck(cfg(), new Set(['engineering-security-engineer']))
+    expect(i.invalid[0]).toEqual({ intent: 'harden', missing: ['nobody-here'], impact: 'CRITICAL: primary agent missing' })
+    expect(limitStatus(cfg(), 3).status).toBe('AT_LIMIT')
+    const over = limitStatus(cfg(), 5)
+    expect([over.status, over.overage, over.level]).toEqual(['EXCEEDED', 2, 'warning'])
+    expect(over.suggestions).toEqual(['remove a (niche; effort low)', 'consolidate b (dup; effort medium)'])
+  })
+
+  test('gapAnalysis writes the report with the bundled config and asks before overwriting', async () => {
+    const io = await project(1)
+    const out = await gapAnalysis(io)
+    expect(out).toContain('Wrote .planning/gap-report.md')
+    expect(io.files.get(GAP_REPORT)).toContain('# Roster Gap Analysis Report')
+    expect(await gapAnalysis(io)).toContain('already exists')
+    expect(await gapSummary(io)).toContain('Roster gaps (2026-10-08)')
+  })
+})
+
+describe('portfolio', () => {
+  const projectAt = async (root: string, name: string, done: number) => {
+    const io = memIo()
+    ;(io as any).root = root
+    await projectInit(io, { name, description: `${name} app.`, phases: [{ name: 'A', goal: 'g', plans: 2 }, { name: 'B', goal: 'g', plans: 2 }] } as any)
+    if (done) io.files.set('.planning/ROADMAP.md', io.files.get('.planning/ROADMAP.md')!.replace(/\| 1 \| (.*?)\| 0\/2 \|.*$/m, m => m.replace('0/2', '2/2')).replace(/^(\|\s*1\s*\|.*)\|\s*Not started\s*\|/m, '$1| Complete |'))
+    io.files.set('.planning/phases/01-a/CONTEXT.md', 'Agents: engineering-backend-architect, testing-qa-verification-specialist')
+    return io
+  }
+
+  test('register, dashboard with dependencies and allocation, stale projects, unregister', async () => {
+    const reg = memIo()
+    const a = await projectAt('/p/alpha', 'Alpha', 1)
+    const b = await projectAt('/p/beta', 'Beta', 0)
+    const at = (root: string) => (root === '/p/alpha' ? a : root === '/p/beta' ? b : memIo())
+    expect(await portfolioDashboard(reg, at)).toContain('No portfolio registry found')
+    expect(await portfolioRegister(reg, a)).toContain('Registered Alpha')
+    await portfolioRegister(reg, b)
+    const r = parseRegistry(reg.files.get(REGISTRY)!)
+    expect(r.projects.map(p => p.name)).toEqual(['Alpha', 'Beta'])
+    expect(await portfolioRegister(reg, await projectAt('/p/alpha-v2', 'Alpha', 0))).toContain('Registered Alpha (alpha-v2)')
+    await portfolioUnregister(reg, '/p/alpha-v2')
+    expect(await portfolioAddDep(reg, at, { from: 'Alpha', from_phase: 9, to: 'Beta', to_phase: 1, type: 'blocks' })).toBe('Alpha has no Phase 9 in its ROADMAP.md.')
+    expect(await portfolioAddDep(reg, at, { from: 'Beta', from_phase: 1, to: 'Alpha', to_phase: 2, type: 'blocks' })).toBe('Dependency DEP-01 added: Beta:Phase 1 blocks Alpha:Phase 2')
+    const d = await portfolioDashboard(reg, at)
+    expect(d).toContain('**2 active projects** | 2 registered')
+    expect(d).toContain('| DEP-01 | Beta:Phase 1 | Alpha:Phase 2 | Blocking | Alpha Phase 2 is waiting on Beta Phase 1 |')
+    expect(d).toContain('| engineering-backend-architect | Engineering | Alpha, Beta |')
+    reg.files.set(REGISTRY, reg.files.get(REGISTRY)!.replace('/p/beta', '/p/gone'))
+    const d2 = await portfolioDashboard(reg, at)
+    expect(d2).toContain('Project directory not found at /p/gone')
+    expect(reg.files.get(REGISTRY)).toContain('- **Status**: Stale')
+    expect(await portfolioUnregister(reg, 'Beta')).toBe('Unregistered Beta; removed 1 dependency row(s).')
   })
 })
