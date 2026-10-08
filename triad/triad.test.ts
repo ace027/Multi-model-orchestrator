@@ -337,6 +337,10 @@ describe('compression helpers', () => {
     expect(eligible('Read', { file_path: '/r/logs/app.log' })).toBe(true)
     expect(eligible('Read', { file_path: '/r/src/app.py' })).toBe(false)
     expect(eligible('Edit', {})).toBe(false)
+    expect(eligible('Read', { file_path: '/tmp/w/notes/a.md' }, '/tmp/w')).toBe(false)
+    expect(eligible('Read', { file_path: '/tmp/w/logs/a.log' }, '/tmp/w')).toBe(true)
+    expect(eligible('Read', { file_path: '/tmp/w/tmp/run.out' }, '/tmp/w/')).toBe(true)
+    expect(eligible('Read', { file_path: '/tmp/w/.triad/out/x-1.txt' }, '/tmp/w')).toBe(false)
   })
   test('keeps distinct error lines once', () => {
     expect(errorLines('ok\nERROR db timeout after 30s\nERROR db timeout after 31s\nTraceback (most recent call last):\nfine')).toEqual(['ERROR db timeout after 30s', 'Traceback (most recent call last):'])

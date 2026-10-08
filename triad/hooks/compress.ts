@@ -13,10 +13,16 @@ const ERRORLINE = /\w*(error|exception)\b|\b(traceback|fail(ed|ure|ing)?|fatal|p
 const MAX_ERROR_LINES = 40
 const MAX_ERROR_CHARS = 6_000
 
-export function eligible(tool: string, input: Record<string, unknown>): boolean {
+// `cwd` matters for Read: the folder test runs on the path inside the project, so a
+// project that itself lives under /tmp is not all log-like. A saved output in
+// .triad/out is the full text a compressed result points to, so it is never compressed.
+export function eligible(tool: string, input: Record<string, unknown>, cwd = ''): boolean {
   if (tool === 'Bash' || tool === 'Grep') return true
-  if (tool === 'Read') return LOGLIKE.test(String(input.file_path ?? ''))
-  return false
+  if (tool !== 'Read') return false
+  let path = String(input.file_path ?? '')
+  if (cwd && path.startsWith(cwd.replace(/\/$/, '') + '/')) path = path.slice(cwd.replace(/\/$/, '').length + 1)
+  if (/(^|\/)\.triad\/out\//.test(path)) return false
+  return LOGLIKE.test(path)
 }
 
 export const overThreshold = (text: string, thresholdTokens: number) => approxTokens(text) > thresholdTokens

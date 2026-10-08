@@ -371,7 +371,7 @@ export const register: Register = (on, options) => {
     const r: any = await next(e)
     const input = e as unknown as Record<string, unknown>
     if (r.deny || typeof r.text !== 'string') return r
-    const compressible = opts.compress && eligible(e.tool, input)
+    const compressible = opts.compress && eligible(e.tool, input, cwd)
     const meter = e.agentId && roles[e.agentId] === 'helper' && opts.haikuCeiling > 0 ? meters[e.agentId] : undefined
     if (!compressible && !meter) return r
     let raw: string = r.text

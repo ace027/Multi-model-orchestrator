@@ -16,15 +16,21 @@ print(f"haiku requests {h['requests']}, largest prompt {h['maxPrompt']}, over th
 print("ceiling", ledger.get("ceiling"))
 if h["overLine"]:
     fails.append(f"{h['overLine']} Haiku requests over 100k")
-# Billed usage: the CLI's Haiku totals must equal the ledger's (every request was seen).
+# Billed usage: the CLI's Haiku totals must equal the helpers' requests in the ledger
+# (every request was seen). The mod's own one-shots ($.model.complete: summaries,
+# progress notes) are not in the CLI's totals; they are reported apart.
 billed = {k: sum(u.get(k, 0) for m, u in cli.get("modelUsage", {}).items() if "haiku" in m)
           for k in ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")}
-t = ledger["tiers"].get("haiku", {})
-seen = {"inputTokens": t.get("input", 0), "outputTokens": t.get("output", 0), "cacheReadInputTokens": t.get("cacheRead", 0), "cacheCreationInputTokens": t.get("cacheWrite", 0)}
-print("billed haiku", billed)
-print("ledger haiku", seen)
+helpers = [v for v in ledger["agents"].values() if v["role"] == "helper"]
+seen = {"inputTokens": sum(v["input"] for v in helpers), "outputTokens": sum(v["output"] for v in helpers),
+        "cacheReadInputTokens": sum(v["cacheRead"] for v in helpers), "cacheCreationInputTokens": sum(v["cacheWrite"] for v in helpers)}
+print("billed haiku (CLI)", billed)
+print("ledger helpers   ", seen)
+oneshot = ledger["agents"].get("compressor")
+if oneshot:
+    print(f"mod one-shots: {oneshot['requests']} requests, ${oneshot['cost']:.4f} (not in the CLI's totals)")
 if billed != seen:
-    fails.append("the ledger's Haiku usage differs from the billed usage (a request went unseen)")
+    fails.append("the ledger's helper usage differs from the billed Haiku usage (a request went unseen)")
 for a, v in ledger["agents"].items():
     if v["role"] == "helper":
         print(f"helper {a[:10]} req {v['requests']} status {v.get('status')}")
