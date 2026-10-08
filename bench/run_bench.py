@@ -4,7 +4,7 @@ Usage: python3 bench/run_bench.py [--configs p2,p3] [--tasks a,b] [--jobs 3] [--
 
 Each run copies tasks/<task>/repo to a scratch dir (plus setup.py if present), commits it,
 runs `claude -p` headless through bench/hermetic.sh, then runs tasks/<task>/check.py.
-Writes <out>/<config>/<task>.json and prints a summary table. Needs ORCHESTRATOR_API_KEY.
+Writes <out>/<config>/<task>.json and <out>/summary.md (this run's table). Needs ORCHESTRATOR_API_KEY.
 """
 import argparse
 import concurrent.futures as cf
@@ -110,6 +110,7 @@ def main() -> int:
             recs.append(r)
             print(f"done {r['task']} {r['config']}: ok={r['success']} cost={r['cost']} tokens={r['totalTokens']}", flush=True)
     print(table(recs))
+    open(os.path.join(a.out, "summary.md"), "w").write("```\n" + table(recs) + "\n```\n")
     return 0
 
 

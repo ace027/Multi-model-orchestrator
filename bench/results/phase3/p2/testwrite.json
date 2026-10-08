@@ -1,0 +1,44 @@
+{
+  "task": "testwrite",
+  "config": "p2",
+  "options": {
+    "compress": false,
+    "deferTools": false
+  },
+  "seconds": 36,
+  "exit": 0,
+  "success": true,
+  "check": "mutants caught 7 of 7: ['available_negative', 'commit_keeps_holds', 'commit_unknown_silent', 'release_unknown', 'reserve_boundary', 'reserve_replace', 'restock_zero']",
+  "cost": 0.1510052,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 10,
+    "outputTokens": 4151,
+    "cacheReadInputTokens": 89526,
+    "cacheCreationInputTokens": 10008
+  },
+  "totalTokens": 103695,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 4151,
+      "cacheReadInputTokens": 89526,
+      "cacheCreationInputTokens": 10008,
+      "costUSD": 0.1510052
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 5
+    }
+  },
+  "work": "/tmp/bench-p2-testwrite-iv7xl2qs/repo"
+}

@@ -1,0 +1,58 @@
+{
+  "task": "discounts",
+  "config": "p3",
+  "options": {},
+  "seconds": 40,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 cli 900 unknown-code exit 2",
+  "cost": 0.15600730000000002,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 16,
+    "outputTokens": 5546,
+    "cacheReadInputTokens": 83689,
+    "cacheCreationInputTokens": 16701
+  },
+  "totalTokens": 105952,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 1788,
+      "cacheReadInputTokens": 62795,
+      "cacheCreationInputTokens": 9650,
+      "costUSD": 0.096609
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 6,
+      "outputTokens": 3758,
+      "cacheReadInputTokens": 20894,
+      "cacheCreationInputTokens": 7051,
+      "costUSD": 0.0593983
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 5
+    },
+    "a419b15093d9552f0": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-p3-discounts-pqaub13m/repo"
+}

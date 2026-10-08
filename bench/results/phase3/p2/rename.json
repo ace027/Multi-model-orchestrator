@@ -1,0 +1,44 @@
+{
+  "task": "rename",
+  "config": "p2",
+  "options": {
+    "compress": false,
+    "deferTools": false
+  },
+  "seconds": 29,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 legacy refs left 0 legacy.py exists False calls unchanged True (rescored after the check fix)",
+  "cost": 0.2033454,
+  "turns": 7,
+  "tokens": {
+    "inputTokens": 14,
+    "outputTokens": 2449,
+    "cacheReadInputTokens": 173772,
+    "cacheCreationInputTokens": 23911
+  },
+  "totalTokens": 200146,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 2449,
+      "cacheReadInputTokens": 173772,
+      "cacheCreationInputTokens": 23911,
+      "costUSD": 0.2033454
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 7
+    }
+  },
+  "work": "/tmp/bench-p2-rename-1t6pdpov/repo"
+}
