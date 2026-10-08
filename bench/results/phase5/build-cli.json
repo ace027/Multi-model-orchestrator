@@ -1,0 +1,37 @@
+{
+  "subtype": "success",
+  "total_cost_usd": 0.1541901,
+  "duration_ms": 41185,
+  "num_turns": 4,
+  "result": "Phase 2 (Reporting) built. Both plans completed:\n\n| Plan | Persona | Outcome |\n|---|---|---|\n| 02-01 | engineering-senior-developer | Complete |\n| 02-02 | engineering-backend-architect | Complete |\n\nThe build logged no failed checks and no escalations.\n\nIt did log some warnings about how the plans are written, not about the code that was built:\n- **02-01** has no `<execution_contract>` section.\n- **02-02** has no `<execution_contract>`, `<stop_gates>` or `<recovery>` sections.\n\nThese didn't block the build. If you want later plans to include those sections, re-plan with `/triad:plan`.\n\n**Next:** `/triad:review` to review Phase 2.",
+  "modelUsage": {
+    "claude-opus-5-5": {
+      "inputTokens": 8,
+      "outputTokens": 463,
+      "cacheReadInputTokens": 50188,
+      "cacheCreationInputTokens": 7530,
+      "webSearchRequests": 0,
+      "costUSD": 0.0569796,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "thinkingTokens": 31,
+      "canonicalModel": "claude-opus-5-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 5175,
+      "cacheReadInputTokens": 58825,
+      "cacheCreationInputTokens": 13467,
+      "webSearchRequests": 0,
+      "costUSD": 0.0972105,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "thinkingTokens": 301,
+      "canonicalModel": "claude-sonnet-5-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  }
+}

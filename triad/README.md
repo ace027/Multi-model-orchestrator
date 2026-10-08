@@ -82,3 +82,30 @@ Findings:
 - The engine refuses subagents writing standalone report files ("Subagents should return findings as text"). Helpers that tried to write part files were blocked and returned their lines as text instead. Briefs should ask helpers to return findings, and let the coder or orchestrator write report files.
 - `$.model.complete` one-shots (summaries, progress notes) are billed but are not in the CLI's `total_cost_usd` or `modelUsage`; the ledger counts them under `compressor`.
 - The first live attempt found two compression bugs, now fixed: a project under `/tmp` had every Read treated as log-like (the folder test ran on the absolute path), and reading a saved output in `.triad/out` was compressed again.
+
+## Phase 5: Legion workflow
+
+Triad reads and writes Legion's `.planning/` layout as is: `PROJECT.md`, `ROADMAP.md`, `STATE.md`, `phases/NN-slug/` with `NN-CONTEXT.md`, `NN-PP-PLAN.md`, `NN-PP-SUMMARY.md` and `NN-REVIEW.md`, and Legion's root `settings.json`. Both STATE field forms (`- **Phase**: N of M` and `Phase: N of M`), progress tables with or without a Reviewed column, legacy plan frontmatter (`plan: 2`, `agent:`) and older plans' `<verify><automated>` task checks are read without migration. Existing projects keep their `commit_prefix`; new ones get `triad`. Derived Legion material and its MIT notice: `LEGION-NOTICE.md`.
+
+| Command | Kind | Does |
+|---|---|---|
+| `/triad:start` | plugin command (Opus judgment) | Questioning flow, then `project_init` writes PROJECT/ROADMAP/STATE from Legion's templates. |
+| `/triad:plan [N]` | plugin command | Opus decomposes the phase into wave-ordered plans (personas picked with `persona_brief`), `plan_write` writes schema-valid plans and runs the mechanical critique, Opus adds the judgment critique, up to 2 auto-refine rounds (`only`). |
+| `/triad:build` | plugin command over `build_phase` | Wave executor in mod code: one agent per plan at its persona's tier (haiku personas on triad-helper, opus personas with the opus model), plans of a wave in parallel unless they share files, verification commands run by the mod, one follow-up fix on a failed check, a SUMMARY.md per plan (failures too), STATE/ROADMAP after every plan and wave, Legion's commit messages. Resumes from the first plan without a successful summary. |
+| `/triad:review` | plugin command over `review_phase` | Panel (2-4 reviewers by divisions touched, always one Testing) or classic; reports parsed and triaged in code (confidence ≥80 actioned, 50-79 deferred, <50 dropped; dedup by file and overlapping lines); must-fix findings (blocker/critical/major) routed to fix agents by file; re-review of changed files; stale-loop abort; up to `review.max_cycles`; NN-REVIEW.md, STATE, ROADMAP `[x]`. |
+| `/triad:quick` | plugin command | One coder on a small ad-hoc task, optional commit and review. |
+| `/triad status`, `/triad validate [--ci] [--fix]` | mod subcommands, no model | Dashboard and next action; schema and consistency checks (exit 0/1/2). |
+
+The tools (`mcp__triad__planning_status`, `project_init`, `plan_write`, `plan_check`, `build_phase`, `review_phase`, `persona_brief`) are registered deferred, so they cost no prompt tokens until a `/triad:*` command loads them, and run in the main loop only. Authority: while an agent works a plan, every Edit/Write is checked against the plan's `files_modified` and `files_forbidden` under the control mode (surgical denies and the executor reverts unclaimed changes, guarded and autonomous warn and record an escalation, advisory logs). Progress goes to `.triad/legion.log`, each agent's raw answer to `.triad/legion/`.
+
+Acceptance (`bench/run_legion.sh <dir>`): `bench/legion/repo` is a Legion-format project (phase 1 complete and reviewed, phase 2 planned with one current-format plan and one legacy plan, `commit_prefix: legion`). Headless `/triad:build` then `/triad:review`, no migration step. Evidence in `bench/results/phase5/`:
+
+- Both plans ran on Sonnet coders, all 4 verification commands passed (run by the mod), a SUMMARY.md per plan, commits `feat(legion): execute plan 02-0N — …`, `chore(legion): update state after wave N of phase 2`, `chore(legion): complete phase 2 execution — Reporting`.
+- Panel of 3 reviewers, all PASS; 3 minor/advisory findings at 55-75% confidence deferred, `invlib/cli.py` a hot spot; `chore(legion): phase 2 review passed — Reporting`; STATE at 100% (3/3 plans), ROADMAP row Complete and `[x] Phase 2`. The project's own tests pass; the CLI behaves as the plan says.
+- Cost: build $0.15, review $0.17 (CLI); the ledger, which also counts the plugin's spawned agents, says $0.18 and $0.19.
+- Legion's own `.planning/` (71 plans) through `/triad validate` and `/triad status`: 11 pass, 55 warnings, 2 failures (two plans name `testing-evidence-collector`, which is not in Legion's roster), "all phases complete" (`legion-own-planning.txt`).
+
+The live runs found three bugs the unit tests could not (the kit drops `agentId` from a plugin's own spawns), all fixed:
+- The answer wait passed `timeoutMs` 610000 to `$.process.run`; the host caps it at 600000, so the first build stopped right after its agent started. A failed wait now fails the plan, not the build.
+- A plugin's `$.agent.spawn` resolves after the agent has answered, so an answer could arrive before the wait began. Answers are now kept until a wait takes them.
+- That spawn also passes through the `Agent` reply check, which rejected every review report for not following the coder schema; the loop saw empty reports and passed the phase. Legion executor agents now skip that check, and a reviewer that returns neither a verdict nor a finding never counts as a pass (it is asked again, then the review escalates).
