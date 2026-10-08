@@ -1,0 +1,255 @@
+import type { Register } from 'claude-code'
+import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, schemaProblems, type Options, type Role } from './policy.ts'
+import { emptyLedger, ensureAgent, recordStep, render, type Ledger } from './ledger.ts'
+
+// Triad, Mode B (routed flat; see SPIKE.md). Only the orchestrator (main loop)
+// has the Agent tool. Coders reach Haiku through the `delegate_menial` tool,
+// whose handler spawns the helper itself. The mod keeps the agent tree.
+
+const HELPER_TYPE = 'triad:triad-helper'
+const DELEGATE = 'mcp__triad__delegate_menial'
+const DELEGATE_MARK = 'triad delegate from '
+const PREFLIGHT_TOKENS = 40_000
+const WRITE_TOOLS = ['Edit', 'Write', 'NotebookEdit', 'MultiEdit']
+
+let opts: Options = { ...DEFAULTS }
+let cwd = ''
+let sessionId = ''
+let ledger: Ledger = emptyLedger()
+const roles: Record<string, Role> = {}
+const parents: Record<string, string | undefined> = {}
+const writable: Record<string, string[]> = {}
+const byToolUse: Record<string, string> = {}
+const retries: Record<string, number> = {}
+const running = { coder: new Set<string>(), helper: new Set<string>() }
+const reserved = { coder: 0, helper: 0 }
+const waiting: Record<string, { marker: string; resolve: (answer: string) => void }> = {}
+let seq = 0
+
+// Byte-stable (no dates, no per-session data) so it caches with the prefix.
+const ORCHESTRATOR_GUIDE = `Triad orchestration. This applies to the main session only; subagents ignore this block.
+You are the orchestrator. Decompose the work, make the architecture decisions, review results and decide retries. Do not implement, or read files at length, yourself.
+- Implementation goes to triad:triad-coder (Sonnet), one well-scoped task per agent. Brief it with file paths, acceptance criteria, constraints and the verify command; no pasted code. Launch independent tasks in parallel (several Agent calls in one message).
+- Menial work (search, running a test suite and summarizing failures, log triage, a checklist, boilerplate you have designed) goes to triad:triad-helper (Haiku). Name the files it may write.
+- Every agent returns status, summary, changes and verify. On blocked, rebrief, split the task, or take it over; retry a task at most once.
+- Check results with the verify commands and git diff --stat, not by reading whole files.
+- /triad shows the agent tree and the tokens and cost per tier.`
+
+const depthOf = (id: string | undefined): number => (id ? 1 + depthOf(parents[id]) : 0)
+const runDir = () => `${cwd}/.triad/run`
+const busy = (role: 'coder' | 'helper') => running[role].size + reserved[role]
+const capOf = (role: 'coder' | 'helper') => (role === 'coder' ? opts.maxCoders : opts.maxHelpers)
+
+// Paths a helper may write: an explicit "Writable files:" line, else the paths its brief names.
+function writableFrom(prompt: string): string[] {
+  const line = prompt.match(/^Writable files:\s*(.*)$/im)
+  if (line) return line[1].trim().toLowerCase().startsWith('none') ? [] : line[1].split(',').map(s => s.trim()).filter(Boolean)
+  return pathsInBrief(prompt)
+}
+
+function refuse(reason: string) {
+  ledger.refusals.push({ reason, at: new Date().toISOString() })
+  return { deny: 'triad: ' + reason }
+}
+
+async function save($: any) {
+  await $.fs.write(`${cwd}/.triad/ledger.json`, JSON.stringify(ledger, null, 2) + '\n')
+  if (sessionId) await $.store.set(`ledger:${sessionId}`, ledger)
+}
+
+// Waits for an agent's turn.complete without spending the hook's own budget:
+// the wait runs in a child process that polls for the marker the turn.complete
+// hook writes (SPIKE.md, hook budget).
+async function waitForAnswer($: any, agentId: string, ms: number): Promise<string | undefined> {
+  let answer: string | undefined
+  const marker = `${runDir()}/${agentId}.${++seq}.done`
+  waiting[agentId] = { marker, resolve: a => { answer = a } }
+  const until = Date.now() + ms
+  while (answer === undefined && waiting[agentId]?.marker === marker && Date.now() < until) {
+    const ticks = String(Math.max(1, Math.min(2400, Math.ceil((until - Date.now()) / 250))))
+    await $.process.run(['bash', '-c', 'for i in $(seq 1 "$2"); do [ -e "$1" ] && exit 0; sleep 0.25; done; exit 1', 'wait', marker, ticks], { timeoutMs: 610_000 })
+  }
+  if (waiting[agentId]?.marker === marker) delete waiting[agentId]
+  return answer
+}
+
+async function cancelWait($: any, agentId: string) {
+  const w = waiting[agentId]
+  if (!w) return
+  delete waiting[agentId]
+  await $.fs.write(w.marker, 'cancelled')
+}
+
+export const register: Register = (on, options) => {
+  opts = { ...DEFAULTS, ...(options as Partial<Options>) }
+
+  on('session.start', async ($, e, next) => {
+    const r = await next(e)
+    cwd = r.cwd ?? e.cwd
+    sessionId = await $.session.id()
+    ledger = ((await $.store.get(`ledger:${sessionId}`)) as Ledger | undefined) ?? emptyLedger()
+    await $.fs.write(`${cwd}/.triad/.gitignore`, '*\n')
+    await $.tool.register({
+      name: 'delegate_menial',
+      description:
+        'Hand a narrow, menial job to a Haiku helper agent and get its report back: broad search, running tests and summarizing failures, log triage, formatting, docs lookup, or boilerplate you have already designed. ' +
+        'The helper may write only the files listed in `writable`. It makes no design decisions; it returns status done, blocked or partial.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          brief: { type: 'string', description: 'What to do, the file paths involved, and how to check it. No pasted code.' },
+          writable: { type: 'array', items: { type: 'string' }, description: 'Files the helper may create or edit. Omit for a read-only job.' },
+        },
+        required: ['brief'],
+      },
+      isDeferred: false,
+    })
+    await $.command.register({ name: 'triad', description: 'Show the Triad agent tree, tokens and cost per tier, and budgets' })
+    return r
+  })
+
+  on('prompt.context', async ($, e, next) => {
+    const r = await next(e)
+    ledger.contextInjections = (ledger.contextInjections ?? 0) + 1
+    return { ...r, blocks: [...r.blocks, { name: 'triad', text: ORCHESTRATOR_GUIDE }] }
+  })
+
+  // Only the main loop has the Agent tool (SPIKE.md #6), so this menu is the orchestrator's.
+  on('agent.offer', async ($, e, next) => {
+    if (opts.strictMenu && !roleOfType(e.agent)) return { isOffered: false }
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('agent.spawn', async ($, e, next) => {
+    // A plugin's own spawn can arrive in the Agent tool's shape (`subagent_type`).
+    const type: string = e.subagentType ?? (e as any).subagent_type ?? 'general-purpose'
+    const role = roleOfType(type)
+    if (!role || role === 'orchestrator') {
+      if (opts.strictMenu) return refuse(`agent type "${type}" bypasses the tiers. Use triad:triad-coder (Sonnet, implements one task) or triad:triad-helper (Haiku, menial work).`)
+      return next(e)
+    }
+    // A delegate_menial spawn runs in the main loop, so the caller rides in the description.
+    const parent = e.description.startsWith(DELEGATE_MARK) ? e.description.slice(DELEGATE_MARK.length).split(/\s/)[0] : e.parentAgentId
+    const depth = depthOf(parent) + 1
+    if (depth > opts.maxDepth) return refuse(`depth ${depth} is over the limit of ${opts.maxDepth}; do this step yourself or return blocked.`)
+    if (busy(role) >= capOf(role)) return refuse(`${busy(role)} ${role}s are already running (limit ${capOf(role)}). Wait for one to finish, or batch the work.`)
+    reserved[role]++
+    let r
+    try {
+      r = await next({ ...e, model: MODEL_FOR[role], background: false })
+    } finally {
+      reserved[role]--
+    }
+    if (r.agentId) {
+      const id = r.agentId
+      roles[id] = role
+      parents[id] = parent
+      running[role].add(id)
+      byToolUse[e.tool_use_id] = id
+      if (role === 'helper') writable[id] = writableFrom(e.prompt)
+      ensureAgent(ledger, id, { role, type, parent: parent ?? 'main', depth, status: 'running' })
+    }
+    return r
+  }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the spawn check failed, so the spawn was refused. Try again.' }))
+
+  on('turn.step', async function* ($, e, next) {
+    const r = yield* next(e)
+    if (r?.usage) recordStep(ledger, e.agentId, r.usage.model || e.model, r.usage)
+    return r
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const id = e.agentId
+    if (id) {
+      const role = roles[id]
+      if (role === 'coder' || role === 'helper') running[role].delete(id)
+      if (ledger.agents[id]) ledger.agents[id].status = parseReply(e.answer).status ?? (e.isAborted ? 'aborted' : 'no status')
+      const w = waiting[id]
+      if (w) {
+        delete waiting[id]
+        w.resolve(e.answer)
+        await $.fs.write(w.marker, 'done')
+      }
+    }
+    await save($)
+    return next(e)
+  })
+
+  // Coders' (and directly spawned helpers') replies: send a non-conforming reply back once.
+  on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
+    const r: any = await next(e)
+    if (r.isError || typeof r.text !== 'string') return r
+    const id = byToolUse[e.tool_use_id] ?? agentIdIn(r.text)
+    if (!id || !roles[id]) return r
+    const problems = schemaProblems(r.text)
+    if (!problems.length || (retries[id] ?? 0) >= opts.maxRetries) return r
+    retries[id] = (retries[id] ?? 0) + 1
+    ledger.rejectedReplies++
+    return {
+      deny:
+        `triad: the reply from agent ${id} did not follow the return schema (${problems.join('; ')}). ` +
+        `Send it a message (SendMessage to ${id}) asking it to resend only the status/summary/changes/verify block.`,
+    }
+  }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the reply check failed before the agent ran. Try again.' }))
+
+  on('tool.call', { tool: DELEGATE }, async ($, e, next) => {
+    const caller = e.agentId
+    const callerRole = caller ? roles[caller] : 'orchestrator'
+    if (!caller) return { deny: 'triad: the orchestrator spawns helpers with the Agent tool (subagent_type triad:triad-helper).' }
+    if (callerRole !== 'coder') return { deny: 'triad: only coders may delegate; helpers never spawn.' }
+    const args = e as unknown as { brief?: unknown; writable?: unknown }
+    const brief = String(args.brief ?? '').trim()
+    const files = Array.isArray(args.writable) ? args.writable.map(String).filter(Boolean) : []
+    if (!brief) return { deny: 'triad: delegate_menial needs a brief.' }
+    if (approxTokens(brief) > PREFLIGHT_TOKENS) return refuse(`the brief is about ${approxTokens(brief)} tokens, too large to start a Haiku job (limit ${PREFLIGHT_TOKENS}). Split it into narrower jobs or do it yourself.`)
+    const prompt = `${brief}\n\nWritable files: ${files.length ? files.join(', ') : 'none (read-only job)'}`
+    const s: any = await $.agent.spawn({ subagentType: HELPER_TYPE, prompt, description: `${DELEGATE_MARK}${caller}`, model: 'haiku' })
+    if (!s.agentId) return { deny: s.deny ?? 'triad: the helper could not be spawned.' }
+    const id: string = s.agentId
+    let answer = await waitForAnswer($, id, 30 * 60_000)
+    if (answer === undefined) return { result: `status: partial\nsummary: helper ${id} did not finish within 30 minutes.\nchanges: unknown\nverify: none` }
+    const problems = schemaProblems(answer)
+    if (problems.length && (retries[id] ?? 0) < opts.maxRetries) {
+      retries[id] = (retries[id] ?? 0) + 1
+      ledger.rejectedReplies++
+      const again = waitForAnswer($, id, 3 * 60_000)
+      let sent: any
+      try {
+        sent = await $.session.send({ to: { agentId: id }, text: `Your reply did not follow the return schema (${problems.join('; ')}). Reply again with only the status/summary/changes/verify block.` })
+      } catch {
+        sent = undefined
+      }
+      if (!sent?.isDelivered) await cancelWait($, id)
+      const second = await again
+      if (second !== undefined && !schemaProblems(second).length) answer = second
+    }
+    return { result: schemaProblems(answer).length ? `triad: helper ${id} did not follow the return schema; its reply follows.\n${answer}` : answer }
+  }).catch(() => ({ deny: 'triad: delegate_menial failed. Do the job yourself or return blocked.' }))
+
+  // Helpers write only the files their brief names.
+  on('tool.call', { tool: WRITE_TOOLS }, async ($, e, next) => {
+    const id = e.agentId
+    if (!id || roles[id] !== 'helper') return next(e)
+    const input = e as unknown as { file_path?: string; notebook_path?: string }
+    const target = input.file_path ?? input.notebook_path ?? ''
+    const allowed = writable[id] ?? []
+    if (!target || mayWrite(target, allowed, cwd)) return next(e)
+    return { deny: `triad: a helper may write only the files its brief names (${allowed.join(', ') || 'none'}); ${target} is not one. Return blocked if the job needs it.` }
+  }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the write check failed, so the write was refused.' }))
+
+  on('session.measure', async ($, e, next) => {
+    if (e.cost) ledger.measuredUsd = e.cost.usd
+    return next(e)
+  })
+
+  on('command.run', { command: 'triad' }, async ($, e) => {
+    await save($)
+    return {
+      text: render(ledger, {
+        coders: [running.coder.size, opts.maxCoders],
+        helpers: [running.helper.size, opts.maxHelpers],
+        maxDepth: opts.maxDepth,
+      }),
+    }
+  })
+}

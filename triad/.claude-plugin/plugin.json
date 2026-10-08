@@ -1,0 +1,12 @@
+{
+  "name": "triad",
+  "version": "0.2.0",
+  "description": "Tiered-model orchestration: Opus orchestrates, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
+  "userConfig": {
+    "maxDepth": { "type": "number", "title": "Max depth below the orchestrator", "description": "Spawns deeper than this are refused.", "default": 2 },
+    "maxCoders": { "type": "number", "title": "Max concurrent coders", "description": "triad-coder agents (Sonnet) running at once.", "default": 4 },
+    "maxHelpers": { "type": "number", "title": "Max concurrent helpers", "description": "triad-helper agents (Haiku) running at once.", "default": 6 },
+    "maxRetries": { "type": "number", "title": "Max automatic retries per task", "description": "How many times a non-conforming reply is sent back before it is passed through.", "default": 1 },
+    "strictMenu": { "type": "boolean", "title": "Offer only Triad agent types", "description": "Hide and refuse built-in and other plugins' agent types, which would bypass the tiers.", "default": true }
+  }
+}
