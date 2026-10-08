@@ -12,8 +12,12 @@ import { runVerification, dirtyFiles, type Agents } from './build.ts'
 import { parseReply } from '../policy.ts'
 import { phaseNumbers } from './status.ts'
 import type { Mode } from './settings.ts'
+import { evaluatorBrief, evaluatorPersona, evaluatorsFor } from './evaluators.ts'
+import { coverageChecks, coverageFindings, readCoverage, renderCoverage } from './coverage.ts'
+import { findingErrors, intentFilter } from './review.ts'
+import { loadIntentConfig, resolveTeam } from './intents.ts'
 
-export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void }
+export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void; intent?: string }
 export type ReviewResult = { ok: boolean; result?: 'PASSED' | 'ESCALATED' | 'STALE LOOP ABORTED'; error?: string; cycles: number; text: string; open: Finding[] }
 
 function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; name: string; goal: string; criteria: string[]; files: string[]; open: Finding[]; cycle: number; checks: string[] }): string {
@@ -78,8 +82,26 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   const text = `${info?.goal ?? ''} ${name} ${ph.context ?? ''} ${files.join(' ')}`
   const agentIds = ph.plans.flatMap(x => x.fm.agents)
   const panelMode = (opts.mode ?? settings.review?.default_mode ?? 'panel') === 'panel'
-  const reviewers = panelMode ? composePanel(text, divisionsOf(files, agentIds)) : classicReviewers(text)
+  let reviewers = panelMode ? composePanel(text, divisionsOf(files, agentIds)) : classicReviewers(text)
+
+  // Intent review (--just-security and the other filter_review intents): the
+  // intent's team replaces the panel and its domains filter the findings.
+  let intentDomains: string[] | undefined
+  if (opts.intent) {
+    const team = resolveTeam((await loadIntentConfig(io)).config, opts.intent)
+    if (!team) return fail(`unknown intent ${opts.intent}.`)
+    const members = [...team.agents.primary, ...team.agents.secondary].map(id => BY_ID.get(id)).filter((x): x is Persona => !!x)
+    if (members.length) reviewers = members
+    intentDomains = team.domains
+  }
   log(`reviewers: ${reviewers.map(r => r.id).join(', ')}`)
+
+  // Multi-pass evaluators (review.evaluator_depth) and coverage thresholds.
+  const evaluators = !opts.intent && (settings.review?.evaluator_depth ?? 'multi-pass') === 'multi-pass' ? evaluatorsFor(files) : []
+  if (evaluators.length) log(`evaluators: ${evaluators.map(e => e.type).join(', ')}`)
+  const coverage = opts.intent ? undefined : await readCoverage(io)
+  const covChecks = coverage ? coverageChecks(coverage, settings.review?.coverage_thresholds) : []
+  const fixesLog: string[] = []
 
   let state = p.stateText
   let roadmap = p.roadmapText
@@ -105,7 +127,30 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
       for (const f of report.findings) if (f.file.startsWith(io.root + '/')) f.file = f.file.slice(io.root.length + 1)
       return report
     }))
-    for (const r of reports) verdicts.push({ agent: r.agent, verdict: r.verdict ?? (r.findings.length ? 'NEEDS WORK' : 'no verdict'), cycle })
+
+    // Evaluators: all on cycle 1, then only those with findings still open.
+    // One that returns neither verdict nor finding is left out, not counted silent.
+    const evalNow = evaluators.filter(e => cycle === 1 || open.some(f => f.agent === `evaluator:${e.type}`))
+    const evalReports = await Promise.all(evalNow.map(async e => {
+      const persona = evaluatorPersona(e)
+      const brief = evaluatorBrief(e, { phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles }) +
+        (cycle > 1 ? `\n\nFindings from the last cycle, said to be fixed; check each one:\n${open.filter(f => f.agent === `evaluator:${e.type}`).map(f => `- ${f.id} [${f.severity}] ${f.file}: ${f.description}`).join('\n')}` : '')
+      const r = await agents.run({ persona, brief, scope: { planId: `review-${pad2(n)}`, mode: 'surgical', files_modified: [], files_forbidden: [] }, label: `evaluate ${e.type}` })
+      const report = parseReport(`evaluator:${e.type}`, r.answer ?? '', cycle)
+      for (const f of report.findings) if (f.file.startsWith(io.root + '/')) f.file = f.file.slice(io.root.length + 1)
+      return report
+    }))
+    reports.push(...evalReports.filter(reviewed))
+    if (cycle === 1 && coverage) {
+      const cf = coverageFindings(coverage, covChecks, cycle)
+      if (cf.length) reports.push({ agent: 'coverage', verdict: undefined, findings: cf })
+    }
+    if (opts.intent) for (const r of reports) {
+      const had = r.findings.length
+      r.findings = intentFilter(r.findings, opts.intent, intentDomains)
+      if (had && !r.findings.length && !r.verdict) r.verdict = 'PASS' // only out-of-intent findings
+    }
+    for (const r of reports.filter(r => r.agent !== 'coverage')) verdicts.push({ agent: r.agent, verdict: r.verdict ?? (r.findings.length ? 'NEEDS WORK' : 'no verdict'), cycle })
     const t = triage(reports, all.length + 1)
     // A finding raised again keeps its id; one nobody raised again counts as fixed.
     const same = (a: Finding, b: Finding) => a.file === b.file && (!a.line_range || !b.line_range || (a.line_range[0] <= b.line_range[1] + 2 && b.line_range[0] <= a.line_range[1] + 2))
@@ -159,6 +204,15 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     const changed = [...after].filter(f => !before.has(f) && !f.startsWith('.triad/') && !f.startsWith('.planning/'))
     const notFixed = runs.flatMap(r => (parseReply(r.r.answer ?? '').status === 'done' ? [] : r.fs.map(f => f.id)))
     fixes.push(`cycle ${cycle}: ${runs.map(r => `${r.id} on ${r.fs.map(f => f.id).join(', ')} (${parseReply(r.r.answer ?? '').status ?? 'no answer'})`).join('; ')}; checks ${verify.filter(v => v.passed).length}/${verify.length} passed`)
+
+    // FIXES.md in the phase directory: what each fix agent was given and did.
+    fixesLog.push(`## Cycle ${cycle}`, '', `**Date**: ${date}`, `**Checks**: ${verify.filter(v => v.passed).length}/${verify.length} passed`, `**Files changed**: ${changed.map(f => `\`${f}\``).join(', ') || 'none'}`, '',
+      '| Finding | Severity | File | Agent | Status | Notes |', '|---------|----------|------|-------|--------|-------|',
+      ...runs.flatMap(r => {
+        const reply = parseReply(r.r.answer ?? '')
+        return r.fs.map(f => `| ${f.id} | ${f.severity} | \`${f.file}\` | ${r.id} | ${notFixed.includes(f.id) ? 'not fixed' : 'fix applied'} | ${(notFixed.includes(f.id) ? reply.blockedReason ?? reply.status ?? 'no answer' : reply.summary.join(' ')).replace(/\|/g, '/').replace(/\n/g, ' ')} |`)
+      }), '')
+    await io.write(`${ph.rel}/FIXES.md`, [`# Phase ${n}: ${name} — Review Fixes`, '', 'Fixes applied by the review loop, one section per cycle. Re-review decides whether each one holds.', '', ...fixesLog].join('\n'))
     reviewFiles = [...new Set([...changed, ...open.map(f => f.file)])].filter(f => files.some(x => overlaps(f, x)) || changed.includes(f))
     state = updateState(state, { status: `Phase ${n} under review — cycle ${cycle}/${maxCycles}, ${open.filter(f => f.severity === 'blocker').length} blocker(s) remaining`, lastActivity: `Phase ${n} review cycle ${cycle} (${date})` })
     await io.write('.planning/STATE.md', state)
@@ -169,7 +223,11 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   }
 
   const findings = [...all]
-  const doc = renderReview({ phase: n, name, result: result!, cycles: Math.min(cycle, maxCycles), reviewers: reviewers.map(r => r.id), date, findings, deferred, suggestions, verdicts, hotSpots: [...hot], cycleDelta: delta, fixes })
+  // Schema check of every recorded finding; invalid ones are flagged in the report, never dropped.
+  const invalid = [...all, ...deferred].map(f => ({ id: f.id, errors: findingErrors(f) })).filter(x => x.errors.length)
+  if (invalid.length) log(`invalid findings: ${invalid.map(i => i.id).join(', ')}`)
+  const doc = renderReview({ phase: n, name, result: result!, cycles: Math.min(cycle, maxCycles), reviewers: reviewers.map(r => r.id), date, findings, deferred, suggestions, verdicts, hotSpots: [...hot], cycleDelta: delta, fixes,
+    coverage: opts.intent ? undefined : renderCoverage(coverage, covChecks), invalid, evaluators: evaluators.map(e => e.type), intent: opts.intent })
   await io.write(`${ph.rel}/${pad2(n)}-REVIEW.md`, doc)
   const total = p.state.total ?? p.roadmap.rows.length
   const phases = phaseNumbers(p.roadmap)
@@ -215,7 +273,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     ghNote = await ghClosePhase(io, n, { plans: ph.plans.length, requirements: [...new Set(ph.plans.flatMap(x => x.fm.requirements ?? []))].join(', '), result: 'pass' }).catch(() => undefined)
   }
   if (settings.execution.auto_commit !== false) {
-    await io.run(['git', 'add', '-A', '--', '.planning/STATE.md', '.planning/ROADMAP.md', `${ph.rel}/${pad2(n)}-REVIEW.md`, ...new Set(memo)])
+    await io.run(['git', 'add', '-A', '--', '.planning/STATE.md', '.planning/ROADMAP.md', `${ph.rel}/${pad2(n)}-REVIEW.md`, ...(fixesLog.length ? [`${ph.rel}/FIXES.md`] : []), ...new Set(memo)])
     await io.run(['git', 'commit', '-q', '-m', result === 'PASSED' ? `chore(${prefix}): phase ${n} review passed — ${name}` : `chore(${prefix}): phase ${n} review ${result === 'ESCALATED' ? 'escalated' : 'stale'} — ${name}`])
   }
   const summary = [
@@ -223,6 +281,8 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     `Reviewers: ${reviewers.map(r => r.id).join(', ')}`,
     ...delta,
     ...(open.length ? ['Unresolved:', ...open.map(f => `- ${f.id} [${f.severity}] ${f.file}: ${f.description}`)] : []),
+    ...(evaluators.length ? [`Evaluators: ${evaluators.map(e => e.type).join(', ')}`] : []),
+    ...(invalid.length ? [`Invalid findings (schema): ${invalid.map(i => i.id).join(', ')} — see ## Invalid Findings`] : []),
     `Report: ${ph.rel}/${pad2(n)}-REVIEW.md`,
     ...(ghNote ? [`GitHub: ${ghNote}`] : []),
   ].join('\n')

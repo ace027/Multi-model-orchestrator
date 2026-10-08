@@ -7,6 +7,8 @@ import { today, type Io } from './io.ts'
 import { parseState } from './planning.ts'
 import { BY_ID } from './registry.ts'
 import type { Settings } from './settings.ts'
+import { SCHEMAS } from './data.ts'
+import { validate } from './schema.ts'
 
 const DIR = '.planning/memory'
 export const OUTCOMES = `${DIR}/OUTCOMES.md`
@@ -98,6 +100,14 @@ export function taskTypeOf(p: { division: string }): string {
   return ({ Engineering: 'implementation', Testing: 'quality-review', Design: 'design', Marketing: 'marketing', Product: 'documentation', 'Project Management': 'planning', Support: 'support', 'Spatial Computing': 'implementation', Specialized: 'implementation' } as Record<string, string>)[p.division] ?? 'general'
 }
 
+// The record as outcomes-record.schema.json sees it (tags a comma list). Board
+// decisions use plan "board", as Legion's board skill writes them.
+export function outcomeErrors(o: Outcome): string[] {
+  const { branch, ...rest } = o
+  const rec = { ...rest, ...(branch ? { branch } : {}), tags: o.tags.join(', '), plan: o.plan === 'board' ? '00-00' : o.plan }
+  return validate(SCHEMAS.outcome, rec).map(e => e.replace('/plan must match', `/plan "${o.plan}" must match`))
+}
+
 export type StoreInput = Omit<Outcome, 'id' | 'date' | 'branch' | 'importance' | 'tags'> & { tags?: string[]; cycles?: number; escalated?: boolean; blockers?: number; importance?: number }
 
 export async function storeOutcome(io: Io, settings: Settings, input: StoreInput): Promise<Outcome | undefined> {
@@ -115,6 +125,8 @@ export async function storeOutcome(io: Io, settings: Settings, input: StoreInput
     importance: input.importance ?? importanceOf({ ...input, firstTime: !rows.some(r => r.agent === input.agent && r.task_type === input.task_type), crossDivision: !!(div && persona && persona.division !== div) }),
     tags: input.tags ?? [],
   }
+  const errs = outcomeErrors(o)
+  if (errs.length) throw new Error(`Outcome record rejected (outcomes-record.schema.json): ${errs.join('; ')}`)
   await io.write(OUTCOMES, text.replace(/\n*$/, '\n') + outcomeRow(o) + '\n')
   const m = (settings as any).memory ?? {}
   if (m.auto_prune && rows.length + 1 > (m.prune_threshold ?? 200)) await prune(io, settings)
@@ -343,4 +355,13 @@ export async function claudeMemory(read: (abs: string) => Promise<string | undef
   const key = root.replace(/[^A-Za-z0-9]/g, '-')
   const text = await read(`${home}/.claude/projects/${key}/memory/MEMORY.md`)
   return text?.trim() ? text.trim().slice(0, 2000) : undefined
+}
+
+// The bridge as memory-manager Section 14 has it: Triad may read Claude Code
+// memory as an advisory note beside its own recall, only while memory is
+// enabled, and never writes or copies into it. A missing file is skipped silently.
+export async function claudeMemoryNote(settings: Settings, home: Io, root: string): Promise<string | undefined> {
+  if (!enabled(settings)) return undefined
+  const text = await claudeMemory(abs => home.read(abs.slice(home.root.length + 1)), home.root, root).catch(() => undefined)
+  return text ? `Claude Code memory suggests (advisory, read only):\n${text.split('\n').map(l => `> ${l}`).join('\n')}` : undefined
 }

@@ -555,7 +555,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'triad' }, async ($, e) => {
     const args = String(e.args ?? '').trim()
-    if (/^status\b/.test(args)) return { text: await statusText(ioOf($)) }
+    if (/^status\b/.test(args)) return { text: await statusText(ioOf($), { dryRun: /--dry-run\b/.test(args) }) }
     if (/^validate\b/.test(args)) return validateText(ioOf($), args)
     await save($)
     return {

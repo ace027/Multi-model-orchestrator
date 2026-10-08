@@ -4,14 +4,18 @@ import { parseGithubSection } from './github.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
 import { isPlanFile, pad2, parsePlan, setRoadmapRow, slugify, updateState, findPhaseDir } from './planning.ts'
 import { renderContext, renderPlan, renderProject, type ContextInput, type PlanInput, type ProjectInput } from './render.ts'
-import { critique, renderCritique } from './critique.ts'
-import { nextAction, renderStatus } from './status.ts'
+import { critique, critiqueDoc, renderCritique } from './critique.ts'
+import { lifecyclePosition, nextAction, phaseNumbers, renderStatus, renderSuggestions } from './status.ts'
+import { contextSuggestions, loadIntentConfig } from './intents.ts'
+import type { Project } from './io.ts'
+import { dryRunReport, renderDryRun } from './dryrun.ts'
 import { renderValidate, runValidate } from './validate.ts'
 import { BY_ID, ROSTER, findPersona, rank } from './registry.ts'
 import { agentScores, briefing } from './memory.ts'
 import { deriveStatus, parseMilestones } from './milestone.ts'
 
-export async function statusText(io: Io): Promise<string> {
+export async function statusText(io: Io, opts: { dryRun?: boolean } = {}): Promise<string> {
+  if (opts.dryRun) return renderDryRun(await dryRunReport(io, 'status'))
   const p = await loadProject(io)
   const plans = new Map<number, [boolean, boolean]>()
   for (const d of p.phaseDirs) {
@@ -37,7 +41,20 @@ export async function statusText(io: Io): Promise<string> {
     extra.push('', '## GitHub', ...gh.rows.map(r => `- ${r.phase}: issue ${r.issue}, PR ${r.pr || '—'}, ${r.status}`))
     for (const m of gh.milestones) extra.push(`- Milestone ${m.name} (${m.number}): ${m.status}`)
   }
+  extra.push(...await suggestionsFor(io, p, n => plans.get(n)?.[0] ?? false))
   return renderStatus(p, nextAction(p, n => plans.get(n)?.[0] ?? false, n => plans.get(n)?.[1] ?? false)) + (extra.length ? '\n' + extra.join('\n') : '')
+}
+
+// intent-teams context_rules for the lifecycle position (the project's yaml, else the bundled one).
+async function suggestionsFor(io: Io, p: Project, hasPlans: (n: number) => boolean): Promise<string[]> {
+  const { config } = await loadIntentConfig(io)
+  const pos = lifecyclePosition(p, hasPlans)
+  const n = p.state?.phase ?? 1
+  const phases = p.roadmap ? phaseNumbers(p.roadmap) : []
+  const next = pos === 'needs_planning' || pos === 'just_started' ? n || 1 : phases.find(x => x > n) ?? n + 1
+  const nameOf = (k: number) => p.roadmap?.phases.find(x => x.phase === k)?.name ?? ''
+  const s = renderSuggestions(contextSuggestions(config, pos, { phase: n, next_phase: next, phase_name: nameOf(pos === 'needs_planning' || pos === 'phase_complete' || pos === 'just_started' ? next : n) }))
+  return s.length ? ['', ...s] : []
 }
 
 export async function validateText(io: Io, args: string): Promise<{ text: string; exitCode: number }> {
@@ -103,7 +120,12 @@ export async function planCheck(io: Io, phase: number): Promise<string> {
   const p = await loadProject(io)
   const ph = await loadPhase(io, p, phase)
   if (!ph.plans.length) return `No plans found for Phase ${phase}.`
-  return renderCritique(critique(ph.plans, p.settings.planning?.max_tasks_per_plan ?? 3, ROSTER))
+  const r = critique(ph.plans, p.settings.planning?.max_tasks_per_plan ?? 3, ROSTER)
+  if (ph.rel) {
+    const name = p.roadmap?.phases.find(x => x.phase === phase)?.name ?? ph.dir?.replace(/^\d+-/, '') ?? ''
+    await io.write(`${ph.rel}/CRITIQUE.md`, critiqueDoc(r, ph.plans, phase, name, today(io)))
+  }
+  return renderCritique(r) + (ph.rel ? `\nWrote ${ph.rel}/CRITIQUE.md.` : '')
 }
 
 // With a task: registry scores plus the memory boost (agents with 2+ outcome

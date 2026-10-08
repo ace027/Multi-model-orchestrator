@@ -104,7 +104,7 @@ export const LEGION_TOOLS = [
   {
     name: 'review_phase',
     description: 'Run the review loop on a built phase: reviewers (panel or classic) in parallel, findings triaged in code, fixes routed to agents, re-review of changed files, up to review.max_cycles; writes NN-REVIEW.md and updates STATE/ROADMAP. Blocks until done; returns the result.',
-    inputSchema: { type: 'object', properties: { phase: { type: 'integer' }, mode: { type: 'string', enum: ['panel', 'classic'] } } },
+    inputSchema: { type: 'object', properties: { phase: { type: 'integer' }, mode: { type: 'string', enum: ['panel', 'classic'] }, intent: { type: 'string', description: 'A filter_review intent (security-only for --just-security): only its team reviews and only findings in its domains count. Skips the multi-pass evaluators and coverage.' } } },
   },
   {
     name: 'persona_brief',
@@ -249,6 +249,7 @@ export const LEGION_TOOLS = [
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['scan', 'save'] }, phase: { type: 'integer' }, full_scan: { type: 'boolean' },
+        mode: { type: 'string', enum: ['phase', 'project', 'audit'], description: 'project (or no phase anywhere): whole-project review saved to .planning/security-review-{timestamp}.md; audit: the --just-harden audit saved to .planning/security-audit-{timestamp}.md. save defaults to the last scan\'s mode.' },
         owasp: str('OWASP Top 10 results (markdown).'), stride: str('STRIDE table (markdown).'), attack_surface: str('Attack surface map (markdown).'),
         findings: { type: 'array', items: { type: 'object', properties: { severity: { type: 'string', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] }, category: str('OWASP category, e.g. A1:Injection.'), finding: str(''), files: str('file:line'), remediation: str('') }, required: ['severity', 'category', 'finding', 'files', 'remediation'] } },
         false_positives: strs('file:line of secret matches that are fixtures or docs.'),
@@ -282,9 +283,11 @@ export const LEGION_TOOLS = [
   },
   {
     name: 'domain',
-    description: 'Design and marketing workflows in code. detect: the phase domain (MKT-/DSN- ids, CONTEXT workflow_type, --domain flag; keywords are only a hint) and its wave pattern. team: the team from the questioning answers. write: scaffold a design system (kind system), UX research report (research) or campaign (campaign) document from the answers. status: move a document forward through its lifecycle. check: completion check of a document. grade: design audit grade from HIGH/MEDIUM counts and the AI-slop grade. passes: the 7-pass plan-stage design review summary (appended to the phase CONTEXT.md when phase is given).',
+    description: 'Design and marketing workflows in code. detect: the phase domain (MKT-/DSN- ids, CONTEXT workflow_type, --domain flag; keywords are only a hint) and its wave pattern. team: the team from the questioning answers. write: scaffold a design system (kind system), UX research report (research) or campaign (campaign) document from the answers. status: move a document forward through its lifecycle. check: completion check of a document. grade: design audit grade from HIGH/MEDIUM counts and the AI-slop grade. passes: the 7-pass plan-stage design review summary (appended to the phase CONTEXT.md when phase is given). report: the campaign final report .planning/campaigns/{phase-dir}/REPORT.md (results vs targets, consistency checklist, learnings); completes the campaign once it is Measuring, the measuring window (marketing.measuring_duration_days, default 14) has elapsed and the checklist is satisfied or waived.',
     inputSchema: { type: 'object', properties: {
-      action: { type: 'string', enum: ['detect', 'team', 'write', 'status', 'check', 'grade', 'passes'] }, phase: { type: 'integer' }, flag: str('--domain=design|marketing'),
+      action: { type: 'string', enum: ['detect', 'team', 'write', 'status', 'check', 'grade', 'passes', 'report'] }, phase: { type: 'integer' }, flag: str('--domain=design|marketing'),
+      summary: str('report: campaign outcome summary'), metrics: { type: 'array', items: strs(''), description: 'report: [metric, target, actual] rows (default: the campaign Success Metrics with no actuals)' },
+      checklist: { type: 'array', items: { type: ['boolean', 'string'] }, description: 'report: the 7 consistency checklist items in order; true satisfied, a string is a waiver rationale' }, learnings: strs('report: learnings'),
       options: { type: 'object', description: 'wave options: backend, frontend, execution, polish (booleans)' },
       domain: { type: 'string', enum: ['design', 'marketing'] }, answers: { type: 'object', description: 'design: focus, disciplines[], brand, platforms[], backend, visual, polish, feedback. marketing: objective, channels[], visual, tracking.' },
       kind: { type: 'string', enum: ['system', 'research', 'campaign'] }, name: str('project, research or campaign name'), fields: { type: 'object', description: 'document fields from the answers (scope, platforms, accessibility, principles, color/typography/spacing/atoms rows; goals, methods; objective, audience, channels, message, tone, hashtags, cta, timeline, metrics, calendar rows)' }, overwrite: { type: 'boolean' },

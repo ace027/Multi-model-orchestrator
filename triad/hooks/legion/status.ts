@@ -24,7 +24,35 @@ export function nextAction(p: Project, phaseHasPlans: (n: number) => boolean, ph
   return { command: '/triad:build', phase: n, why: `phase ${n} has plans` }
 }
 
-export const phaseNumbers = (r: Roadmap) => [...new Set([...r.rows.map(x => x.phase), ...r.phases.map(x => x.phase)])].sort((a, b) => a - b)
+// The lifecycle position intent-teams context_rules are keyed by (intent-router
+// detectLifecyclePosition), with Triad's status words: "under review" is
+// review_in_progress; escalated, stale and failed reviews are review_failed.
+export type Position = 'no_project' | 'just_started' | 'needs_planning' | 'planned_not_built' | 'building' | 'needs_review' | 'review_in_progress' | 'review_failed' | 'phase_complete' | 'milestone_complete' | 'unknown'
+
+export function lifecyclePosition(p: Project, phaseHasPlans: (n: number) => boolean): Position {
+  if (p.project === undefined || !p.state) return 'no_project'
+  const n = p.state.phase ?? 0
+  const total = p.state.total ?? (p.roadmap ? phaseNumbers(p.roadmap).length : 0)
+  const s = `${p.state.phaseNote ?? ''} ${p.state.status ?? ''}`.toLowerCase()
+  if (n <= 1 && /initiali[sz]ed|not started|ready to plan/.test(s) && !phaseHasPlans(1)) return 'just_started'
+  if (n === total && /complete/.test(s) && !/incomplete/.test(s)) return 'milestone_complete'
+  if (/executing|in progress/.test(s)) return 'building'
+  if (/escalated|stale|failed|needs work|rework/.test(s)) return 'review_failed'
+  if (/under review|reviewing/.test(s)) return 'review_in_progress'
+  if (/pending review|\bbuilt\b|executed|partial/.test(s)) return 'needs_review'
+  if (/planned/.test(s)) return 'planned_not_built'
+  if (/complete/.test(s)) return 'phase_complete'
+  if (n && !phaseHasPlans(n)) return 'needs_planning'
+  return 'unknown'
+}
+
+// "## Suggested Next Actions": at most three, as the intent router shows them.
+export function renderSuggestions(s: { command: string; description: string; reason: string }[]): string[] {
+  if (!s.length) return []
+  return ['## Suggested Next Actions', ...s.slice(0, 3).map((x, i) => `${i + 1}. **\`${x.command.replace(/^\/triad:status\b/, '/triad status')}\`** — ${x.description}\n   _${x.reason}_`)]
+}
+
+export const phaseNumbers =(r: Roadmap) => [...new Set([...r.rows.map(x => x.phase), ...r.phases.map(x => x.phase)])].sort((a, b) => a - b)
 
 export function totals(r: Roadmap): { done: number; total: number } {
   return r.rows.reduce((t, x) => ({ done: t.done + (x.completed ?? 0), total: t.total + (x.plans ?? 0) }), { done: 0, total: 0 })

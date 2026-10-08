@@ -1,7 +1,7 @@
 // Dispatch for the Phase 6 (extended Legion) tools.
 import { loadPhase, loadProject, type Io } from './io.ts'
 import type { Agents } from './build.ts'
-import { agentScores, briefing, learnList, learnRecall, learnRecord, prune, recallOutcomes } from './memory.ts'
+import { agentScores, briefing, claudeMemoryNote, learnList, learnRecall, learnRecord, prune, recallOutcomes } from './memory.ts'
 import { milestoneArchive, milestoneComplete, milestoneDefine, milestoneFacts, milestoneStatus } from './milestone.ts'
 import { freshness, mapBuild, mapNarrate, mapQuery, renderFreshness } from './map.ts'
 import { agentCreate, loadCustomPersonas, validateAgent } from './custom.ts'
@@ -15,7 +15,7 @@ import { retroGather, retroSave } from './retro.ts'
 import { filterPlans, loadIntentConfig, parseIntentFlags, parseNaturalLanguage, renderNl, renderValidation, resolveTeam, validateFlagCombination } from './intents.ts'
 import { dryRunReport, renderDryRun } from './dryrun.ts'
 import { renderSpecCheck, specAssess, specCheck, specGather, specTrigger } from './spec.ts'
-import { designGrade, designTeam, detectDomain, domainCheck, marketingTeam, passSummary, setStatus, slopGrade, wavePattern, writeDoc } from './domain.ts'
+import { campaignReport, designGrade, designTeam, detectDomain, domainCheck, marketingTeam, passSummary, setStatus, slopGrade, wavePattern, writeDoc } from './domain.ts'
 import { boardCompose, boardDecide, boardMeet, boardReview } from './board.ts'
 
 export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security', 'intent', 'dry_run', 'board', 'spec', 'domain'])
@@ -25,6 +25,12 @@ export type Ctx = { agents: () => Agents; ioAt: (root: string) => Io; registry: 
 export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): Promise<string> {
   await loadCustomPersonas(io)
   const settings = (await loadProject(io)).settings
+  // Claude Code memory (read only) next to Triad's recall; home is the registry's parent.
+  const withClaudeMemory = async (text: string) => {
+    const reg = await ctx.registry().catch(() => undefined)
+    const note = reg ? await claudeMemoryNote(settings, ctx.ioAt(reg.root.replace(/\/\.claude\/legion\/?$/, '')), io.root) : undefined
+    return note ? `${text}\n\n${note}` : text
+  }
   switch (name) {
     case 'intent': {
       const { config, warnings } = await loadIntentConfig(io)
@@ -60,7 +66,7 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
       return 'board: unknown action'
     case 'spec':
       switch (input.action) {
-        case 'trigger': { const t = await specTrigger(io, input.phase, !!input.flag); return `${t.action}: ${t.reason}` }
+        case 'trigger': { const t = await specTrigger(io, input.phase, !!input.flag); return `${t.action}: ${t.reason}\nproposals: ${t.proposals} (planning.architecture_proposals_default)` }
         case 'gather': return specGather(io, input.phase)
         case 'check': return renderSpecCheck(await specCheck(io, input.phase))
         case 'assess': return specAssess(io, input.phase)
@@ -73,6 +79,7 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
         case 'write': return writeDoc(io, { kind: input.kind, name: String(input.name ?? ''), fields: input.fields, overwrite: input.overwrite })
         case 'status': return setStatus(io, String(input.path ?? ''), String(input.status ?? ''))
         case 'check': return domainCheck(io, String(input.path ?? ''))
+        case 'report': return campaignReport(io, input)
         case 'grade': return `Design Score: ${designGrade(Number(input.high ?? 0), Number(input.medium ?? 0))}; AI Slop Score: ${slopGrade(Number(input.slop ?? 0))}`
         case 'passes': {
           const text = passSummary(input.scores ?? [])
@@ -89,7 +96,7 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
     case 'memory':
       switch (input.action) {
         case 'record': return learnRecord(io, { type: input.type, summary: String(input.summary ?? ''), tags: input.tags ?? [], text: String(input.text ?? input.summary ?? '') })
-        case 'recall': return learnRecall(io, settings, String(input.topic ?? ''))
+        case 'recall': return withClaudeMemory(await learnRecall(io, settings, String(input.topic ?? '')))
         case 'list': return learnList(io)
         case 'prune': return prune(io, settings)
         case 'outcomes': {
@@ -97,7 +104,7 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
           return [...r.records.map(o => `${o.id} ${o.date} ${o.plan} ${o.agent} ${o.task_type}: ${o.outcome} (importance ${o.importance}) — ${o.summary}`), `(${r.records.length} of ${r.total})`, ...(r.note ? [r.note] : [])].join('\n')
         }
         case 'scores': return JSON.stringify(await agentScores(io, settings, input.task_types ?? []))
-        case 'briefing': return (await briefing(io, settings)) ?? 'No outcome records yet.'
+        case 'briefing': return withClaudeMemory((await briefing(io, settings)) ?? 'No outcome records yet.')
       }
       return 'memory: unknown action'
     case 'milestone':

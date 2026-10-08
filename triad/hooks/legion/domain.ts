@@ -202,7 +202,11 @@ export async function setStatus(io: Io, path: string, status: string): Promise<s
   if (!want) return `Status must be one of ${order.join(', ')}.`
   const cur = doc.match(/^\*\*Status:\*\*\s*(.+)$/m)?.[1]?.trim() ?? order[0]!
   if (order.indexOf(want) < order.indexOf(cur)) return `${path} is ${cur}; status only moves forward (${order.join(' → ')}).`
-  await io.write(path, doc.replace(/^\*\*Status:\*\*.*$/m, `**Status:** ${want}`))
+  // Measuring → Complete needs the final report and the measuring window (campaignReport).
+  if (kind === 'campaign' && want === 'Complete' && cur !== 'Complete') return `Use domain action \`report\` to close a campaign: it writes ${CAMPAIGN_DIR}/{phase-slug}/REPORT.md and completes the campaign once the measuring window has elapsed.`
+  let next = doc.replace(/^\*\*Status:\*\*.*$/m, `**Status:** ${want}`)
+  if (kind === 'campaign' && want === 'Measuring' && cur !== 'Measuring') next = next.replace(/^\*\*Measuring since:\*\*.*\n?/m, '').replace(/^(\*\*Status:\*\*.*)$/m, `$1\n**Measuring since:** ${today(io)}`)
+  await io.write(path, next)
   return `${path}: ${cur} → ${want}`
 }
 
@@ -262,4 +266,66 @@ export function passSummary(scores: { pre: number; post?: number; deferred?: boo
   })
   const avg = scores.length ? scores.reduce((t, s) => t + (s.post ?? s.pre), 0) / scores.length : 0
   return ['## Design Review Summary', '', table(['Pass', 'Dimension', 'Pre-Score', 'Post-Score', 'Status'], rows), '', `**Overall Design Readiness:** ${avg.toFixed(1)}/10`, ...(avg < 5 ? ['', 'WARNING: average below 5 — confirm with the user before building.'] : [])].join('\n')
+}
+
+// --- campaign report (marketing-workflows completion gate 4 and 5) ---
+
+export const CONSISTENCY_CHECKLIST = [
+  'All channel agents have received the core message and supporting points',
+  'Campaign hashtags are defined and consistent across all channels',
+  'Visual style guidelines are shared with visual channels (Instagram, TikTok)',
+  'CTA destinations are aligned (all channels point to the same landing page/action)',
+  'Tone guidelines per channel are documented in the campaign document',
+  'Launch timing is coordinated (stagger by 2-4 hours across channels for maximum reach)',
+  'Channel adaptation guidelines (Section 4.2) are included in each agent\'s execution context',
+]
+
+export type ReportInput = { phase?: number; path?: string; summary?: string; metrics?: string[][]; checklist?: (boolean | string)[]; learnings?: string[] }
+
+const num = (s?: string) => { const m = s?.replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : undefined }
+
+// Writes .planning/campaigns/{phase-slug}/REPORT.md. The campaign moves
+// Measuring → Complete only when the measuring window
+// (marketing.measuring_duration_days, default 14) has elapsed and every
+// checklist item is satisfied or waived with a rationale.
+export async function campaignReport(io: Io, input: ReportInput): Promise<string> {
+  const p = await loadProject(io)
+  const n = input.phase ?? p.state?.phase
+  const ph = n ? await loadPhase(io, p, n) : undefined
+  if (!n || !ph?.dir) return `Phase ${n ?? '?'} has no directory; the report goes in ${CAMPAIGN_DIR}/{phase-slug}/REPORT.md.`
+  const docs = input.path ? [input.path] : (await io.list(CAMPAIGN_DIR)).filter(e => !e.dir && e.name.endsWith('.md')).map(e => `${CAMPAIGN_DIR}/${e.name}`)
+  if (docs.length > 1) return `Several campaign documents (${docs.join(', ')}); pass path.`
+  const path = docs[0]
+  const doc = path ? await io.read(path) : undefined
+  const name = doc?.match(/^# Campaign:\s*(.+)$/m)?.[1]?.trim() ?? p.roadmap?.phases.find(x => x.phase === n)?.name ?? ph.dir
+  const status = doc?.match(/^\*\*Status:\*\*\s*(.+)$/m)?.[1]?.trim()
+  const since = doc?.match(/^\*\*Measuring since:\*\*\s*(\S+)/m)?.[1]
+  const days = Number((p.settings as any).marketing?.measuring_duration_days ?? 14)
+  const elapsed = since ? Math.floor((io.now().getTime() - Date.parse(since)) / 86_400_000) : undefined
+  const windowDone = elapsed !== undefined && elapsed >= days
+  const targets = doc ? sectionRows(doc, /^###\s+Success Metrics/im) : []
+  const metrics = input.metrics?.length ? input.metrics : targets.map(r => [r[0] ?? '', r[1] ?? '', ''])
+  const metricRows = metrics.map(([m, t, a]) => {
+    const tv = num(t), av = num(a)
+    return [m ?? '', t || '—', a || 'not measured', tv !== undefined && av !== undefined ? (av >= tv ? 'MET' : 'MISSED') : '—']
+  })
+  const checks = CONSISTENCY_CHECKLIST.map((item, i) => { const c = input.checklist?.[i]; return { item, ok: c === true || (typeof c === 'string' && !!c.trim()), waiver: typeof c === 'string' ? c.trim() : undefined } })
+  const checklistDone = checks.every(c => c.ok)
+  const complete = status === 'Measuring' && windowDone && checklistDone
+  const date = today(io)
+  const out = `${CAMPAIGN_DIR}/${ph.dir}/REPORT.md`
+  const text = [
+    `# Campaign Report: ${name}`, '',
+    `**Phase:** ${n}: ${p.roadmap?.phases.find(x => x.phase === n)?.name ?? ph.dir}`, `**Campaign:** ${path ? `\`${path}\`` : '_no campaign document_'}`, `**Generated:** ${date}`,
+    `**Measuring window:** ${since ? `${since}, ${days} days (${windowDone ? 'elapsed' : `${Math.max(0, days - (elapsed ?? 0))} day(s) left`})` : `not started (${days} days once the campaign is Measuring)`}`,
+    `**Campaign status:** ${complete ? 'Complete' : status ?? 'unknown'}`, '',
+    '## Summary', input.summary?.trim() || '_to be written_', '',
+    '## Results vs Targets', table(['Metric', 'Target', 'Actual', 'Result'], metricRows), '',
+    '## Consistency Checklist', ...checks.map(c => `- [${c.ok ? 'x' : ' '}] ${c.item}${c.waiver ? ` — waived: ${c.waiver}` : ''}`), '',
+    '## Learnings', ...(input.learnings?.length ? input.learnings.map(l => `- ${l}`) : ['_none recorded_']), '',
+  ].join('\n')
+  await io.write(out, text)
+  if (complete && path && doc) await io.write(path, doc.replace(/^\*\*Status:\*\*.*$/m, '**Status:** Complete'))
+  const why = complete ? 'campaign marked Complete' : status !== 'Measuring' ? `campaign is ${status ?? 'missing'}, not Measuring` : !windowDone ? `measuring window not elapsed (${since ? `${Math.max(0, days - (elapsed ?? 0))} day(s) left` : 'no start date'})` : `${checks.filter(c => !c.ok).length} checklist item(s) neither satisfied nor waived`
+  return `Wrote ${out}: ${why}.`
 }

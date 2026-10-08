@@ -19,10 +19,28 @@ async function phaseOf(io: Io, n?: number) {
 }
 
 // Activation trigger: run, offer (ask first) or skip.
-export async function specTrigger(io: Io, n?: number, flag = false): Promise<{ action: 'run' | 'offer' | 'skip'; reason: string }> {
+export type Default = 'always' | 'prompt' | 'never'
+export type Trigger = { action: 'run' | 'offer' | 'skip'; reason: string; proposals: 'run' | 'offer' | 'skip' }
+
+// planning.spec_pipeline_default: always runs, never skips unless --spec,
+// prompt applies the activation conditions. planning.architecture_proposals_default
+// comes back as `proposals` for plan step 2d (run, offer the choice, or skip).
+export async function specTrigger(io: Io, n?: number, flag = false): Promise<Trigger> {
+  const settings = (await loadProject(io)).settings as any
+  const pick = (v: unknown): Default => (v === 'always' || v === 'never' ? v : 'prompt')
+  const spec = pick(settings.planning?.spec_pipeline_default)
+  const pa = pick(settings.planning?.architecture_proposals_default)
+  const proposals = pa === 'always' ? 'run' : pa === 'never' ? 'skip' : 'offer'
+  const t = await specTriggerOf(io, n, flag, spec)
+  return { ...t, proposals }
+}
+
+async function specTriggerOf(io: Io, n: number | undefined, flag: boolean, spec: Default): Promise<Omit<Trigger, 'proposals'>> {
   if (flag) return { action: 'run', reason: '--spec given' }
+  if (spec === 'never') return { action: 'skip', reason: 'planning.spec_pipeline_default is never (pass --spec to run it)' }
   const { p, n: num, info } = await phaseOf(io, n)
   if (!info || !num) return { action: 'skip', reason: 'phase not in ROADMAP.md' }
+  if (spec === 'always') return { action: 'run', reason: 'planning.spec_pipeline_default is always' }
   const ph = await loadPhase(io, p, num)
   const ctx = ph.rel ? (await io.read(`${ph.rel}/CONTEXT.md`)) ?? '' : ''
   if (/^spec_required:\s*true\s*$/m.test(ctx)) return { action: 'run', reason: 'CONTEXT.md spec_required: true' }
