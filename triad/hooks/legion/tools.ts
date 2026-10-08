@@ -292,6 +292,15 @@ export const LEGION_TOOLS = [
       scores: { type: 'array', items: { type: 'object', properties: { pre: { type: 'number' }, post: { type: 'number' }, deferred: { type: 'boolean' } } } },
     }, required: ['action'] },
   },
+  {
+    name: 'escalation',
+    description: 'Escalations recorded in the phase SUMMARY.md files (escalation-protocol.yaml). list: the open (pending or deferred) escalations across a phase, or all with all=true. resolve: set one escalation\'s status (approved, rejected, deferred, or pending to reopen) and resolution note in its plan\'s SUMMARY.md, after the user decides; record deferred only when the user chose to defer.',
+    inputSchema: { type: 'object', properties: {
+      action: { type: 'string', enum: ['list', 'resolve'] }, phase: { type: 'integer' }, all: { type: 'boolean' },
+      plan: str('plan id NN-PP (resolve)'), number: { type: 'integer', description: 'escalation # in the plan\'s table (resolve)' },
+      status: str('a resolution.statuses value (Legion: pending, approved, rejected, deferred)'), resolution: str('what the user decided and why'),
+    }, required: ['action'] },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)

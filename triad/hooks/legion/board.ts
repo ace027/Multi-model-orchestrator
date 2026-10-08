@@ -106,8 +106,10 @@ const voteBrief = (topic: string, own: Assessment, transcript: string, retry = f
   '## Vote Format', `### Vote: ${own.member.name}`, '- Verdict: APPROVE | REJECT', '- Confidence: {0.0-1.0}', '- Conditions: {text or "None"}',
 ].join('\n')
 
-type RunCtx = { agents: Agents; log: (s: string) => void }
-const run = (io: Io, c: RunCtx, runs: { agent: string; brief: string; label: string }[]) => runPersonas(io, c.agents, { runs, read_only: true }, c.log)
+// board.assessment_timeout_ms bounds every member run; a member that times out has no assessment.
+type RunCtx = { agents: Agents; log: (s: string) => void; timeoutMs?: number }
+const run = (io: Io, c: RunCtx, runs: { agent: string; brief: string; label: string }[]) =>
+  runPersonas(io, c.timeoutMs ? { ...c.agents, run: o => c.agents.run({ ...o, timeoutMs: c.timeoutMs }) } : c.agents, { runs, read_only: true }, c.log)
 
 function membersOf(ids: string[]): { members: Member[]; errors: string[] } {
   const members: Member[] = []
@@ -134,7 +136,7 @@ export async function boardMeet(io: Io, agents: Agents, input: MeetInput, log: (
   const floor = input.allow_two ? 2 : b.min_size
   if (picked.members.length < floor) return `Only ${picked.members.length} board members; the minimum is ${floor}.`
   const members = picked.members
-  const c = { agents, log }
+  const c = { agents, log, timeoutMs: b.assessment_timeout_ms }
 
   // Phase 1
   log(`board: assessments by ${members.map(m => m.id).join(', ')}`)
@@ -272,7 +274,7 @@ export async function boardReview(io: Io, agents: Agents, input: { phase?: numbe
   const b = boardSettings(p.settings)
   const members = compose(topic, b.default_size)
   if (members.length < 2) return `Only ${members.length} agents scored above zero for "${topic}"; a quick review needs at least 2.`
-  const raw = await run(io, { agents, log }, members.map(m => ({ agent: m.id, brief: assessBrief(topic, `Phase ${n} goal: ${info?.goal ?? 'see ROADMAP.md'}. Read the phase directory under .planning/phases/ and the files its plans changed.`, m, 'REVIEW'), label: `${m.id}-board-assessment` })))
+  const raw = await run(io, { agents, log, timeoutMs: b.assessment_timeout_ms }, members.map(m => ({ agent: m.id, brief: assessBrief(topic, `Phase ${n} goal: ${info?.goal ?? 'see ROADMAP.md'}. Read the phase directory under .planning/phases/ and the files its plans changed.`, m, 'REVIEW'), label: `${m.id}-board-assessment` })))
   const as = members.map((m, i) => parseAssessment(m, raw[i]!))
   const ok = as.filter(a => !a.error)
   const scores = ok.map(a => a.score).filter((x): x is number => x !== undefined)

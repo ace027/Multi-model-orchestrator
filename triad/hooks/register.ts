@@ -216,7 +216,7 @@ function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
   return {
     maxParallel: opts.maxCoders,
     async run(o) {
-      const { persona, label } = o
+      const { persona, label, timeoutMs } = o
       const prep = await prepareRun(ioOf($), persona, o.brief, o.scope)
       if ('deny' in prep) {
         log(`${label}: not started (${prep.deny})`)
@@ -237,8 +237,9 @@ function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
       scopes[id] = scope
       scopeLog[id] ??= { files: new Set(), warnings: [] }
       try {
-        const answer = await waitForAnswer($, id, LEGION_WAIT)
+        const answer = await waitForAnswer($, id, timeoutMs ?? LEGION_WAIT)
         log(`${label}: agent ${id} answered (${answer === undefined ? 'no answer' : `${answer.length} chars`})`)
+        if (answer === undefined && timeoutMs !== undefined) return { agentId: id, deny: `no answer within ${timeoutMs} ms (timed out)` }
         // Kept for audit: what the executor parsed for this plan or review.
         await $.fs.write(`${cwd}/.triad/legion/${label.replace(/[^\w.-]+/g, '-')}-${id}.md`, answer ?? '(no answer)')
         return { agentId: id, answer }
