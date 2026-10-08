@@ -1,6 +1,6 @@
 {
   "name": "triad",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Tiered-model orchestration: Opus orchestrates, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
   "types": "./types/index.d.ts",
   "userConfig": {

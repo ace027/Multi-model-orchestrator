@@ -69,9 +69,10 @@ You are the orchestrator. Decompose the work, make the architecture decisions, r
 - Check results with the verify commands and git diff --stat, not by reading whole files.
 - Long tool output may come back compressed, with the path of the full text in .triad/out/.
 - /triad shows the agent tree and the tokens and cost per tier.
-- Legion projects (.planning/) run through /triad:start, /triad:plan, /triad:build, /triad:review and /triad:quick; /triad status and /triad validate are computed in code.
+- Legion projects (.planning/) run through the /triad:* commands (start, plan, build, review, quick and the rest); each brings its coordination rules. /triad status and /triad validate are computed in code.`
 
-## Legion coordination
+// Sent only with a /triad:* prompt (prompt.submit context), not in every request.
+const LEGION_GUIDE = `## Legion coordination
 You hold the agents-orchestrator role yourself; that persona is never spawned. The workflow is start, plan, build, review, ship, retro, then the next phase's plan.
 - Nine divisions of specialist personas: Engineering, Design, Marketing, Testing, Product, Project Management, Support, Spatial Computing, Specialized. Pick personas with persona_brief (hybrid selection: recommend, the user confirms or overrides).
 - Authority: each persona owns exclusive domains (.planning/config/authority-matrix.yaml). Briefs list them; reviews drop out-of-domain findings from non-owners, except blockers. Agents may decide alone only inside their plan's files_modified, tests for their code, declared dependencies and formatting.
@@ -83,9 +84,9 @@ You hold the agents-orchestrator role yourself; that persona is never spawned. T
   - autonomous: checks only warn and log; confirmation gates are skipped with their defaults. Permissions are never loosened.
 - Every question to the user (confirmation gates, choices, persona swaps) uses AskUserQuestion with a closed set of options, never a question in plain text.`
 
-// The guide plus the knowledge index built at session start from the plugin's
-// own files (byte-stable for a plugin version).
-let guide = ORCHESTRATOR_GUIDE
+// The Legion guide plus the knowledge index built at session start from the
+// plugin's own files (byte-stable for a plugin version).
+let legionGuide = LEGION_GUIDE
 
 const depthOf = (id: string | undefined): number => (id ? 1 + depthOf(parents[id]) : 0)
 const runDir = () => `${cwd}/.triad/run`
@@ -338,8 +339,8 @@ export const register: Register = (on, options) => {
     })
     for (const t of LEGION_TOOLS) await $.tool.register({ ...t, isDeferred: true })
     try {
-      guide = `${ORCHESTRATOR_GUIDE}\n\n${await loadKnowledgeIndex(ioOf($, $.plugin.root))}`
-    } catch { guide = ORCHESTRATOR_GUIDE }
+      legionGuide = `${LEGION_GUIDE}\n\n${await loadKnowledgeIndex(ioOf($, $.plugin.root))}`
+    } catch { legionGuide = LEGION_GUIDE }
     await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `pane` opens it as a live pane; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project', argumentHint: '[pane | status | validate [--ci] [--fix]]' })
     await publish($)
     if (opts.openPane) void $.ui.open({ id: PANE, title: 'Triad' })
@@ -351,7 +352,16 @@ export const register: Register = (on, options) => {
   on('prompt.section', { name: 'communication' }, async ($, e, next) => {
     const r = await next(e)
     ledger.contextInjections = (ledger.contextInjections ?? 0) + 1
-    return { text: (r.text ? r.text + '\n\n' : '') + guide }
+    return { text: (r.text ? r.text + '\n\n' : '') + ORCHESTRATOR_GUIDE }
+  })
+
+  // The Legion coordination rules and the command and persona index ride with
+  // the /triad:* prompt that needs them, so plain sessions never pay for them.
+  // (Context a command.run hook adds to a markdown command does not reach the
+  // model; prompt.submit context does.)
+  on('prompt.submit', async ($, e, next) => {
+    if (!/^\/triad:/.test(e.text.trimStart())) return next(e)
+    return next({ ...e, context: [...(e.context ?? []), legionGuide] })
   })
 
   on('tool.describe', async ($, e, next) => {

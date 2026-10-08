@@ -250,6 +250,20 @@ describe('hooks', () => {
     expect((await $.prompt.section({ name: 'communication', text: 'base' })).text).toMatch(/^base\n\n# Triad orchestration/)
     expect((await $.prompt.section({ name: 'env_info_model', text: 'model' })).text).toBe('model')
   })
+
+  test('keeps the Legion rules out of the system prompt and sends them with /triad:* prompts only', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    on('prompt.section', (_$: any, e: any) => ({ text: e.text }))
+    const seen: any[] = []
+    on('prompt.submit', (_$: any, e: any) => { seen.push(e); return { text: e.text, context: e.context } })
+    await start($)
+    expect((await $.prompt.section({ name: 'communication', text: 'base' })).text).not.toMatch(/Legion coordination/)
+    await $.prompt.submit({ text: 'fix the parser' } as any)
+    await $.prompt.submit({ text: '/triad:plan 2' } as any)
+    expect(seen[0].context ?? []).toEqual([])
+    expect(seen[1].context).toHaveLength(1)
+    expect(seen[1].context[0]).toMatch(/^## Legion coordination/)
+  })
 })
 
 // A helper's conversation in both forms, grown by `chars` of tool output, plus the
