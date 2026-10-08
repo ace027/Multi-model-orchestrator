@@ -171,3 +171,24 @@ The hidden checks are pass/fail, so the run directories were also compared by ha
 - **testwrite:** every suite caught the 7 benchmark mutants and all 9 extra ones.
 
 On these tasks the work is equivalent across Opus alone, Legion and Triad, although in Triad a Sonnet coder wrote the code for `discounts`, `logfix` and `testwrite`. The tasks are small and well specified, so quality saturates; telling the configs apart on quality would need harder, more open tasks.
+
+## Harder tasks (designed, not yet run)
+
+The Phase 7 tasks are too small to separate the configs on quality: every run produced equivalent work. Two harder tasks with graded checks (`python3 bench/run_bench.py --tasks hard`):
+
+- **csvimport:** a CSV importer for a small banking library, from a two-page format spec (`docs/csv-format.md` in the fixture): delimiter and number formats that depend on each other, quoting, three ways to write a negative, debit/credit columns, a footer rule, line-numbered row errors, and duplicate matching by count. The fixture's existing QIF importer uses a set for duplicates, which is wrong for CSV; copying it costs points. 30 hidden cases.
+- **refunds:** a refund service with three tickets from support and finance (items refunded that never shipped, a double refund after a mail outage, partial refunds a cent over the charge) and a written refund policy. A fourth bug breaks the policy but has no ticket. 18 hidden cases; the untouched fixture scores 6/18.
+
+Each check prints `score P/N`; a run succeeds at 80% with its own tests passing and tests added, and the score goes into the results table. `bench/selftest.py` checks both, with no model calls: each check must fail the untouched fixture and give the reference solution in `tasks/<task>/solution` full marks. Realistic mistakes, made in a copy of the reference, lose points:
+
+| Mistake | Score |
+|---|---|
+| refunds: fixes the three tickets, misses the unreported bug | 15/18 |
+| refunds: no double refund, but a failed notification still returns 503 | 16/18 |
+| refunds: rounding still per request | 16/18 |
+| csvimport: amounts through floating point | 29/30 |
+| csvimport: duplicates by set, copied from the QIF importer | 29/30 |
+| csvimport: slash dates always month-first | 29/30 |
+| csvimport: no `Total` footer rule, signed debits accepted | 27/30 |
+
+Like the other tasks' checks, the hidden tests and reference solutions sit in `bench/tasks`, outside the run's working copy.

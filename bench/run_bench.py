@@ -1,6 +1,6 @@
 """Phase 3 benchmark: runs each task under each config and records success, tokens and cost.
 
-Usage: python3 bench/run_bench.py [--configs p2,p3] [--tasks a,b] [--jobs 3] [--out bench/results/phase3]
+Usage: python3 bench/run_bench.py [--configs p2,p3] [--tasks core|hard|a,b] [--jobs 3] [--out bench/results/phase3]
                                    [--legion-home DIR]
 
 Configs: opus (no plugin), p2/p3 (Phase 3 option sets), triad (current defaults),
@@ -9,12 +9,15 @@ a fresh HOME (a copy of --legion-home for legion), so no config sees the user's 
 
 Each run copies tasks/<task>/repo to a scratch dir (plus setup.py if present), commits it,
 runs `claude -p` headless through bench/hermetic.sh, then runs tasks/<task>/check.py.
+Task sets: core (the Phase 3 tasks, the default) and hard (csvimport, refunds: graded checks
+that print `score P/N`, recorded as the run's score; bench/selftest.py checks them).
 Writes <out>/<config>/<task>.json and <out>/summary.md (this run's table). Needs ORCHESTRATOR_API_KEY.
 """
 import argparse
 import concurrent.futures as cf
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -24,6 +27,7 @@ import uuid
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASKS = os.path.join(ROOT, "bench", "tasks")
+SETS = {"core": ["discounts", "logfix", "noisy", "rename", "testwrite"], "hard": ["csvimport", "refunds"]}
 PROMPT = "Do the task described in TASK.md."
 TOOLS = "Agent,SendMessage,Read,Edit,Write,Bash,Glob,Grep,mcp__triad__delegate_menial"
 
@@ -85,6 +89,7 @@ def run(task: str, config: str, out_dir: str) -> dict:
     rec = {
         "task": task, "config": config, "options": opts if opts != "legion" else None, "seconds": secs, "exit": p.returncode,
         "success": chk.returncode == 0, "check": chk.stdout.strip()[-500:],
+        "score": [int(x) for x in m.groups()] if (m := re.search(r"score (\d+)/(\d+)", chk.stdout)) else None,
         "cost": cli.get("total_cost_usd"), "turns": cli.get("num_turns"),
         "tokens": tokens, "totalTokens": sum(tokens.values()),
         "byModel": {m: {k: v for k, v in u.items() if k in tokens or k == "costUSD"} for m, u in usage.items()},
@@ -102,14 +107,14 @@ def run(task: str, config: str, out_dir: str) -> dict:
 
 
 def table(recs: list) -> str:
-    rows = [f"{'task':<11}{'config':<7}{'ok':<4}{'cost':>8}{'tokens':>10}{'in+cw':>9}{'out':>7}{'secs':>6}  agents"]
+    rows = [f"{'task':<11}{'config':<7}{'ok':<9}{'cost':>8}{'tokens':>10}{'in+cw':>9}{'out':>7}{'secs':>6}  agents"]
     for r in sorted(recs, key=lambda r: (r["task"], r["config"])):
         t = r["tokens"]
         roles = {}
         for a in (r["agents"] or {}).values():
             roles[a["role"]] = roles.get(a["role"], 0) + 1
         cost = f"{r['cost']:.3f}" if r["cost"] is not None else "-"
-        rows.append(f"{r['task']:<11}{r['config']:<7}{'Y' if r['success'] else 'N':<4}{cost:>8}{r['totalTokens']:>10}"
+        rows.append(f"{r['task']:<11}{r['config']:<7}{('Y' if r['success'] else 'N') + (' %d/%d' % tuple(r['score']) if r.get('score') else ''):<9}{cost:>8}{r['totalTokens']:>10}"
                     f"{t['inputTokens'] + t['cacheCreationInputTokens']:>9}{t['outputTokens']:>7}{r['seconds']:>6}  "
                     + " ".join(f"{k}:{v}" for k, v in sorted(roles.items())))
     return "\n".join(rows)
@@ -118,7 +123,7 @@ def table(recs: list) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--configs", default="p2,p3")
-    ap.add_argument("--tasks", default=",".join(sorted(os.listdir(TASKS))))
+    ap.add_argument("--tasks", default="core", help="task names or set names (core, hard), comma-separated")
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--out", default=os.path.join(ROOT, "bench", "results", "phase3"))
     ap.add_argument("--legion-home", help="a HOME with Legion installed (node bin/install.js --claude --global)")
@@ -127,7 +132,8 @@ def main() -> int:
     LEGION_HOME = a.legion_home
     if "legion" in a.configs.split(",") and not (LEGION_HOME and os.path.isdir(os.path.join(LEGION_HOME, ".claude", "commands", "legion"))):
         ap.error("the legion config needs --legion-home with Legion installed")
-    jobs = [(t, c) for t in a.tasks.split(",") for c in a.configs.split(",")]
+    tasks = [t for name in a.tasks.split(",") for t in SETS.get(name, [name])]
+    jobs = [(t, c) for t in tasks for c in a.configs.split(",")]
     recs = []
     with cf.ThreadPoolExecutor(a.jobs) as ex:
         for f in cf.as_completed([ex.submit(run, t, c, a.out) for t, c in jobs]):
