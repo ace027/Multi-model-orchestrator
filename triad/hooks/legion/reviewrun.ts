@@ -1,6 +1,7 @@
 // The review loop (review-loop, review-panel) in mod code: reviewers in
 // parallel, triage in code, fix agents routed by file, scoped re-review, cycle
 // cap, stale-loop abort, REVIEW.md, STATE/ROADMAP, commits.
+import { ghClosePhase } from './github.ts'
 import { OUTCOMES, storeKnowledge, storeOutcome } from './memory.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
 import { checkPhase, getSection, overlaps, pad2, setRoadmapRow, updateState, verificationCommands } from './planning.ts'
@@ -209,6 +210,10 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     if (result === 'PASSED' && await storeKnowledge(io, settings, 'preference', ['review-verdict', `Phase ${n} review`, 'PASS', 'accepted', 'positive', 'system', 'review']))
       memo.push('.planning/memory/PREFERENCES.md')
   } catch { /* memory never blocks the review */ }
+  let ghNote: string | undefined
+  if (result === 'PASSED' && settings.integrations?.github === 'enabled') {
+    ghNote = await ghClosePhase(io, n, { plans: ph.plans.length, requirements: [...new Set(ph.plans.flatMap(x => x.fm.requirements ?? []))].join(', '), result: 'pass' }).catch(() => undefined)
+  }
   if (settings.execution.auto_commit !== false) {
     await io.run(['git', 'add', '-A', '--', '.planning/STATE.md', '.planning/ROADMAP.md', `${ph.rel}/${pad2(n)}-REVIEW.md`, ...new Set(memo)])
     await io.run(['git', 'commit', '-q', '-m', result === 'PASSED' ? `chore(${prefix}): phase ${n} review passed — ${name}` : `chore(${prefix}): phase ${n} review ${result === 'ESCALATED' ? 'escalated' : 'stale'} — ${name}`])
@@ -219,6 +224,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     ...delta,
     ...(open.length ? ['Unresolved:', ...open.map(f => `- ${f.id} [${f.severity}] ${f.file}: ${f.description}`)] : []),
     `Report: ${ph.rel}/${pad2(n)}-REVIEW.md`,
+    ...(ghNote ? [`GitHub: ${ghNote}`] : []),
   ].join('\n')
   return { ok: result === 'PASSED', result, cycles: Math.min(cycle, maxCycles), text: summary, open }
 }

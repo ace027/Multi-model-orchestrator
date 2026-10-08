@@ -38,7 +38,7 @@ export type MapData = {
 
 const sh = async (io: Io, cmd: string) => (await io.run(['bash', '-c', cmd]).catch(() => ({ exitCode: 1, stdout: '', stderr: '' })))
 
-async function listFiles(io: Io, scope?: string): Promise<string[]> {
+export async function listFiles(io: Io, scope?: string): Promise<string[]> {
   const prune = EXCLUDE_DIRS.map(d => `-name '${d}'`).join(' -o ')
   const where = scope ? `'${scope.replace(/'/g, '')}'` : '.'
   let r = await sh(io, `git ls-files -co --exclude-standard -- ${where} 2>/dev/null`)

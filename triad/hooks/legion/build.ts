@@ -3,6 +3,8 @@
 // per plan at its persona's tier, verification commands run here, a SUMMARY.md
 // per plan (failures too), STATE/ROADMAP updated as it goes, one commit per
 // successful plan. Resumable: a plan with a successful SUMMARY is not run again.
+import { preBuildCheck } from './gates.ts'
+import { ghTickPlan } from './github.ts'
 import { loadPhase, loadProject, today, type Io, type Project } from './io.ts'
 import {
   appendToSection, checkPhase, getSection, handoffOf, pad2, planWaves, progressBar, runGroups, setRoadmapRow, summaryStatus,
@@ -155,6 +157,8 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   let p = await loadProject(io)
   if (!p.hasPlanning || p.project === undefined) return fail('no Legion project here (.planning/PROJECT.md is missing). Run /triad:start.')
   if (!p.state || !p.roadmap || !p.stateText || !p.roadmapText) return fail('.planning/STATE.md or ROADMAP.md is missing.')
+  const malformed = await preBuildCheck(io)
+  if (malformed) return fail(malformed)
   const n = opts.phase ?? p.state.phase
   if (!n) return fail('STATE.md names no phase. Run /triad:plan 1 first, or pass --phase N.')
   const note = `${p.state.phaseNote} ${p.state.status}`.toLowerCase()
@@ -296,6 +300,10 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           if (okNow && autoCommit) {
             const err = await commit(io, [...files, `${ph.rel}/${plan.id}-SUMMARY.md`, ...(rec ? [OUTCOMES] : [])], commitPlan(prefix, plan.id, plan.title, n, phaseName, w.wave, plan.fm.requirements))
             if (err) warnings.push(`${plan.id}: ${err}`)
+          }
+          if (okNow && settings.integrations?.github === 'enabled') {
+            const gh = await ghTickPlan(io, n, plan.id).catch(() => undefined)
+            if (gh) log(gh)
           }
           outcomes.push({ id: plan.id, status, agent: persona.id, files, failedChecks: verify.filter(v => !v.passed).map(v => v.command) })
           log(`${plan.id}: ${status}`)

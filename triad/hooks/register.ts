@@ -10,6 +10,7 @@ import { checkWrite, type Scope } from './legion/settings.ts'
 import { renderPersonaRuns, runPersonas } from './legion/personarun.ts'
 import { EXTENDED, extendedTool } from './legion/extended.ts'
 import { loadCustomPersonas } from './legion/custom.ts'
+import { preBuildCheck, preShipAudit } from './legion/gates.ts'
 import type { Io } from './legion/io.ts'
 import type { Agents } from './legion/build.ts'
 import { COMPRESS_TOOLS, SUMMARY_SYSTEM, chunks, describeCall, eligible, errorLines, headTail, mergePrompt, overThreshold, render as renderCompressed, summaryPrompt } from './compress.ts'
@@ -251,7 +252,7 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
   await loadCustomPersonas(io).catch(() => [])
   if (EXTENDED.has(name)) {
     const registry = async () => ioOf($, `${String((await $.env.get('HOME')) ?? '~')}/.claude/legion`)
-    return extendedTool(io, { agents: () => agentsOf($, log), ioAt: root => ioOf($, root), registry }, name, input)
+    return extendedTool(io, { agents: () => agentsOf($, log), ioAt: root => ioOf($, root), registry, schedule: (ms, fn) => { $.clock.after(ms, fn) }, notify: text => { void $.prompt.submit({ text }) } }, name, input)
   }
   switch (name) {
     case 'planning_status': {
@@ -495,6 +496,20 @@ export const register: Register = (on, options) => {
     if (target && !r.deny && !r.isError) written[id]?.add(target.startsWith(cwd + '/') ? target.slice(cwd.length + 1) : target)
     return r
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the write check failed, so the write was refused.' }))
+
+  // Legion's hooks, always on: STATE.md must be sane before an agent starts, and
+  // `gh pr create` waits on a clean npm audit (critical level).
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    const cmd = String((e as any).command ?? '')
+    if (!/\bgh\s+pr\s+create\b/.test(cmd)) return next(e)
+    const block = await preShipAudit(ioOf($), cmd)
+    return block ? { deny: `triad: ${block}` } : next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
+    const block = await preBuildCheck(ioOf($))
+    return block ? { deny: `triad: ${block}` } : next(e)
+  }).catch(($, e, next) => next(e))
 
   // Long Bash/Grep output (and log-like files read) is saved to .triad/out and
   // replaced by its error lines plus a Haiku summary. Edits and writes never are.

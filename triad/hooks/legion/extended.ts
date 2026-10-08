@@ -7,11 +7,15 @@ import { freshness, mapBuild, mapNarrate, mapQuery, renderFreshness } from './ma
 import { agentCreate, loadCustomPersonas, validateAgent } from './custom.ts'
 import { gapAnalysis, rosterLimit } from './gaps.ts'
 import { portfolioAddDep, portfolioDashboard, portfolioDetails, portfolioRegister, portfolioUnregister } from './portfolio.ts'
+import { ghClosePhase, ghPhaseIssue, ghMode, ghStatus, ghTickPlan, setGhMode } from './github.ts'
+import { canaryCheck, renderCanary, shipCheck, shipPublish } from './ship.ts'
+import { polishRun, polishScope } from './polish.ts'
+import { securitySave, securityScan } from './security.ts'
 import { retroGather, retroSave } from './retro.ts'
 
-export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster'])
+export const EXTENDED = new Set(['memory', 'milestone', 'retro', 'map', 'portfolio', 'agent', 'roster', 'ship', 'polish', 'github', 'security'])
 
-export type Ctx = { agents: () => Agents; ioAt: (root: string) => Io; registry: () => Promise<Io> }
+export type Ctx = { agents: () => Agents; ioAt: (root: string) => Io; registry: () => Promise<Io>; schedule?: (ms: number, fn: () => void) => void; notify?: (text: string) => void }
 
 export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): Promise<string> {
   await loadCustomPersonas(io)
@@ -73,9 +77,72 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
       }
       return 'agent: unknown action'
     }
+    case 'ship':
+      switch (input.action) {
+        case 'check': return shipCheck(io, input)
+        case 'publish': return shipPublish(io, input)
+        case 'canary': return canary(io, ctx, settings, input)
+      }
+      return 'ship: unknown action'
+    case 'polish': {
+      if (input.action === 'scope') {
+        const sc = await polishScope(io, input)
+        return sc.error ?? [`Files: ${sc.files.length} (${sc.base} base + ${sc.expanded} dependents, ${sc.excluded} excluded)`, ...sc.warnings, ...sc.files.map(f => `- ${f}`)].join('\n')
+      }
+      const r = await polishRun(io, ctx.agents(), input)
+      return typeof r === 'string' ? r : r.text
+    }
+    case 'github':
+      switch (input.action) {
+        case 'mode': return `integrations.github: ${await ghMode(io)}`
+        case 'set': return setGhMode(io, input.value)
+        case 'issue': return ghPhaseIssue(io, Number(input.phase))
+        case 'tick': return (await ghTickPlan(io, Number(input.phase), String(input.plan))) ?? 'No issue to update.'
+        case 'close': return (await ghClosePhase(io, Number(input.phase), { plans: Number(input.plans ?? 0), requirements: String(input.requirements ?? ''), result: String(input.result ?? 'pass') })) ?? 'No issue recorded for that phase.'
+        case 'status': return ghStatus(io)
+      }
+      return 'github: unknown action'
+    case 'security':
+      if (input.action === 'save') return securitySave(io, input)
+      return securityScan(io, input)
     case 'roster':
       if (input.action === 'limit') { const l = await rosterLimit(io); return `${l.count} agents, limit ${l.limit}: ${l.status}${l.suggestions.length ? `\n${l.suggestions.map(s => `- ${s}`).join('\n')}` : ''}` }
       return gapAnalysis(io, input)
   }
   return `unknown tool ${name}`
+}
+
+const CANARY: [string, number][] = [['1 min', 60_000], ['5 min', 300_000], ['15 min', 900_000]]
+
+// Deploy (adapter.deploy_command), then checks at 1, 5 and 15 minutes on the
+// clock, never a blocking wait. Each result goes into the ship report; anything
+// but a healthy check, and the final all-clear, comes back as a message.
+async function canary(io: Io, ctx: Ctx, settings: any, input: any): Promise<string> {
+  const deploy = settings?.adapter?.deploy_command
+  if (!deploy) return 'Canary monitoring needs adapter.deploy_command in settings.json; nothing was deployed.'
+  if (!ctx.schedule || !ctx.notify) return 'Canary scheduling is not available here.'
+  const phase = Number(input.phase ?? (await loadProject(io)).state?.phase)
+  const d = await io.run(['bash', '-c', String(deploy)], { timeoutMs: 600_000 })
+  if (d.exitCode !== 0) return `Deploy failed (exit ${d.exitCode}): ${(d.stderr || d.stdout).trim().split('\n').slice(-10).join('\n')}`
+  const hash = (await io.run(['git', 'rev-parse', '--short', 'HEAD'])).stdout.trim()
+  let stopped = false
+  const record = async (text: string) => {
+    const log = '.planning/memory/OUTCOMES.md'
+    if ((await io.list('.planning/memory')).length) await io.write(log, ((await io.read(log)) ?? '').replace(/\s*$/, '\n\n') + `## Phase ${phase} — Canary ${new Date(io.now()).toISOString().slice(0, 16)}\ntask_type: canary\nagent: ship-pipeline\nresult: ${/REGRESSION/.test(text) ? 'failed' : 'success'}\n`)
+  }
+  for (const [label, ms] of CANARY) {
+    ctx.schedule(ms, () => {
+      if (stopped) return
+      void (async () => {
+        const r = await canaryCheck(io, phase, input.commands ?? [])
+        const text = renderCanary(label, r, hash) + (r.status === 'HEALTHY' && label === '15 min' ? '\n\n## Canary Monitoring — ALL CLEAR' : '')
+        const p = await loadProject(io)
+        const dir = p.phaseDirs.find(x => x.startsWith(String(phase).padStart(2, '0')))
+        if (dir) { const f = `.planning/phases/${dir}/${String(phase).padStart(2, '0')}-SHIP-REPORT.md`; const t = await io.read(f); if (t !== undefined) await io.write(f, t.replace(/\s*$/, '\n\n') + text + '\n') }
+        if (r.status !== 'HEALTHY') stopped = true
+        if (r.status !== 'HEALTHY' || label === '15 min') { await record(text); ctx.notify!(`triad canary for Phase ${phase}:\n\n${text}\n\nAsk the user how to proceed (Rollback (Recommended) / Investigate first / Ignore) when it is not healthy; never run the revert yourself without their yes.`) }
+      })().catch(() => undefined)
+    })
+  }
+  return `Deployed (${String(deploy)}). Canary checks are scheduled at 1, 5 and 15 minutes after deploy; results are appended to the ship report and arrive here as a message. Rollback is never automatic.`
 }

@@ -18,4 +18,7 @@ Plan a phase of the Triad project in `.planning/`. Phase: $ARGUMENTS (default: t
 5. Call `plan_write` with the phase, the context (goal, requirements, what earlier phases built, key decisions) and the plans (`replace: true` if the user chose to re-plan).
 6. Critique. The tool returns a mechanical verdict. Also judge, yourself, what code cannot: are requirements covered, are the tasks decision-complete, will the verification commands actually prove the success criteria, is the wave order right?
 7. Auto-refine: if the verdict is REWORK, or your judgment finds a real gap, fix the affected plans and call `plan_write` again with `only` set to their plan numbers. At most 2 refine rounds. Then call `plan_check` once more.
-8. Report to the user: the plans by wave (one line each), the final verdict, any remaining CAUTION items, and the next command `/triad:build`.
+8. GitHub sync (never blocks planning): load `mcp__triad__github` and call action `mode`.
+   - `prompt`: ask the user with AskUserQuestion "Track this phase on GitHub?": "Yes, this time", "No", "Always" (call action `set` with `enabled`), "Never" (call action `set` with `disabled`).
+   - `enabled`, Yes or Always: call action `issue` with the phase. It creates the phase issue with the plan checklist (build ticks it, review closes it). If it reports gh is not available, mention it in one line and go on.
+9. Report to the user: the plans by wave (one line each), the final verdict, any remaining CAUTION items, the issue link if one was created, and the next command `/triad:build`.

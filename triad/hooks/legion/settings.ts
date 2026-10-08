@@ -31,7 +31,8 @@ export function loadSettings(text: string | undefined): { settings: Settings; wa
     }
   }
   const existing = !!user && ('control_mode' in user || 'execution' in user || 'review' in user)
-  if (user && !existing) user = undefined // some other tool's settings.json
+  // integrations alone is a settings.json triad wrote (github mode), so it is ours but not Legion's
+  if (user && !existing && !('integrations' in user)) user = undefined // some other tool's settings.json
   const settings = merge(SETTINGS, user ?? {}) as Settings
   // Legion fills missing keys from its defaults, so a partial file is valid: check the merged result.
   if (user) for (const e of validate(SCHEMAS.settings, settings)) warnings.push(`settings.json ${e}`)

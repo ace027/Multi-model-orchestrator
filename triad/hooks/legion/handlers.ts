@@ -1,5 +1,6 @@
 // Tool and command handlers over an Io (the mod passes one built on `$`).
 import { gapSummary } from './gaps.ts'
+import { parseGithubSection } from './github.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
 import { isPlanFile, pad2, parsePlan, setRoadmapRow, slugify, updateState, findPhaseDir } from './planning.ts'
 import { renderContext, renderPlan, renderProject, type ContextInput, type PlanInput, type ProjectInput } from './render.ts'
@@ -30,6 +31,12 @@ export async function statusText(io: Io): Promise<string> {
   if (b) extra.push('', '## Memory', b)
   const g = await gapSummary(io)
   if (g) extra.push('', '## Roster', g)
+  // local readback of STATE.md ## GitHub; the live one is the github tool's status action
+  const gh = p.stateText ? parseGithubSection(p.stateText) : undefined
+  if (gh?.rows.length) {
+    extra.push('', '## GitHub', ...gh.rows.map(r => `- ${r.phase}: issue ${r.issue}, PR ${r.pr || '—'}, ${r.status}`))
+    for (const m of gh.milestones) extra.push(`- Milestone ${m.name} (${m.number}): ${m.status}`)
+  }
   return renderStatus(p, nextAction(p, n => plans.get(n)?.[0] ?? false, n => plans.get(n)?.[1] ?? false)) + (extra.length ? '\n' + extra.join('\n') : '')
 }
 

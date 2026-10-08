@@ -12,6 +12,11 @@ import { BY_ID, rank } from './hooks/legion/registry.ts'
 import { CUSTOM_CATALOG, agentCreate, loadCustomPersonas, validateAgent, type AgentInput } from './hooks/legion/custom.ts'
 import { GAP_REPORT, coverage, gapAnalysis, gapSummary, gaps, intentCheck, limitStatus, severityOf, type GapConfig } from './hooks/legion/gaps.ts'
 import { REGISTRY, parseRegistry, portfolioAddDep, portfolioDashboard, portfolioRegister, portfolioUnregister } from './hooks/legion/portfolio.ts'
+import { renderCanary, shipCheck, shipPublish } from './hooks/legion/ship.ts'
+import { ghClosePhase, ghMode, ghPhaseIssue, ghTickPlan, setGhMode } from './hooks/legion/github.ts'
+import { secretScan, securitySave, securityScan, securityTrigger, verdictOf } from './hooks/legion/security.ts'
+import { polishRun, polishScope } from './hooks/legion/polish.ts'
+import { CRITICAL_AUDIT, preBuildCheck, preShipAudit } from './hooks/legion/gates.ts'
 import { ARTIFACTS, freshness, mapBuild, mapNarrate, mapQuery } from './hooks/legion/map.ts'
 import type { PlanInput } from './hooks/legion/render.ts'
 
@@ -343,5 +348,184 @@ describe('portfolio', () => {
     expect(d2).toContain('Project directory not found at /p/gone')
     expect(reg.files.get(REGISTRY)).toContain('- **Status**: Stale')
     expect(await portfolioUnregister(reg, 'Beta')).toBe('Unregistered Beta; removed 1 dependency row(s).')
+  })
+})
+
+// Wrap an io's run: `fake` answers first; undefined falls through.
+function withRun(io: ReturnType<typeof memIo>, fake: (argv: string[]) => { exitCode: number; stdout: string; stderr?: string } | undefined) {
+  const orig = io.run
+  const calls: string[][] = []
+  io.run = async (argv, o) => { calls.push(argv); const r = fake(argv); return r ? { stderr: '', ...r } : orig(argv, o) }
+  return calls
+}
+
+async function shippable() {
+  const io = await project(1)
+  await planWrite(io, { phase: 1, context: { goal: 'g' }, plans: [plan(1, 1, 'src/a.ts')] })
+  await build(io, fakeAgents(io), {})
+  return io
+}
+
+describe('ship', () => {
+  test('refuses an unreviewed phase; the gate names what fails', async () => {
+    const io = await shippable()
+    expect(await shipCheck(io, {})).toContain('Phase 1 has not passed review yet')
+    const g = await shipCheck(io, { phase: 1 })
+    expect(g).toContain('| Review passed | FAIL |')
+    expect(g).toContain('GATE FAIL: No review found. Run /triad:review before shipping.')
+    expect(g).toContain('**Result**: 5 of 6 gates passed')
+    expect(g).toContain('Ship blocked — resolve the above issues and re-run /triad:ship.')
+  })
+
+  test('dry run writes nothing; check writes the report; publish marks shipped and commits', async () => {
+    const io = await shippable()
+    await review(io, fakeAgents(io), {})
+    const dry = await shipCheck(io, { dry_run: true })
+    expect(dry).toContain('DRY RUN — ship checks will run but no PRs, pushes, or state changes will be made')
+    expect(dry).toContain('**Result**: 6 of 6 gates passed')
+    expect([...io.files.keys()].some(k => k.endsWith('SHIP-REPORT.md'))).toBe(false)
+    expect(await shipCheck(io, {})).toContain('Wrote .planning/phases/01-p1/01-SHIP-REPORT.md')
+    const rep = io.files.get('.planning/phases/01-p1/01-SHIP-REPORT.md')!
+    expect(rep).toContain('gate_result: PASSED')
+    expect(rep).toContain('| 01-01 | engineering-backend-architect | Completed | 1 |')
+    const out = await shipPublish(io, { method: 'mark' })
+    expect(out).toContain('Phase 1: P1 — Shipped!')
+    expect(io.files.get('.planning/ROADMAP.md')).toMatch(/\|\s*1\s*\|.*Shipped/)
+    expect(io.commits.at(-1)).toMatch(/^chore\(triad\): ship phase 1 — P1\n\nAll quality gates passed\. 1 plans shipped\.\nPR: N\/A/)
+  })
+
+  test('publish as a PR: branch, push, labels, gh pr create with the body file, PR recorded', async () => {
+    const io = await shippable()
+    await review(io, fakeAgents(io), {})
+    const calls = withRun(io, a => {
+      if (a[0] === 'gh' && a[1] === 'auth') return { exitCode: 0, stdout: '' }
+      if (a[0] === 'git' && a[1] === 'remote') return { exitCode: 0, stdout: 'git@x:o/r.git' }
+      if (a[0] === 'gh' && a[1] === 'repo') return { exitCode: 0, stdout: 'o/r main\n' }
+      if (a[0] === 'git' && a[1] === 'branch') return { exitCode: 0, stdout: 'main\n' }
+      if (a[0] === 'gh' && a[1] === 'pr') return { exitCode: 0, stdout: 'https://github.com/o/r/pull/7\n' }
+      return a[0] === 'gh' || (a[0] === 'git' && ['push', 'checkout'].includes(a[1]!)) ? { exitCode: 0, stdout: '' } : undefined
+    })
+    const out = await shipPublish(io, { method: 'pr' })
+    expect(out).toContain('Created branch triad/phase-01-p1.')
+    expect(out).toContain('PR: https://github.com/o/r/pull/7')
+    const pr = calls.find(a => a[0] === 'gh' && a[1] === 'pr')!
+    expect(pr).toEqual(['gh', 'pr', 'create', '--title', 'Phase 01: P1', '--body-file', '.triad/pr-body.md', '--base', 'main', '--head', 'triad/phase-01-p1', '--label', 'triad-ship', '--label', 'phase-01', '--assignee', '@me'])
+    expect(io.files.get('.triad/pr-body.md')).toContain('*Created by Triad*')
+    expect(calls.some(a => a.join(' ') === 'git push --force')).toBe(false)
+    expect(io.files.get('.planning/STATE.md')).toContain('| Phase 1: P1 | — | #7 | Open |')
+  })
+
+  test('canary statuses', () => {
+    expect(renderCanary('5 min', { status: 'REGRESSION', passed: 1, total: 2, regressions: ['npm test'] }, 'abc123')).toContain('Run `git revert abc123` to roll back. Automatic rollback disabled for safety.')
+    expect(renderCanary('1 min', { status: 'HEALTHY', passed: 2, total: 2, regressions: [] }, 'abc')).toContain('**Verification**: 2/2 commands passed')
+  })
+})
+
+describe('github sync', () => {
+  test('issue, checklist tick, close; STATE ## GitHub stays last', async () => {
+    const io = await shippable()
+    let body = ''
+    const calls = withRun(io, a => {
+      if (a[0] === 'gh' && a[1] === 'auth') return { exitCode: 0, stdout: '' }
+      if (a[0] === 'git' && a[1] === 'remote') return { exitCode: 0, stdout: 'x' }
+      if (a[0] === 'gh' && a[1] === 'repo') return { exitCode: 0, stdout: 'o/r main' }
+      if (a[0] === 'gh' && a[1] === 'issue' && a[2] === 'create') { body = a[a.indexOf('--body') + 1]!; return { exitCode: 0, stdout: 'https://github.com/o/r/issues/12\n' } }
+      if (a[0] === 'gh' && a[1] === 'issue' && a[2] === 'view') return { exitCode: 0, stdout: body }
+      if (a[0] === 'gh' && a[1] === 'issue' && a[2] === 'edit') { body = a[a.indexOf('--body') + 1]!; return { exitCode: 0, stdout: '' } }
+      return a[0] === 'gh' ? { exitCode: 0, stdout: '' } : undefined
+    })
+    expect(await ghPhaseIssue(io, 1)).toContain('Created issue #12 for Phase 1')
+    expect(body).toContain('- [ ] Plan 01-01:')
+    expect(body).toContain('*Created by Triad*')
+    expect(calls.some(a => a.join(' ').startsWith('gh label create triad --description Created by Triad --color 7B68EE'))).toBe(true)
+    expect(await ghTickPlan(io, 1, '01-01')).toBe('Ticked Plan 01-01 on #12')
+    expect(body).toContain('- [x] Plan 01-01:')
+    expect(await ghClosePhase(io, 1, { plans: 1, requirements: '', result: 'pass' })).toContain('Closed #12')
+    const state = io.files.get('.planning/STATE.md')!
+    expect(state).toContain('| Phase 1: P1 | #12 | — | Closed |')
+    expect(state.trimEnd().split('\n').slice(-1)[0]).toBe('| Phase 1: P1 | #12 | — | Closed |')
+    expect(await ghPhaseIssue(io, 1)).toBe('Phase 1 already has issue #12.')
+  })
+
+  test('without gh it skips quietly; the mode lives in settings.json', async () => {
+    const io = await shippable()
+    withRun(io, a => (a[0] === 'gh' ? { exitCode: 1, stdout: '', stderr: 'not logged in' } : undefined))
+    expect(await ghPhaseIssue(io, 1)).toBe('GitHub sync skipped: Run `gh auth login` to enable GitHub integration.')
+    expect(await ghMode(io)).toBe('prompt')
+    await setGhMode(io, 'enabled')
+    expect(await ghMode(io)).toBe('enabled')
+  })
+})
+
+describe('security review', () => {
+  test('secrets are redacted, the verdict fails on a critical, and ship is blocked', async () => {
+    const io = await shippable()
+    io.files.set('src/a.ts', "const k = 'AKIAABCDEFGHIJKLMNOP'\nconst host = '10.1.2.3:8080'\n")
+    const s = await secretScan(io, ['src/a.ts'])
+    expect(s.map(x => `${x.severity} ${x.files} ${x.finding}`)).toEqual(['CRITICAL src/a.ts:1 AWS access key: AKIAABCD…MNOP', 'LOW src/a.ts:2 IP:port: 10.1.2.3…8080'])
+    expect(securityTrigger(['src/auth/session.ts', 'docs/readme.md'], {})).toEqual(['src/auth/session.ts: security-sensitive path'])
+    await review(io, fakeAgents(io), {})
+    expect(await securityScan(io, {})).toContain('Secrets: 2 match(es)')
+    const out = await securitySave(io, { owasp: '- A1 Injection: PASS', findings: [{ severity: 'HIGH', category: 'A7:XSS', finding: 'unescaped html', files: 'src/a.ts:9', remediation: 'escape' }], false_positives: ['src/a.ts:2'] })
+    expect(out).toContain('verdict FAIL')
+    expect(out).toContain('[VERDICT-OVERRIDE] critical secret')
+    const doc = io.files.get('.planning/phases/01-p1/01-SECURITY-REVIEW.md')!
+    expect(doc).toContain('| SEC-001 | Secret | CRITICAL |')
+    expect(doc).toContain('| SEC-002 | A7:XSS | HIGH | unescaped html |')
+    expect(doc).not.toContain('10.1.2.3')
+    expect(io.files.get('.planning/phases/01-p1/01-REVIEW.md')).toContain('## Security Review')
+    expect(await shipCheck(io, { phase: 1 })).toContain('GATE FAIL: 2 unresolved blockers in review.')
+    expect(verdictOf([{ severity: 'HIGH', category: 'x', finding: 'y', files: 'z', remediation: 'r' }]).verdict).toBe('CAUTION')
+  })
+})
+
+describe('polish', () => {
+  const polishAgents = (io: ReturnType<typeof memIo>, edits: Record<string, string>): any => ({
+    maxParallel: 2,
+    async run({ scope }: any) {
+      for (const f of scope.files_modified) if (edits[f] !== undefined) await io.write(f, edits[f]!)
+      return { agentId: 'p1', answer: 'PASS1 | src/a.ts:1 | CLEAN | "// set x" | restates-code\nPASS2 | src/b.ts:1-3 | FLAG | "extract" | extract-function\n\n## Flagged\nEXTRACT | src/b.ts | 1-3 | long fn | extract-function | split it\n\n## Files Modified\n- src/a.ts' }
+    },
+    followUp: async () => '', writesOf: () => ({ files: [], warnings: [] }), usageOf: () => '',
+  })
+
+  test('scope adds one level of importers and excludes generated files', async () => {
+    const io = memIo({ 'src/alpha.ts': 'export const a = 1\n', 'src/beta.ts': "import { a } from './alpha'\n", 'src/gamma.ts': "import { b } from './beta'\n", 'dist/alpha.js': '' })
+    const sc = await polishScope(io, { target: 'src/alpha.ts' })
+    expect(sc.files).toEqual(['src/alpha.ts', 'src/beta.ts'])
+    expect((await polishScope(io, { target: 'src/alpha.ts', scope: 'changed' })).files).toEqual(['src/alpha.ts'])
+    expect((await polishScope(io, {})).error).toContain('Cannot auto-detect scope')
+  })
+
+  test('a regression reverts the culprit file only; the rest is committed', async () => {
+    const io = memIo({ 'settings.json': JSON.stringify({ execution: { auto_commit: true }, polish: { test_command: 'check' } }), 'src/a.ts': '// set x\nexport const a = 1\n', 'src/b.ts': 'export const b = 2\n' })
+    withRun(io, a => (a[0] === 'bash' && a[2] === 'check' ? { exitCode: (io.files.get('src/b.ts') ?? '').includes('BROKEN') ? 1 : 0, stdout: '' } : undefined))
+    const r: any = await polishRun(io, polishAgents(io, { 'src/a.ts': 'export const a = 1\n', 'src/b.ts': 'BROKEN\n' }), { files: ['src/a.ts', 'src/b.ts'], target: 'src', save: true })
+    expect(r.reverted).toEqual(['src/b.ts'])
+    expect(r.changed).toEqual(['src/a.ts'])
+    expect(io.files.get('src/b.ts')).toBe('export const b = 2\n')
+    expect(r.text).toContain('| PASS | not run (no command) | src/b.ts |')
+    expect(io.commits.at(-1)).toMatch(/^refactor: polish src\n\nPolish applied 1 changes across 1 files\./)
+    expect(r.flagged).toEqual(['EXTRACT | src/b.ts | 1-3 | long fn | extract-function | split it'])
+    expect(io.files.get('.planning/POLISH.md')).toContain('| src/a.ts | 1 | "// set x" | restates-code |')
+  })
+
+  test('dry run is read-only', async () => {
+    const io = memIo({ 'src/a.ts': 'x\n' })
+    const r: any = await polishRun(io, polishAgents(io, {}), { files: ['src/a.ts'], dry_run: true })
+    expect(r.text).toContain('**No files were modified.** Run without --dry-run to apply changes.')
+  })
+})
+
+describe('gates (Legion hooks)', () => {
+  test('malformed STATE blocks agents; gh pr create waits on npm audit', async () => {
+    const io = memIo({ '.planning/STATE.md': '# State\n' })
+    expect(await preBuildCheck(io)).toContain('STATE.md malformed')
+    expect(await preBuildCheck(memIo())).toBe(undefined)
+    const io2 = memIo({ 'package-lock.json': '{}' })
+    withRun(io2, a => (a[0] === 'bash' && /npm audit/.test(a[2]!) ? { exitCode: 1, stdout: '1 critical severity vulnerability' } : a[0] === 'bash' && /command -v npm/.test(a[2]!) ? { exitCode: 0, stdout: '' } : undefined))
+    expect(await preShipAudit(io2, 'gh pr create --title x')).toBe(CRITICAL_AUDIT)
+    expect(await preShipAudit(io2, 'git push')).toBe(undefined)
+    expect(await preShipAudit(memIo(), 'gh pr create')).toBe(undefined)
   })
 })

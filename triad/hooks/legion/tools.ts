@@ -226,6 +226,35 @@ export const LEGION_TOOLS = [
       required: ['action'],
     },
   },
+  {
+    name: 'ship',
+    description: 'Ship a reviewed phase, in code. check: resolve the phase, run all 6 pre-ship gates (build complete, review passed incl. unresolved CRITICAL/HIGH security findings, no blocker escalations, verification commands, tests, clean tree), write {NN}-SHIP-REPORT.md and preview the PR (dry_run writes nothing). publish (after the user chose): method pr (branch, push, labels, gh pr create, npm audit gate), push, or mark; then post-ship verification, STATE/ROADMAP Shipped, outcome, commit. Never force-pushes. canary: run adapter.deploy_command, then schedule checks at 1, 5 and 15 minutes; results come back as a message.',
+    inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['check', 'publish', 'canary'] }, phase: { type: 'integer' }, dry_run: { type: 'boolean' }, method: { type: 'string', enum: ['pr', 'push', 'mark'] }, commands: strs('Extra canary commands.') }, required: ['action'] },
+  },
+  {
+    name: 'polish',
+    description: 'Code polish. scope: resolve the files (target path or glob, else the phase\'s files_modified; plus one level of importers unless scope changed; excludes; capped at 50). run: baseline tests and type check, one testing-code-polisher agent runs the 4 passes (comments, simplification, readability, consistency) on those files, then a regression reverts the culprit file (or all of the polish), commits `refactor: polish ...`, and returns the log, the flagged items and the safety table; dry_run reports only; save writes POLISH.md.',
+    inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['scope', 'run'] }, phase: { type: 'integer' }, target: str('Path, directory or glob.'), scope: { type: 'string', enum: ['changed', 'dependents', 'directory'] }, files: strs('Exact files (skip scope resolution).'), dry_run: { type: 'boolean' }, save: { type: 'boolean' } }, required: ['action'] },
+  },
+  {
+    name: 'github',
+    description: 'GitHub sync via gh, never blocking. mode: integrations.github (enabled|disabled|prompt). set: write enabled or disabled. issue: create the phase issue (label triad, plan checklist, milestone) and record it in STATE.md ## GitHub. tick: check a plan off the phase issue. close: close the phase issue (and its milestone when complete). status: read-only issue/PR/milestone readback.',
+    inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['mode', 'set', 'issue', 'tick', 'close', 'status'] }, value: { type: 'string', enum: ['enabled', 'disabled'] }, phase: { type: 'integer' }, plan: str('NN-PP'), plans: { type: 'integer' }, requirements: str(''), result: str('') }, required: ['action'] },
+  },
+  {
+    name: 'security',
+    description: 'Security review. scan: trigger reasons, secret scan (redacted), dependency audit (npm/pip/composer/go/bundle/cargo), supply-chain checks, and the files for the OWASP/STRIDE review (full_scan: all tracked files for secrets). save: the security engineer\'s OWASP checklist, STRIDE table, attack surface and findings plus the scan findings get SEC ids and a verdict (PASS/CAUTION/FAIL) in {NN}-SECURITY-REVIEW.md and a section in the phase review; unresolved CRITICAL/HIGH block /triad:ship.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['scan', 'save'] }, phase: { type: 'integer' }, full_scan: { type: 'boolean' },
+        owasp: str('OWASP Top 10 results (markdown).'), stride: str('STRIDE table (markdown).'), attack_surface: str('Attack surface map (markdown).'),
+        findings: { type: 'array', items: { type: 'object', properties: { severity: { type: 'string', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] }, category: str('OWASP category, e.g. A1:Injection.'), finding: str(''), files: str('file:line'), remediation: str('') }, required: ['severity', 'category', 'finding', 'files', 'remediation'] } },
+        false_positives: strs('file:line of secret matches that are fixtures or docs.'),
+      },
+      required: ['action'],
+    },
+  },
 ]
 
 export const LEGION_TOOL_NAMES = LEGION_TOOLS.map(t => `mcp__triad__${t.name}`)
