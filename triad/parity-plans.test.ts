@@ -57,8 +57,11 @@ describe('parity: plan-schema-conformance', () => {
     expect(p.schemaErrors).toEqual([])
     expect(critique([p], 3, ROSTER).verdict).toBe('PASS')
   })
-  // Legion's invalid-vague-action fixture ("Implement as appropriate", "use
-  // existing helpers") is not flagged: critique.ts has no vague-action rule.
+  test('a vague task action is a decisions BLOCKER', () => {
+    const p = fixturePlan('plan-validation/invalid-vague-action.md')
+    expect(rules([p]).some(r => r.startsWith('BLOCKER decisions') && r.includes('as appropriate'))).toBe(true)
+    expect(critique([p], 3, ROSTER).verdict).toBe('REWORK')
+  })
 })
 
 describe('parity: validate-plan-frontmatter and migrate-plans', () => {

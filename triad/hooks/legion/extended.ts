@@ -212,7 +212,7 @@ async function canary(io: Io, ctx: Ctx, settings: any, input: any): Promise<stri
         const text = renderCanary(label, r, hash) + (r.status === 'HEALTHY' && label === '15 min' ? '\n\n## Canary Monitoring — ALL CLEAR' : '')
         const p = await loadProject(io)
         const dir = p.phaseDirs.find(x => x.startsWith(String(phase).padStart(2, '0')))
-        if (dir) { const f = `.planning/phases/${dir}/${String(phase).padStart(2, '0')}-SHIP-REPORT.md`; const t = await io.read(f); if (t !== undefined) await io.write(f, t.replace(/\s*$/, '\n\n') + text + '\n') }
+        if (dir) { const f = `.planning/phases/${dir}/SHIP-REPORT.md`; const t = await io.read(f); if (t !== undefined) await io.write(f, t.replace(/\s*$/, '\n\n') + text + '\n') }
         if (r.status !== 'HEALTHY') stopped = true
         if (r.status !== 'HEALTHY' || label === '15 min') { await record(text); ctx.notify!(`triad canary for Phase ${phase}:\n\n${text}\n\nAsk the user how to proceed (Rollback (Recommended) / Investigate first / Ignore) when it is not healthy; never run the revert yourself without their yes.`) }
       })().catch(() => undefined)

@@ -204,7 +204,4 @@ describe('parity: observability-cycle-delta', () => {
   })
 })
 
-// intent-review: pending. Legion filtered review findings by intent
-// (--just-security, harden, document) before deduplication. reviewrun.ts has
-// no intent filter at this HEAD, so there is nothing to test yet; the runner
-// has no test.todo, so this comment stands in for it.
+// intent-review: covered in legion6w3.test.ts (intentFilter and review_phase with an intent).

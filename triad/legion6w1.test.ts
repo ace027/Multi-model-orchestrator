@@ -8,6 +8,7 @@ import {
 } from './hooks/legion/authority.ts'
 import { runPersonas, renderPersonaRuns } from './hooks/legion/personarun.ts'
 import { BY_ID } from './hooks/legion/registry.ts'
+import { runValidate } from './hooks/legion/validate.ts'
 import type { Finding, ReviewerReport } from './hooks/legion/review.ts'
 import type { PlanInput } from './hooks/legion/render.ts'
 
@@ -117,6 +118,11 @@ describe('authority matrix', () => {
     const m = parseMatrix(MATRIX.replace('      - "performance"', '      - "performance"\n      - "owasp"'))
     expect(m.errors).toEqual(["Domain conflict: 'owasp' assigned to both engineering-security-engineer and testing-performance-benchmarker"])
     expect(parseMatrix(MATRIX.replace('engineering-security-engineer:', 'nobody-real:')).errors).toEqual(['Unknown agent: nobody-real'])
+  })
+  test('/triad validate warns on a domain owned by two agents', async () => {
+    const io = memIo({ '.planning/config/authority-matrix.yaml': MATRIX.replace('      - "performance"', '      - "performance"\n      - "owasp"') })
+    const { checks } = await runValidate(io)
+    expect(checks.some(c => c.level === 'WARN' && c.message.startsWith("Domain conflict: 'owasp'"))).toBe(true)
   })
   test('detectDomain: highest keyword score, first declared on a tie, word boundaries, else general', () => {
     const m = parseMatrix(MATRIX)

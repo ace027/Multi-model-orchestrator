@@ -9,6 +9,7 @@ import { applyMode, escalationRows, escalationTool, loadProtocol, parseEscalatio
 import { AGENT_FILES, classifyFailure, hashText } from './hooks/legion/resilience.ts'
 import { checkSummary, compactPhase, compactedCovers, summaryObject } from './hooks/legion/compact.ts'
 import { boardReview } from './hooks/legion/board.ts'
+import { runPersonas } from './hooks/legion/personarun.ts'
 import { PERSONAS } from './hooks/legion/personas.ts'
 import { PERSONA_BODIES } from './hooks/legion/personasfull.ts'
 import { fakeAgents, memIo, REPLY } from './testkit.ts'
@@ -360,7 +361,33 @@ describe('agent_personality_verbosity', () => {
       const agents = capture(io)
       await build(io, agents)
       expect(agents.briefs['plan 01-01']!.includes(fullOnly)).toBe(has)
+      const pr = capture(io)
+      await runPersonas(io, pr, { runs: [{ agent: id, brief: 'Assess the API', label: 'assess' }] })
+      expect(pr.briefs['assess']!.includes(fullOnly)).toBe(has)
     }
+  })
+})
+
+describe('haiku plans in build', () => {
+  test('a haiku persona\'s plan gets a sonnet review in the same scope; its answer is the plan\'s', async () => {
+    const io = await project()
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts', { agents: ['testing-test-results-analyzer'] })] })
+    const agents = capture(io)
+    const r = await build(io, agents)
+    expect(agents.spawned).toEqual(['plan 01-01 @haiku', 'plan 01-01 sonnet review @sonnet'])
+    const rb = agents.briefs['plan 01-01 sonnet review']!
+    expect(rb).toContain("Review of a Haiku agent's plan work")
+    expect(rb).toContain(agents.briefs['plan 01-01']!)
+    expect(agents.inputs[1].scope.files_modified).toEqual(['src/a.ts'])
+    expect(r.text).toContain('01-01')
+    expect(io.files.get('.planning/phases/01-core/01-01-SUMMARY.md')).toBeDefined()
+  })
+  test('a sonnet persona\'s plan is not reviewed', async () => {
+    const io = await project()
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })
+    const agents = capture(io)
+    await build(io, agents)
+    expect(agents.spawned).toEqual(['plan 01-01 @sonnet'])
   })
 })
 

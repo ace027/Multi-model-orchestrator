@@ -120,7 +120,11 @@ for (const f of readdirSync(join(legion, 'agents')).filter(f => f.endsWith('.md'
     '---',
     '',
   ].join('\n')
-  writeFileSync(join(triad, 'personas', f), fm + p.core + '\n')
+  // Legion paths and commands that do not exist in Triad.
+  const core = p.core
+    .replaceAll('Follow `skills/agent-registry/MANDATORY-PERSONA-CONTRACT.md`.', 'Follow the persona contract below (it is the same for every persona).')
+    .replace(/\/legion:([a-z-]+)/g, '/triad:$1')
+  writeFileSync(join(triad, 'personas', f), fm + core + '\n')
 }
 
 // Bundle from the compact files, so edits to triad/personas/*.md are what ships.

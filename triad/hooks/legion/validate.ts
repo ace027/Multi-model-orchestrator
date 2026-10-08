@@ -2,6 +2,7 @@
 // Where Legion's own command contradicts its writers (PARITY, contract notes),
 // it checks what Legion actually writes: `NN-PP-PLAN.md` files, the template's
 // progress table, the statuses build and start produce.
+import { parseMatrix } from './authority.ts'
 import { loadPhase, loadProject, type Io } from './io.ts'
 import { getField, setRoadmapRow } from './planning.ts'
 import { ROSTER } from './registry.ts'
@@ -118,6 +119,9 @@ export async function runValidate(io: Io, opts: { fix?: boolean } = {}): Promise
     const unknown = [...new Set(refs.map(String))].filter(a => !ROSTER.has(a))
     if (unknown.length) add(rel, 'FAIL', `names agents not in the roster: ${unknown.join(', ')}`)
     else add(rel, 'PASS', refs.length ? `parses; ${new Set(refs).size} agent references resolve` : 'parses')
+    // authority-enforcer integrity check: a domain owned by two agents. Legion's own
+    // matrix has some, so they warn; at review time both agents own the domain.
+    if (f.name === 'authority-matrix.yaml') for (const e of parseMatrix(await io.read(rel)).errors.filter(e => e.startsWith('Domain conflict'))) add(rel, 'WARN', e)
   }
 
   // Settings

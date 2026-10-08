@@ -1,7 +1,7 @@
 // Security review: the trigger, secret scan, dependency audit and supply-chain
 // checks run in code; the OWASP and STRIDE judgment is the security engineer's
 // (persona_run). `save` assigns SEC ids, computes the verdict and writes
-// {NN}-SECURITY-REVIEW.md plus a section in the phase review. Unresolved
+// SECURITY-REVIEW.md plus a section in the phase review. Unresolved
 // CRITICAL/HIGH findings block /triad:ship.
 import { loadPhase, loadProject, type Io } from './io.ts'
 import { pad2 } from './planning.ts'
@@ -113,7 +113,8 @@ export async function supplyChain(io: Io): Promise<SecFinding[]> {
   return out
 }
 
-const secPath = (rel: string, n: number) => `${rel}/${pad2(n)}-SECURITY-REVIEW.md`
+// Legion's name (security-review: phases/{NN}/SECURITY-REVIEW.md).
+const secPath = (rel: string, _n: number) => `${rel}/SECURITY-REVIEW.md`
 
 async function phaseFiles(io: Io, n: number): Promise<{ rel?: string; files: string[]; context?: string }> {
   const p = await loadProject(io)
@@ -255,7 +256,7 @@ export async function securitySave(io: Io, input: SaveInput): Promise<string> {
   await io.write(path, text)
   const rp = `${ph.rel}/${pad2(n)}-REVIEW.md`
   const review = await io.read(rp)
-  const sec = `## Security Review\n\n**Verdict**: ${v.verdict} — ${blockers} unresolved CRITICAL/HIGH finding(s). Details: \`${pad2(n)}-SECURITY-REVIEW.md\`.\n`
+  const sec = `## Security Review\n\n**Verdict**: ${v.verdict} — ${blockers} unresolved CRITICAL/HIGH finding(s). Details: \`SECURITY-REVIEW.md\`.\n`
   await io.write(rp, review === undefined ? `# Phase ${n}: Review\n\n${sec}` : review.includes('## Security Review') ? review.replace(/## Security Review\n[\s\S]*?(?=\n## |$)/, sec) : review.replace(/\s*$/, '\n\n') + sec)
   return `Wrote ${path}: verdict ${v.verdict}, ${all.length} finding(s), ${blockers} blocking ship.${v.overrides.length ? ' ' + v.overrides.join(' ') : ''}`
 }

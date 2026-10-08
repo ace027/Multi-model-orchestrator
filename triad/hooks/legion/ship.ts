@@ -78,7 +78,7 @@ export async function shipGate(io: Io, opts: { phase?: number }): Promise<Gate |
   const checks: Check[] = []
   const missing = ph.plans.filter(pl => !ph.summaries[pl.id])
   checks.push({ name: 'Build complete', pass: ph.plans.length > 0 && !missing.length, detail: ph.plans.length ? missing.length ? [`GATE FAIL: ${missing.length} plans missing build output. Run /triad:build to complete.`, ...missing.map(m => `- ${m.id}`)] : [] : ['GATE FAIL: no plans in this phase. Run /triad:plan and /triad:build.'] })
-  const sec = ph.rel ? await io.read(`${ph.rel}/${pad2(n)}-SECURITY-REVIEW.md`) ?? await io.read(`${ph.rel}/SECURITY-REVIEW.md`) : undefined
+  const sec = ph.rel ? await io.read(`${ph.rel}/SECURITY-REVIEW.md`) ?? await io.read(`${ph.rel}/${pad2(n)}-SECURITY-REVIEW.md`) : undefined
   const blockers = ph.review ? [...reviewBlockers(ph.review), ...securityBlockers(sec)] : []
   checks.push({ name: 'Review passed', pass: !!ph.review && !blockers.length, detail: !ph.review ? ['GATE FAIL: No review found. Run /triad:review before shipping.'] : blockers.length ? [`GATE FAIL: ${blockers.length} unresolved blockers in review.`, ...blockers.map(b => `- ${b}`)] : [] })
   const esc = Object.values(ph.summaries).reduce((a, t) => a + blockerEscalations(t), 0)
@@ -149,7 +149,8 @@ export function renderPrBody(g: Gate, issue?: number): string {
     ...(issue ? [`Closes #${issue}`, ''] : []), FOOTER].join('\n')
 }
 
-const reportPath = (g: Gate) => `${g.ph.rel}/${pad2(g.n)}-SHIP-REPORT.md`
+// Legion's name (ship-pipeline: phases/{NN}/SHIP-REPORT.md).
+const reportPath = (g: Gate) => `${g.ph.rel}/SHIP-REPORT.md`
 
 // Gate + report. With dry_run nothing is written.
 export async function shipCheck(io: Io, opts: { phase?: number; dry_run?: boolean }): Promise<string> {

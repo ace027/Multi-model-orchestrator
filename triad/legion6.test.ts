@@ -384,8 +384,8 @@ describe('ship', () => {
     expect(dry).toContain('DRY RUN — ship checks will run but no PRs, pushes, or state changes will be made')
     expect(dry).toContain('**Result**: 6 of 6 gates passed')
     expect([...io.files.keys()].some(k => k.endsWith('SHIP-REPORT.md'))).toBe(false)
-    expect(await shipCheck(io, {})).toContain('Wrote .planning/phases/01-p1/01-SHIP-REPORT.md')
-    const rep = io.files.get('.planning/phases/01-p1/01-SHIP-REPORT.md')!
+    expect(await shipCheck(io, {})).toContain('Wrote .planning/phases/01-p1/SHIP-REPORT.md')
+    const rep = io.files.get('.planning/phases/01-p1/SHIP-REPORT.md')!
     expect(rep).toContain('gate_result: PASSED')
     expect(rep).toContain('| 01-01 | engineering-backend-architect | Completed | 1 |')
     const out = await shipPublish(io, { method: 'mark' })
@@ -469,7 +469,7 @@ describe('security review', () => {
     const out = await securitySave(io, { owasp: '- A1 Injection: PASS', findings: [{ severity: 'HIGH', category: 'A7:XSS', finding: 'unescaped html', files: 'src/a.ts:9', remediation: 'escape' }], false_positives: ['src/a.ts:2'] })
     expect(out).toContain('verdict FAIL')
     expect(out).toContain('[VERDICT-OVERRIDE] critical secret')
-    const doc = io.files.get('.planning/phases/01-p1/01-SECURITY-REVIEW.md')!
+    const doc = io.files.get('.planning/phases/01-p1/SECURITY-REVIEW.md')!
     expect(doc).toContain('| SEC-001 | Secret | CRITICAL |')
     expect(doc).toContain('| SEC-002 | A7:XSS | HIGH | unescaped html |')
     expect(doc).not.toContain('10.1.2.3')

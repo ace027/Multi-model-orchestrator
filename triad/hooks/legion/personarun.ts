@@ -4,7 +4,7 @@
 // cap. Read-only runs may not write any file; others only their `writable` list.
 import type { Io } from './io.ts'
 import type { Agents } from './build.ts'
-import { BY_ID, findPersona, personaBrief } from './registry.ts'
+import { BY_ID, findPersona, personaBrief, personaTextFor } from './registry.ts'
 import { NOT_SPAWNED, NOT_SPAWNED_MSG } from './authority.ts'
 
 export type PersonaRunInput = { runs: { agent: string; brief: string; label?: string; writable?: string[] }[]; read_only?: boolean }
@@ -20,6 +20,7 @@ export async function runPersonas(io: Io, agents: Agents, input: PersonaRunInput
   // Writes outside the run's list are refused whatever the project's mode.
   const mode = 'surgical' as const
   const results: PersonaRunResult[] = new Array(runs.length)
+  const personaText = await personaTextFor(io)
   let next = 0
   const worker = async () => {
     while (next < runs.length) {
@@ -33,7 +34,7 @@ export async function runPersonas(io: Io, agents: Agents, input: PersonaRunInput
       }
       const writable = readOnly ? [] : (r.writable ?? [])
       const scopeNote = readOnly ? READ_ONLY_NOTE : `Files you may write: ${writable.length ? writable.join(', ') : 'none'}. Other writes are refused.`
-      const brief = `${personaBrief(f.persona)}\n\n---\n\n${r.brief}\n\n${scopeNote}`
+      const brief = `${personaText(f.persona)}\n\n---\n\n${r.brief}\n\n${scopeNote}`
       const scope = { planId: label, mode, files_modified: writable, files_forbidden: [] }
       const run = await agents.run({ persona: f.persona, brief, label, scope })
       const w = run.agentId ? agents.writesOf(run.agentId) : { files: [], warnings: [] }

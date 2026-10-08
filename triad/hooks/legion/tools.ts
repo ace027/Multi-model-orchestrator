@@ -229,7 +229,7 @@ export const LEGION_TOOLS = [
   },
   {
     name: 'ship',
-    description: 'Ship a reviewed phase, in code. check: resolve the phase, run all 6 pre-ship gates (build complete, review passed incl. unresolved CRITICAL/HIGH security findings, no blocker escalations, verification commands, tests, clean tree), write {NN}-SHIP-REPORT.md and preview the PR (dry_run writes nothing). publish (after the user chose): method pr (branch, push, labels, gh pr create, npm audit gate), push, or mark; then post-ship verification, STATE/ROADMAP Shipped, outcome, commit. Never force-pushes. canary: run adapter.deploy_command, then schedule checks at 1, 5 and 15 minutes; results come back as a message.',
+    description: 'Ship a reviewed phase, in code. check: resolve the phase, run all 6 pre-ship gates (build complete, review passed incl. unresolved CRITICAL/HIGH security findings, no blocker escalations, verification commands, tests, clean tree), write SHIP-REPORT.md and preview the PR (dry_run writes nothing). publish (after the user chose): method pr (branch, push, labels, gh pr create, npm audit gate), push, or mark; then post-ship verification, STATE/ROADMAP Shipped, outcome, commit. Never force-pushes. canary: run adapter.deploy_command, then schedule checks at 1, 5 and 15 minutes; results come back as a message.',
     inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['check', 'publish', 'canary'] }, phase: { type: 'integer' }, dry_run: { type: 'boolean' }, method: { type: 'string', enum: ['pr', 'push', 'mark'] }, commands: strs('Extra canary commands.') }, required: ['action'] },
   },
   {
@@ -244,7 +244,7 @@ export const LEGION_TOOLS = [
   },
   {
     name: 'security',
-    description: 'Security review. scan: trigger reasons, secret scan (redacted), dependency audit (npm/pip/composer/go/bundle/cargo), supply-chain checks, and the files for the OWASP/STRIDE review (full_scan: all tracked files for secrets). save: the security engineer\'s OWASP checklist, STRIDE table, attack surface and findings plus the scan findings get SEC ids and a verdict (PASS/CAUTION/FAIL) in {NN}-SECURITY-REVIEW.md and a section in the phase review; unresolved CRITICAL/HIGH block /triad:ship.',
+    description: 'Security review. scan: trigger reasons, secret scan (redacted), dependency audit (npm/pip/composer/go/bundle/cargo), supply-chain checks, and the files for the OWASP/STRIDE review (full_scan: all tracked files for secrets). save: the security engineer\'s OWASP checklist, STRIDE table, attack surface and findings plus the scan findings get SEC ids and a verdict (PASS/CAUTION/FAIL) in SECURITY-REVIEW.md and a section in the phase review; unresolved CRITICAL/HIGH block /triad:ship.',
     inputSchema: {
       type: 'object',
       properties: {

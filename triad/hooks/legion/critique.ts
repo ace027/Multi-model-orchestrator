@@ -35,6 +35,9 @@ export function critique(plans: Plan[], maxTasks = 3, knownAgents?: Set<string>)
     const undecided = p.body.match(/\b(TBD|decide later|to be decided|as needed|executor (should|can|will) decide)\b/i)
     if (undecided) add(p.id, 'BLOCKER', 'decisions', `the plan leaves a decision open ("${undecided[0]}"); make it now`)
     else if (/\b(leave (this )?for later|future phase)\b/i.test(p.body)) add(p.id, 'WARNING', 'decisions', 'the plan defers work to a later phase')
+    // plan-critique: a vague action ("implement as appropriate") is not decision-complete.
+    const vague = [...p.body.matchAll(/<action>([\s\S]*?)<\/action>/g)].map(m => m[1]!.match(/\b(as appropriate|appropriately|where (appropriate|relevant)|update (the )?relevant|and so on|etc\.|verify manually|use existing helpers)/i)).find(Boolean)
+    if (vague) add(p.id, 'BLOCKER', 'decisions', `a task action is vague ("${vague[0]}"); name the files, functions and behaviour`)
     if (!fm.agents.length && fm.autonomous !== true) add(p.id, 'BLOCKER', 'agents', 'no agents named')
   }
   const w = planWaves(plans, knownAgents)

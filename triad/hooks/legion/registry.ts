@@ -2,6 +2,8 @@
 // partial 1), review panels (review-panel Section 1) and rubrics.
 import { PERSONAS, type Persona } from './personas.ts'
 import { DEFAULT_RUBRICS, RUBRICS } from './data.ts'
+import { PERSONA_BODIES } from './personasfull.ts'
+import type { Io } from './io.ts'
 
 export const BY_ID = new Map(PERSONAS.map(p => [p.id, p]))
 export const ROSTER = new Set(PERSONAS.map(p => p.id))
@@ -128,4 +130,13 @@ export function fixAgentFor(file: string): string {
   if (/(content|campaigns|marketing)\//.test(file)) return 'marketing-content-social-strategist'
   if (/(^|\/)(\.github\/workflows|Dockerfile|docker-compose)/.test(file)) return 'engineering-infrastructure-devops'
   return 'engineering-senior-developer'
+}
+
+// execution.agent_personality_verbosity: the full Legion body only when the
+// project's settings.json says `full`; otherwise the condensed core.
+export async function personaTextFor(io: Io): Promise<(p: Persona) => string> {
+  let raw: any = {}
+  try { raw = JSON.parse((await io.read('settings.json')) ?? '{}') } catch { /* loadProject warns */ }
+  const full = raw?.execution?.agent_personality_verbosity === 'full'
+  return p => (full && PERSONA_BODIES[p.id] ? `# Persona: ${p.name} (${p.id}, ${p.division})\n${PERSONA_BODIES[p.id]}` : personaBrief(p))
 }

@@ -11,7 +11,7 @@ import {
   succeeded, updateState, verificationCommands, overlaps, type Plan,
 } from './planning.ts'
 import { commitPhase, commitPlan, commitWave, renderSummary, type SummaryInput, type VerifyRun } from './render.ts'
-import { BY_ID, findPersona, personaBrief, ROSTER } from './registry.ts'
+import { BY_ID, findPersona, personaBrief, personaTextFor, ROSTER } from './registry.ts'
 import type { Persona } from './personas.ts'
 import { critique } from './critique.ts'
 import { parseReply } from '../policy.ts'
@@ -20,7 +20,6 @@ import { OUTCOMES, agentScores, storeOutcome, taskTypeOf } from './memory.ts'
 import { applyMode, escalationRows, loadProtocol, parseEscalations, type Escalation } from './escalation.ts'
 import { blockerType, classifyFailure, detectManualEdits, envRetryBrief, recordAgentFiles, type Failure } from './resilience.ts'
 import { checkSummary, compactedBody, compactedCovers, compactedPath, compactPhase, shouldCompact, COMPACT_TARGET } from './compact.ts'
-import { PERSONA_BODIES } from './personasfull.ts'
 import { renderDecisionSummary, selectionRationale, type Rationale } from './rationale.ts'
 import { addWorktree, inWorktree, mergeWorktree, removeWorktree, worktreeFiles, type Worktree } from './worktree.ts'
 
@@ -96,6 +95,12 @@ const listAfter = (text: string, key: string) => {
   const out = first && !/^none$/i.test(first) ? [first] : []
   for (let j = i + 1; j < lines.length && !/^\s*[a-z_]+:/i.test(lines[j]!) && !/^</.test(lines[j]!) && !/^\s*```/.test(lines[j]!); j++) if (lines[j]!.trim().replace(/^-\s*/, '')) out.push(lines[j]!.trim().replace(/^-\s*/, ''))
   return out
+}
+
+const HAIKU_REVIEWER = 'testing-qa-verification-specialist'
+
+export function haikuReviewBrief(reviewer: Persona, author: Persona, brief: string, answer: string): string {
+  return `${personaBrief(reviewer)}\n\n---\n\n# Review of a Haiku agent's plan work\nThe ${author.name} (${author.id}) ran the plan below on Haiku and reported the answer at the end. Read the files it changed, check them against the plan's tasks and done criteria, fix errors and omissions in those files only, run the verification commands, and reply in the return schema for the plan as a whole (your fixes included).\n\n## Plan brief\n${brief}\n\n## Haiku answer\n${answer}`
 }
 
 export function planBrief(o: { persona: Persona; plan: Plan; planText: string; phase: number; phaseName: string; wave: number; peers: string[]; handoffs: string; mode: Mode; haiku: boolean; personaText?: string; workdir?: string }): string {
@@ -184,11 +189,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   const esc = await loadProtocol(io)
   const protocol = esc.protocol
   warnings.push(...esc.warnings)
-  // agent_personality_verbosity: full only when the project's settings.json asks for it.
-  let raw: any = {}
-  try { raw = JSON.parse((await io.read('settings.json')) ?? '{}') } catch { /* loadProject warned */ }
-  const fullPersonas = raw?.execution?.agent_personality_verbosity === 'full' ? PERSONA_BODIES : undefined
-  const personaText = (x: Persona) => (fullPersonas?.[x.id] ? `# Persona: ${x.name} (${x.id}, ${x.division})\n${fullPersonas[x.id]}` : personaBrief(x))
+  const personaText = await personaTextFor(io)
   let useWorktrees = settings.execution.use_worktrees === true
   if (useWorktrees && !autoCommit) {
     warnings.push('execution.use_worktrees needs commits (auto_commit on, a writable control mode); plans run in the main tree')
@@ -282,7 +283,14 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           const at = (fs: string[]) => (wt ? fs.map(f => `${wt.path}/${f}`) : fs)
           const scope: Scope = { planId: plan.id, mode, files_modified: at(writableOf(plan)), files_forbidden: at(plan.fm.files_forbidden ?? []) }
           const r = await agents.run({ persona, brief, scope, label: `plan ${plan.id}` })
-          return { plan, persona, r }
+          // User decision 1: a haiku-tier persona's work gets a Sonnet review that fixes
+          // errors and omissions in the same files, then answers in the return schema.
+          if (persona.tier !== 'haiku' || r.deny || r.answer === undefined) return { plan, persona, r, reviewerId: undefined as string | undefined }
+          const reviewer = BY_ID.get(HAIKU_REVIEWER)!
+          const rb = haikuReviewBrief(reviewer, persona, brief, r.answer)
+          const rv = await agents.run({ persona: reviewer, brief: rb, scope, label: `plan ${plan.id} sonnet review` })
+          if (rv.deny || !rv.answer?.trim()) { warnings.push(`${plan.id}: sonnet review of the haiku work failed (${rv.deny ?? 'no answer'}); the work is unreviewed`); return { plan, persona, r, reviewerId: undefined } }
+          return { plan, persona, r: { ...r, answer: rv.answer }, reviewerId: rv.agentId }
         }))
         // Files changed by this batch, attributed to the plan that owns them.
         const after = await dirtyFiles(io)
@@ -302,7 +310,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           warnings.push(`reverted changes outside the plans' files (control mode ${mode}): ${unclaimed.join(', ')}`)
         } else if (unclaimed.length) warnings.push(`changes outside every plan's files_modified (left uncommitted): ${unclaimed.join(', ')}`)
 
-        for (const { plan, persona, r } of runs) {
+        for (const { plan, persona, r, reviewerId } of runs) {
           const wt = trees.get(plan.id)
           let answer = r.answer ?? ''
           const cmds = verificationCommands(plan)
@@ -328,6 +336,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           const reply = parseReply(answer)
           const raised = parseEscalations(answer, protocol)
           const seen = r.agentId ? agents.writesOf(r.agentId) : { files: [], warnings: [] }
+          if (reviewerId) { const rw = agents.writesOf(reviewerId); seen.files.push(...rw.files); seen.warnings.push(...rw.warnings) }
           // surgical auto_escalate_file_scope: out-of-scope access is a blocker even without a block.
           for (const wmsg of seen.warnings) raised.push({ severity: fileScope ? 'blocker' : 'warning', type: 'scope', decision: wmsg, status: 'pending' })
           if (fileScope && unclaimed.length) raised.push({ severity: 'blocker', type: 'scope', decision: `Out-of-scope changes were reverted: ${unclaimed.join(', ')}`, context: `Control mode ${mode} auto-escalates file access outside files_modified${batch.length > 1 ? ` (batch ${batch.map(x => x.id).join(', ')})` : ''}.`, status: 'pending' })
