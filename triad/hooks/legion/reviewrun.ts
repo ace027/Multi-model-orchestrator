@@ -12,6 +12,7 @@ import { runVerification, dirtyFiles, type Agents } from './build.ts'
 import { parseReply } from '../policy.ts'
 import { phaseNumbers } from './status.ts'
 import type { Mode } from './settings.ts'
+import { filterReview } from './authority.ts'
 
 export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void }
 export type ReviewResult = { ok: boolean; result?: 'PASSED' | 'ESCALATED' | 'STALE LOOP ABORTED'; error?: string; cycles: number; text: string; open: Finding[] }
@@ -99,12 +100,13 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   for (cycle = 1; cycle <= maxCycles; cycle++) {
     const reports: ReviewerReport[] = await Promise.all(reviewers.map(async persona => {
       const brief = reviewerBrief({ persona, panel: panelMode, phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles, open, cycle, checks })
-      const r = await agents.run({ persona, brief, scope: { planId: `review-${pad2(n)}`, mode: 'surgical', files_modified: [], files_forbidden: [] }, label: `review ${persona.id}` })
+      const r = await agents.run({ persona, brief, scope: { planId: `review-${pad2(n)}`, mode: 'surgical', files_modified: [], files_forbidden: [], active: reviewers.map(x => x.id) }, label: `review ${persona.id}` })
       const report = parseReport(persona.id, r.answer ?? '', cycle)
       // Reviewers sometimes give absolute paths; findings are keyed by the project-relative one.
       for (const f of report.findings) if (f.file.startsWith(io.root + '/')) f.file = f.file.slice(io.root.length + 1)
       return report
     }))
+    delta.push(...await filterReview(io, reports, reviewers.map(r => r.id), cycle))
     for (const r of reports) verdicts.push({ agent: r.agent, verdict: r.verdict ?? (r.findings.length ? 'NEEDS WORK' : 'no verdict'), cycle })
     const t = triage(reports, all.length + 1)
     // A finding raised again keeps its id; one nobody raised again counts as fixed.

@@ -6,7 +6,8 @@ import { LEGION_TOOLS } from './legion/tools.ts'
 import { personaRank, planCheck, planWrite, projectInit, statusText, validateText } from './legion/handlers.ts'
 import { buildRun } from './legion/buildrun.ts'
 import { review } from './legion/reviewrun.ts'
-import { checkWrite, type Scope } from './legion/settings.ts'
+import { checkWrite, controlMode, controlModeLine, type Scope } from './legion/settings.ts'
+import { checkMapping, loadKnowledgeIndex, logDecision, prepareRun } from './legion/authority.ts'
 import { renderPersonaRuns, runPersonas } from './legion/personarun.ts'
 import { EXTENDED, extendedTool } from './legion/extended.ts'
 import { loadCustomPersonas } from './legion/custom.ts'
@@ -66,7 +67,23 @@ You are the orchestrator. Decompose the work, make the architecture decisions, r
 - Check results with the verify commands and git diff --stat, not by reading whole files.
 - Long tool output may come back compressed, with the path of the full text in .triad/out/.
 - /triad shows the agent tree and the tokens and cost per tier.
-- Legion projects (.planning/) run through /triad:start, /triad:plan, /triad:build, /triad:review and /triad:quick; /triad status and /triad validate are computed in code.`
+- Legion projects (.planning/) run through /triad:start, /triad:plan, /triad:build, /triad:review and /triad:quick; /triad status and /triad validate are computed in code.
+
+## Legion coordination
+You hold the agents-orchestrator role yourself; that persona is never spawned. The workflow is start, plan, build, review, ship, retro, then the next phase's plan.
+- Nine divisions of specialist personas: Engineering, Design, Marketing, Testing, Product, Project Management, Support, Spatial Computing, Specialized. Pick personas with persona_brief (hybrid selection: recommend, the user confirms or overrides).
+- Authority: each persona owns exclusive domains (.planning/config/authority-matrix.yaml). Briefs list them; reviews drop out-of-domain findings from non-owners, except blockers. Agents may decide alone only inside their plan's files_modified, tests for their code, declared dependencies and formatting.
+- Escalate (an <escalation> block, then a human decision): architecture changes, unplanned dependencies, files outside the task's scope, schema or API contract changes, deletions, CI/CD or deployment changes, overriding review findings or skipping quality gates. Never rationalize a small exception.
+- Control modes (settings.json control_mode; planning_status reports the flags and whether confirmation gates are on):
+  - guarded (default): authority and domain filtering on, out-of-scope writes warned and escalated.
+  - surgical: out-of-scope writes refused and reverted.
+  - advisory: read-only; agents return suggestions, nothing is committed.
+  - autonomous: checks only warn and log; confirmation gates are skipped with their defaults. Permissions are never loosened.
+- Every question to the user (confirmation gates, choices, persona swaps) uses AskUserQuestion with a closed set of options, never a question in plain text.`
+
+// The guide plus the knowledge index built at session start from the plugin's
+// own files (byte-stable for a plugin version).
+let guide = ORCHESTRATOR_GUIDE
 
 const depthOf = (id: string | undefined): number => (id ? 1 + depthOf(parents[id]) : 0)
 const runDir = () => `${cwd}/.triad/run`
@@ -198,7 +215,14 @@ function ioOf($: any, root = cwd): Io {
 function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
   return {
     maxParallel: opts.maxCoders,
-    async run({ persona, brief, scope, label }) {
+    async run(o) {
+      const { persona, label } = o
+      const prep = await prepareRun(ioOf($), persona, o.brief, o.scope)
+      if ('deny' in prep) {
+        log(`${label}: not started (${prep.deny})`)
+        return { deny: prep.deny }
+      }
+      const { brief, scope } = prep
       const helper = persona.tier === 'haiku'
       const description = `${LEGION_MARK}${label} #${++seq}`
       if (persona.tier === 'opus') modelFor[description] = 'opus'
@@ -257,7 +281,7 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
   switch (name) {
     case 'planning_status': {
       const v = await validateText(io, '--ci')
-      return `${await statusText(io)}\n\nValidate: ${v.text}`
+      return `${await statusText(io)}\n\nValidate: ${v.text}\n${controlModeLine(await controlMode(io))}`
     }
     case 'project_init': return projectInit(io, input)
     case 'plan_write': return planWrite(io, input)
@@ -296,6 +320,9 @@ export const register: Register = (on, options) => {
       isDeferred: false,
     })
     for (const t of LEGION_TOOLS) await $.tool.register({ ...t, isDeferred: true })
+    try {
+      guide = `${ORCHESTRATOR_GUIDE}\n\n${await loadKnowledgeIndex(ioOf($, $.plugin.root))}`
+    } catch { guide = ORCHESTRATOR_GUIDE }
     await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project', argumentHint: '[status | validate [--ci] [--fix]]' })
     return r
   })
@@ -305,7 +332,7 @@ export const register: Register = (on, options) => {
   on('prompt.section', { name: 'communication' }, async ($, e, next) => {
     const r = await next(e)
     ledger.contextInjections = (ledger.contextInjections ?? 0) + 1
-    return { text: (r.text ? r.text + '\n\n' : '') + ORCHESTRATOR_GUIDE }
+    return { text: (r.text ? r.text + '\n\n' : '') + guide }
   })
 
   on('tool.describe', async ($, e, next) => {
@@ -481,8 +508,16 @@ export const register: Register = (on, options) => {
     const input = e as unknown as { file_path?: string; notebook_path?: string }
     const target = input.file_path ?? input.notebook_path ?? ''
     const scope = id ? scopes[id] : undefined
+    // Directory mappings (when the project has them) for Legion plan agents and coders.
+    const mapped = id && target && (scope || roles[id] === 'coder') ? await checkMapping(ioOf($), rel(target)) : { action: 'ok' as const }
+    if (mapped.action !== 'ok') {
+      await logDecision(ioOf($), { agents: [id!], topic: 'directory-mapping', decision: mapped.action === 'deny' ? 'write denied' : 'write warned', reason: mapped.reason! })
+      if (mapped.action === 'deny') return { deny: `triad: ${mapped.reason}. Directory mappings are strict: write it there, or return blocked naming the path the task needs.` }
+      if (scope && !scopeLog[id!]!.warnings.includes(mapped.reason!)) scopeLog[id!]!.warnings.push(mapped.reason!)
+    }
     if (id && scope && target) {
       const d = checkWrite(rel(target), scope)
+      if (d.action !== 'allow') await logDecision(ioOf($), { agents: [id], topic: `write ${rel(target)}`, decision: d.action, reason: `${scope.planId} (${scope.mode}): ${d.reason ?? ''}` })
       if (d.action === 'deny') return { deny: 'triad: ' + d.reason }
       if (d.action !== 'allow' && d.reason && !scopeLog[id]!.warnings.includes(d.reason)) scopeLog[id]!.warnings.push(d.reason)
       const r: any = await next(e)
@@ -555,7 +590,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'triad' }, async ($, e) => {
     const args = String(e.args ?? '').trim()
-    if (/^status\b/.test(args)) return { text: await statusText(ioOf($)) }
+    if (/^status\b/.test(args)) return { text: `${await statusText(ioOf($))}\n${controlModeLine(await controlMode(ioOf($)))}` }
     if (/^validate\b/.test(args)) return validateText(ioOf($), args)
     await save($)
     return {

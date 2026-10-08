@@ -1,6 +1,6 @@
 ---
 description: Ship a reviewed phase: 6 pre-ship gates in code, ship report, PR or push, post-ship verification, optional canary
-argument-hint: "[--phase N] [--dry-run] [--canary]"
+argument-hint: "[--phase N] [--dry-run] [--canary] [--auto]"
 ---
 Ship a reviewed phase of the Triad project. Arguments: $ARGUMENTS
 
@@ -11,7 +11,7 @@ Load the tools: ToolSearch with query `select:mcp__triad__ship,mcp__triad__githu
 3. Ask the user how to publish with AskUserQuestion. The check result says whether `gh` is ready for this repo:
    - gh ready: "Create PR (Recommended)" (method `pr`), "Push to current branch" (`push`), "Mark shipped only" (`mark`).
    - gh not ready: "Push to current branch", "Mark shipped only", and say why a PR is not offered (the reason the check gave).
-   Stop if the user cancels.
+   Stop if the user cancels. This confirmation gate is skipped when `planning_status` (load `mcp__triad__planning_status`) reports confirmation gates off (control mode autonomous) or with `--auto`: then take the recommended option (Create PR when gh is ready, else Push to current branch).
 4. Call ship action `publish` with the phase and the chosen `method`. It never force-pushes. If the npm audit gate blocks the PR, show the critical advisories and stop. Show the PR URL (or the pushed branch), the post-ship verification result and the commit.
-5. Canary, if `--canary` was given or the user asks for it now: only when settings.json has `adapter.deploy_command` (otherwise say so and skip). Call ship action `canary` with the phase (and any extra health-check commands the user names). It deploys and schedules checks at 1, 5 and 15 minutes; the results come back here as messages. When a check reports unhealthy, show it and ask the user whether to roll back; never roll back automatically.
+5. Canary, if `--canary` was given or the user asks for it now: only when settings.json has `adapter.deploy_command` (otherwise say so and skip). Call ship action `canary` with the phase (and any extra health-check commands the user names). It deploys and schedules checks at 1, 5 and 15 minutes; the results come back here as messages. When a check reports unhealthy, show it and ask the user whether to roll back; never roll back automatically (gates off: report it and do not roll back).
 6. Next: `/triad:plan N+1`, or `/triad:milestone` when this was the milestone's last phase.

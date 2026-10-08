@@ -104,13 +104,13 @@ describe('plans and critique', () => {
 
 describe('authority', () => {
   const scope = (mode: any) => ({ planId: '01-01', mode, files_modified: ['src/a.ts', 'src/lib/'], files_forbidden: ['secrets/'] })
-  test('control modes: surgical denies, guarded and autonomous warn, advisory logs', () => {
+  test('control modes: surgical denies, guarded and autonomous warn, advisory (read-only) denies', () => {
     expect(checkWrite('src/a.ts', scope('surgical')).action).toBe('allow')
     expect(checkWrite('src/lib/x.ts', scope('surgical')).action).toBe('allow')
     expect(checkWrite('src/b.ts', scope('surgical')).action).toBe('deny')
     expect(checkWrite('secrets/k', scope('guarded')).action).toBe('warn')
     expect(checkWrite('src/b.ts', scope('autonomous')).action).toBe('warn')
-    expect(checkWrite('src/b.ts', scope('advisory')).action).toBe('log')
+    expect(checkWrite('src/b.ts', scope('advisory')).action).toBe('deny')
     expect(checkWrite('.triad/out/x', scope('surgical')).action).toBe('allow')
   })
   test('settings: new projects get the triad prefix, Legion projects keep theirs, bad modes fall back', () => {
