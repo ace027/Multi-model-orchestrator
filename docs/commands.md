@@ -68,6 +68,8 @@ Execute a planned phase with the wave executor (one agent per plan, verification
 
 Wave executor in mod code: one agent per plan at its persona's tier (haiku personas on triad-helper, opus personas with the opus model), plans of a wave in parallel unless they share files, verification commands run by the mod, one follow-up fix on a failed check, a SUMMARY.md per plan (failures too), STATE/ROADMAP after every plan and wave, Legion's commit messages. Resumes from the first plan without a successful summary.
 
+Interrupted builds: each agent's answer is saved in `.triad/legion/answers/` before its plan is verified, and removed once the plan's SUMMARY is written. If the session restarts in between (a remote session stopped while it looked idle), the next `/triad:build` verifies and commits the saved answer without running the agent again, and `/triad status` names the plan under Interrupted build until then. While `build_phase` or `review_phase` runs, each progress line also goes into the transcript (and the status line), with a "still running" line every 5 minutes.
+
 Flags: intent flags validated in code (`--just-harden` ad-hoc team, `--just-document`, `--skip-frontend`, `--skip-backend` plan filters), natural-language routing, `--dry-run`, two-wave mode (Wave A build + analysis, architecture gate, Wave B execution + remediation, production verdict, manifests).
 
 ### /triad:review

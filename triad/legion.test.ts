@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 import type { Io, RunResult } from './hooks/legion/io.ts'
 import type { Agents } from './hooks/legion/build.ts'
-import { build, gitignoreLines } from './hooks/legion/build.ts'
+import { ANSWERS_DIR, answerPath, build, gitignoreLines } from './hooks/legion/build.ts'
 import { calibrate, estimate, phaseShape, predicted, type StepRecord } from './hooks/legion/estimate.ts'
 import { review } from './hooks/legion/reviewrun.ts'
 import { planCheck, planWrite, processLine, projectInit, statusText, validateText } from './hooks/legion/handlers.ts'
@@ -261,6 +261,34 @@ describe('build and review', () => {
     await build(io, fakeAgents(io))
     expect((await estimate(io, { lightPlans: 2 })).phases[0]!.build).toBe(0)
     expect((await estimate(memIo(), { lightPlans: 2 })).text).toMatch(/No Legion project/)
+  })
+  test('build: an agent answer saved before a restart is verified and committed without running the agent again', async () => {
+    const io = await newProject()
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })
+    // A normal build saves each answer before verifying it, and removes it once the SUMMARY is written.
+    const first = await newProject()
+    await planWrite(first, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })
+    const agents = fakeAgents(first)
+    const seen: (string | undefined)[] = []
+    const io0 = first.run.bind(first)
+    first.run = async (argv, o) => { if (argv[0] === 'bash' && /test -f/.test(argv[2] ?? '')) seen.push(first.files.get(answerPath(1, '01-01'))); return io0(argv, o) }
+    expect((await build(first, agents)).ok).toBe(true)
+    expect(JSON.parse(seen[0]!).answer).toContain('status: done')
+    expect([...first.files.keys()].some(k => k.startsWith(ANSWERS_DIR))).toBe(false)
+    // The interrupted run: the agent wrote its file and answered, then the session restarted.
+    await io.write('src/a.ts', '// written before the restart\n')
+    await io.write(answerPath(1, '01-01'), JSON.stringify({ answer: 'status: done\nsummary: wrote a\nchanges:\n- src/a.ts | added | a\nverify: ok', files: ['src/a.ts'], at: '2026-10-09T06:44:25Z' }))
+    expect(await statusText(io)).toMatch(/Interrupted build[\s\S]*plan 01-01 answered[\s\S]*Run `\/triad:build` again/)
+    const none = fakeAgents(io)
+    none.run = async () => { throw new Error('the agent must not run again') }
+    const lines: string[] = []
+    const r = await build(io, none, { log: l => lines.push(l) })
+    expect(r.ok).toBe(true)
+    expect(lines.some(l => /01-01: verifying the answer its agent gave before the build was interrupted/.test(l))).toBe(true)
+    expect(io.files.get('.planning/phases/01-core/01-01-SUMMARY.md') ?? [...io.files].find(([k]) => k.endsWith('01-01-SUMMARY.md'))![1]).toContain('src/a.ts')
+    expect(io.commits.some(c => /01-01/.test(c) && !/^docs/.test(c))).toBe(true)
+    expect(io.files.has(answerPath(1, '01-01'))).toBe(false)
+    expect(await statusText(io)).not.toMatch(/Interrupted build/)
   })
   test('estimate: calibrated from the measured cost of past steps', async () => {
     const rec = (project: string, step: StepRecord['step'], usd: number, plans = 2): StepRecord => ({ project, session: 's', phase: 1, step, plans, opusPlans: 0, light: false, usd, at: '' })

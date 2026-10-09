@@ -435,6 +435,38 @@ describe('haiku ceiling', () => {
     expect(r.result).not.toMatch(/plan x1\.00/)
   })
 
+  test('build_phase reports progress in the transcript and resumes from an answer saved before a restart', async ($, on) => {
+    const io = memIo()
+    const rel = (path: string) => path.replace(/^\/repo\//, '')
+    // Writes land in the in-memory project, which fs.read and fs.list serve.
+    const log = { writes: new Proxy({} as Record<string, string>, { set: (_t, k, v) => (io.files.set(rel(String(k)), v), true) }), spawns: [] as any[] }
+    world(on, log)
+    await projectInit(io, { name: 'Demo', description: 'A demo.', phases: [{ name: 'Core', goal: 'Build the core API', plans: 1 }] } as any)
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [{
+      plan: 1, title: 'Plan 1', wave: 1, agents: ['engineering-backend-architect'], depends_on: [], files_modified: ['src/a.ts'], files_forbidden: ['secrets/'],
+      verification_commands: ['test -f src/a.ts'], expected_artifacts: [{ path: 'src/a.ts', provides: 'code', required: true }], truths: ['it works'],
+      objective: 'Write src/a.ts.', tasks: [{ name: 'write', files: ['src/a.ts'], action: 'Create src/a.ts.', verification: ['test -f src/a.ts'], done: 'src/a.ts exists' }], success_criteria: ['src/a.ts exists'],
+    }] } as any)
+    await io.write('src/a.ts', '// before the restart\n')
+    await io.write('.triad/legion/answers/01-01-01.json', JSON.stringify({ answer: 'status: done\nsummary: wrote a\nchanges:\n- src/a.ts | added | a\nverify: ok', files: ['src/a.ts'], at: '2026-10-09T06:44:25Z' }))
+    on('fs.read', (_$: any, e: any) => { const t = io.files.get(rel(e.path)); if (t === undefined) throw new Error('ENOENT'); return { value: t } })
+    on('fs.list', async (_$: any, e: any) => ({ value: (await io.list(rel(e.path))).map(x => ({ name: x.name, kind: x.dir ? 'dir' : 'file' })) }))
+    const runs: string[][] = []
+    on('process.run', (_$: any, e: any) => { runs.push(e.argv); if (e.argv[0] === 'rm') io.files.delete(e.argv[2]); return { value: { exitCode: e.argv[1] === 'diff' ? 1 : 0, stdout: '', stderr: '' } } })
+    const shown: string[] = []
+    on('ui.log', (_$: any, e: any) => { shown.push(e.text); return { value: undefined } })
+    on('ui.status', () => ({ value: undefined }))
+    await start($)
+    const r: any = await $.tool.call({ tool: 'mcp__triad__build_phase', tool_use_id: 'b', phase: 1 } as any)
+    await new Promise(res => setTimeout(res, 20)) // ui.log lines are dispatched after the call that wrote them
+    expect(log.spawns).toHaveLength(0)
+    expect(r.result).toMatch(/01-01 .*: Complete/)
+    expect(shown.some(l => /^triad build_phase: 01-01: verifying the answer its agent gave before the build was interrupted/.test(l))).toBe(true)
+    expect(shown.some(l => /^triad build_phase: 01-01: running 1 verification command/.test(l))).toBe(true)
+    expect(runs.some(a => a[0] === 'git' && a[1] === 'commit' && /execute plan 01-01/.test(a.join(' ')))).toBe(true)
+    expect(io.files.has('.triad/legion/answers/01-01-01.json')).toBe(false)
+  })
+
   test('maxSpend 0 is no limit', async ($, on) => {
     world(on, { writes: {}, spawns: [] })
     const state = { chars: 1_000, sent: [] as string[], steps: 0 }

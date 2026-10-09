@@ -13,6 +13,7 @@ import { renderValidate, runValidate } from './validate.ts'
 import { BY_ID, ROSTER, findPersona, rank } from './registry.ts'
 import { agentScores, briefing } from './memory.ts'
 import { deriveStatus, parseMilestones } from './milestone.ts'
+import { interruptedPlans } from './build.ts'
 
 export async function statusText(io: Io, opts: { dryRun?: boolean } = {}): Promise<string> {
   if (opts.dryRun) return renderDryRun(await dryRunReport(io, 'status'))
@@ -25,6 +26,13 @@ export async function statusText(io: Io, opts: { dryRun?: boolean } = {}): Promi
     plans.set(n, [ph.plans.length > 0, Object.keys(ph.summaries).length > 0])
   }
   const extra: string[] = []
+  // A build cut off after an agent answered (a session restart).
+  const cut = []
+  for (const key of await interruptedPlans(io)) {
+    const [, ph, id] = key.match(/^(\d+)-(.+)$/) ?? []
+    if (ph && id && !(await loadPhase(io, p, Number(ph))).summaries[id]) cut.push(id)
+  }
+  if (cut.length) extra.push('', '## Interrupted build', `The build stopped after the agent for plan ${cut.join(', ')} answered, before its work was verified and committed (a session restart). Run \`/triad:build\` again: it verifies and commits the saved answer without running the agent again. Do not finish the plan by hand.`)
   const ms = p.roadmap && p.roadmapText ? parseMilestones(p.roadmapText).map(m => ({ ...m, status: deriveStatus(m, p.roadmap!) })) : []
   const cur = ms.find(m => m.status === 'In Progress') ?? ms.find(m => m.status === 'Pending') ?? ms.find(m => m.status === 'Complete')
   if (cur) {

@@ -19,7 +19,7 @@ Keep the run lean; every turn of yours re-reads the whole conversation. Load too
    - planned, not built (or a build stopped part way): call `build_phase` with the phase directly (no Skill). "Two-wave mode" with a Wave A report: call `build_phase` with `stage: "B"` unless the report has a blocker escalation or a CRITICAL finding (then stop). All plans succeeded: review.
    - built: call `review_phase` with the phase directly (no `mode`). If `.planning/designs/` or `.planning/campaigns/` exists, run Skill `triad:review` with `N --auto` instead, for the domain review. PASSED on a full-process phase: run Skill `triad:polish` with `--phase N --auto`. A light-process phase skips polish (the review fixed its minor findings).
    - review passed: the next phase; after the last phase (or phase N of `--until N`), go to step 6.
-   Call `planning_status` again only when a result leaves the position unclear.
+   Call `planning_status` again only when a result leaves the position unclear. After a session restart (a `build_phase` or `review_phase` call that never returned), call the same tool again; it resumes, and reuses answers agents gave before the restart.
 5. Stop early, and go to step 6, when:
    - a result says a spending budget is reached (`spending budget is reached`), or `planning_status`'s Budget line says reached;
    - planning halts on a BLOCKER (a critical security finding, a Blocking spec question, REWORK after the refine cap);
