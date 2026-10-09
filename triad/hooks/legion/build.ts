@@ -39,6 +39,25 @@ export interface Agents {
 
 // only: run just these plans (intent filters, two-wave stages); the phase is
 // finalized only once every plan in it has succeeded.
+// An agent's answer is saved before its plan is verified and committed, so a
+// build cut off in between (a session restart) verifies and commits the saved
+// answer on the next run instead of paying for the agent again. Under .triad/,
+// never committed; removed once the plan's SUMMARY is written.
+export const ANSWERS_DIR = '.triad/legion/answers'
+export const answerPath = (n: number, id: string) => `${ANSWERS_DIR}/${pad2(n)}-${id}.json`
+type SavedAnswer = { answer: string; files: string[]; at: string }
+function parseSaved(text: string | undefined): SavedAnswer | undefined {
+  try {
+    const j = JSON.parse(text ?? '')
+    if (j && typeof j.answer === 'string' && j.answer.trim()) return { answer: j.answer, files: Array.isArray(j.files) ? j.files.filter((f: unknown) => typeof f === 'string') : [], at: String(j.at ?? '') }
+  } catch { /* none, or unreadable: the agent runs */ }
+  return undefined
+}
+// Plans whose agent answered but whose build stopped before the answer was verified.
+export async function interruptedPlans(io: Io): Promise<string[]> {
+  return (await io.list(ANSWERS_DIR)).filter(e => !e.dir && e.name.endsWith('.json')).map(e => e.name.replace(/\.json$/, '')).sort()
+}
+
 export type BuildOptions = { phase?: number; wave?: number; rerun?: boolean; only?: string[]; log?: (s: string) => void }
 export type PlanOutcome = { id: string; status: SummaryInput['status']; agent: string; files: string[]; failedChecks: string[]; skipped?: boolean; failure?: Failure; escalations?: Escalation[]; rationale?: Rationale }
 export type BuildReport = { ok: boolean; phase?: number; error?: string; warnings: string[]; plans: PlanOutcome[]; stoppedAfterWave?: number; text: string }
@@ -315,15 +334,28 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           const scope: Scope = { planId: plan.id, mode, files_modified: at(writableOf(plan)), files_forbidden: at(plan.fm.files_forbidden ?? []) }
           // A plan marked `model: opus` (open-ended work) runs on the Opus coder.
           const runAs = plan.fm.model === 'opus' && persona.tier === 'sonnet' ? { ...persona, tier: 'opus' as const } : persona
+          // A worktree build starts from a fresh worktree, so a saved answer only counts in the main tree.
+          const saved = opts.rerun || wt ? undefined : parseSaved(await io.read(answerPath(n, plan.id)))
+          if (saved) {
+            log(`${plan.id}: verifying the answer its agent gave before the build was interrupted (${saved.at}); the agent does not run again`)
+            return { plan, persona, r: { answer: saved.answer } as AgentRun, reviewerId: undefined as string | undefined, resumed: saved.files }
+          }
+          const save = async (run: AgentRun, ids: (string | undefined)[]) => {
+            if (!run.answer?.trim()) return
+            const files = [...new Set(ids.flatMap(id => (id ? agents.writesOf(id).files : [])))]
+            await io.write(answerPath(n, plan.id), JSON.stringify({ answer: run.answer, files, at: io.now().toISOString() }) + '\n').catch(() => undefined)
+          }
           const r = await agents.run({ persona: runAs, brief, scope, label: `plan ${plan.id}` })
           // User decision 1: a haiku-tier persona's work gets a Sonnet review that fixes
           // errors and omissions in the same files, then answers in the return schema.
-          if (persona.tier !== 'haiku' || r.deny || r.answer === undefined) return { plan, persona, r, reviewerId: undefined as string | undefined }
+          if (persona.tier !== 'haiku' || r.deny || r.answer === undefined) { await save(r, [r.agentId]); return { plan, persona, r, reviewerId: undefined as string | undefined, resumed: undefined as string[] | undefined } }
           const reviewer = BY_ID.get(HAIKU_REVIEWER)!
           const rb = haikuReviewBrief(reviewer, persona, brief, r.answer)
           const rv = await agents.run({ persona: reviewer, brief: rb, scope, label: `plan ${plan.id} sonnet review` })
-          if (rv.deny || !rv.answer?.trim()) { warnings.push(`${plan.id}: sonnet review of the haiku work failed (${rv.deny ?? 'no answer'}); the work is unreviewed`); return { plan, persona, r, reviewerId: undefined } }
-          return { plan, persona, r: { ...r, answer: rv.answer }, reviewerId: rv.agentId }
+          if (rv.deny || !rv.answer?.trim()) { warnings.push(`${plan.id}: sonnet review of the haiku work failed (${rv.deny ?? 'no answer'}); the work is unreviewed`); await save(r, [r.agentId]); return { plan, persona, r, reviewerId: undefined, resumed: undefined } }
+          const reviewed = { ...r, answer: rv.answer }
+          await save(reviewed, [r.agentId, rv.agentId])
+          return { plan, persona, r: reviewed, reviewerId: rv.agentId, resumed: undefined }
         }))
         // Files changed by this batch, attributed to the plan that owns them.
         const after = await dirtyFiles(io)
@@ -343,10 +375,11 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           warnings.push(`reverted changes outside the plans' files (control mode ${mode}): ${unclaimed.join(', ')}`)
         } else if (unclaimed.length) warnings.push(`changes outside every plan's files_modified (left uncommitted): ${unclaimed.join(', ')}`)
 
-        for (const { plan, persona, r, reviewerId } of runs) {
+        for (const { plan, persona, r, reviewerId, resumed } of runs) {
           const wt = trees.get(plan.id)
           let answer = r.answer ?? ''
           const cmds = verificationCommands(plan)
+          if (!r.deny && cmds.length) log(`${plan.id}: running ${cmds.length} verification command${cmds.length === 1 ? '' : 's'}`)
           let verify = r.deny ? [] : await runVerification(io, cmds, wt)
           // BLOCKER/ENVIRONMENT classification of a failed check or a blocked agent
           // (workflow-common Auto-Remediation): ENVIRONMENT gets one automatic retry, BLOCKER escalates.
@@ -378,7 +411,12 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           let status: SummaryInput['status'] = r.deny ? 'Failed' : !r.answer ? 'Failed' : statusFrom(reply, verify, escalations, [])
           const files = wt
             ? (await worktreeFiles(io, wt)).filter(f => !f.startsWith('.triad/') && !f.startsWith('.planning/')).sort()
-            : [...new Set([...(claimed.get(plan.id) ?? []), ...seen.files.filter(f => writableOf(plan).some(m => overlaps(f, m)))])].sort()
+            : [...new Set([
+              ...(claimed.get(plan.id) ?? []),
+              ...[...seen.files, ...(resumed ?? [])].filter(f => writableOf(plan).some(m => overlaps(f, m))),
+              // A resumed plan's files were already changed when this build started.
+              ...(resumed ? [...before].filter(f => !f.startsWith('.triad/') && !f.startsWith('.planning/') && writableOf(plan).some(m => overlaps(f, m))) : []),
+            ])].sort()
           let error = r.deny ? `The agent could not start: ${r.deny}` : !r.answer ? 'The agent did not return an answer.' : status === 'Failed' ? `Verification failed: ${verify.filter(v => !v.passed).map(v => v.command).join('; ')}` : undefined
           // Worktree: merged back once verification passed; a conflict is aborted, fails the plan, and keeps the worktree.
           if (wt && succeeded(status)) {
@@ -412,6 +450,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           for (const e of checkSummary(summaryText, { verificationDeclared: cmds.length > 0 && !!r.answer, escalations: escalations.length, decisions: s.decisions.length })) warnings.push(`SUMMARY ${plan.id}: ${e}`)
           summaries[plan.id] = summaryText
           await io.write(`${ph.rel}/${plan.id}-SUMMARY.md`, summaryText)
+          await io.run(['rm', '-f', answerPath(n, plan.id)]).catch(() => undefined)
           const okNow = succeeded(status)
           state = appendToSection(state, resultsHeading, `- Plan ${plan.id} (Wave ${w.wave}): ${plan.title} — ${okNow ? status : `${status.toUpperCase()}: ${(s.error ?? reply.blockedReason ?? reply.summary[0] ?? '').slice(0, 200)}`}`)
           await saveState({ status: `Phase ${n} executing — Plan ${plan.id} ${okNow ? 'complete' : 'failed'}`, lastActivity: `Plan ${plan.id} execution (${date})` })

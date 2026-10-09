@@ -109,4 +109,4 @@ The ledger prices every request per tier, including Haiku's rate above 100k prom
 
 `claude plugin test triad` runs the test suites; [`../CONTRIBUTING.md`](../CONTRIBUTING.md) has the other checks and the conventions. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the `delegate_menial` round trip is covered by the live run in `bench/run_accept.sh` instead.
 
-Version 0.12.0.
+Version 0.12.1.

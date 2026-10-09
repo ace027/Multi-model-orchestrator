@@ -18,3 +18,4 @@ Execute a planned phase of the Triad project in `.planning/`. Arguments: $ARGUME
 6. Report the result to the user: each plan's outcome, skipped plans from an intent filter, failed checks, escalations, and the next command.
    - All plans succeeded: next is `/triad:review`.
    - A plan failed or is blocked: show its SUMMARY.md issues. Offer to re-plan it (`/triad:plan N`) or fix it and run `/triad:build` again, which resumes from the failed plan. Do not fix it yourself unasked.
+   - The session restarted while `build_phase` ran (the call never returned, or `planning_status` shows an Interrupted build): call `build_phase` again. It verifies and commits the answer an agent gave before the restart without running the agent again. Never verify or commit a plan by hand.

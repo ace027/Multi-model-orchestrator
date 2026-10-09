@@ -87,7 +87,8 @@ You hold the agents-orchestrator role yourself; that persona is never spawned. T
   - surgical: out-of-scope writes refused and reverted.
   - advisory: read-only; agents return suggestions, nothing is committed.
   - autonomous: checks only warn and log; confirmation gates are skipped with their defaults. Permissions are never loosened.
-- Every question to the user (confirmation gates, choices, persona swaps) uses AskUserQuestion with a closed set of options, never a question in plain text.`
+- Every question to the user (confirmation gates, choices, persona swaps) uses AskUserQuestion with a closed set of options, never a question in plain text.
+- A turn resumed after a session restart, with a build_phase or review_phase call that never returned: call the same tool again. A build resumes where it stopped and verifies and commits an agent answer saved before the restart without running the agent again. Never verify or commit a plan by hand.`
 
 // The Legion guide plus the knowledge index built at session start from the
 // plugin's own files (byte-stable for a plugin version).
@@ -369,14 +370,38 @@ function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
 }
 
 // The Legion tools run in the main loop only: they spawn and wait for agents.
+// A build or review is one long tool call: its progress also goes into the
+// transcript, with a line every HEARTBEAT while it runs, so the session shows
+// what it is doing (a remote session that looked idle has been stopped mid-build).
+const HEARTBEAT = 5 * 60_000
+const LONG_TOOLS = new Set(['build_phase', 'review_phase', 'persona_run', 'polish'])
 async function legionTool($: any, name: string, input: any): Promise<string> {
   const io = ioOf($)
   // Progress goes to .triad/legion.log (tail -f it during a long build).
   const lines: string[] = []
+  const long = LONG_TOOLS.has(name)
   const log = (line: string) => {
     lines.push(`${new Date().toISOString().slice(11, 19)} ${line}`)
     void $.fs.write(`${cwd}/.triad/legion.log`, lines.join('\n') + '\n').catch(() => {})
+    if (long) try { $.ui.log(`triad ${name}: ${line}`); $.ui.status(`triad ${name}: ${line}`.slice(0, 200)) } catch { /* the log file has it */ }
   }
+  if (!long) return legionStep($, io, name, input, log)
+  const t0 = Date.now()
+  let beat: { cancel(): void } | undefined
+  try {
+    beat = $.clock.every(HEARTBEAT, () => {
+      try { $.ui.log(`triad ${name}: still running (${Math.round((Date.now() - t0) / 60_000)} min)${lines.length ? `; last: ${lines[lines.length - 1]!.slice(9)}` : ''}`) } catch { /* best effort */ }
+    })
+  } catch { beat = undefined }
+  try {
+    return await legionStep($, io, name, input, log)
+  } finally {
+    try { beat?.cancel() } catch { /* already gone */ }
+    try { $.ui.status(undefined) } catch { /* best effort */ }
+  }
+}
+
+async function legionStep($: any, io: Io, name: string, input: any, log: (line: string) => void): Promise<string> {
   await loadCustomPersonas(io).catch(() => [])
   if (EXTENDED.has(name)) {
     const registry = async () => ioOf($, `${String((await $.env.get('HOME')) ?? '~')}/.claude/legion`)
