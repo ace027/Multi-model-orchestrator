@@ -149,6 +149,7 @@ describe('build and review', () => {
     const r = await build(io, agents)
     expect(r.ok).toBe(true)
     expect(io.files.has('.planning/phases/01-core/01-03-SUMMARY.md')).toBe(true)
+    expect(io.commits[0]).toBe('docs(triad): plan phase 1 — Core\n\n3 plans across 2 waves.')
     expect(io.commits.filter(c => c.startsWith('feat(triad): execute plan')).length).toBe(3)
     expect(io.commits).toContain('chore(triad): complete phase 1 execution — Core')
     expect(parseState(io.files.get('.planning/STATE.md')!).phaseNote).toBe('executed, pending review')

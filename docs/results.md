@@ -309,7 +309,7 @@ Triad 0.8.0 ran twice (`a`, `b`) and Opus alone ran a second time (`opus2`), on 
 
 Run b by step: start $0.23, plans $1.97, builds $1.96, reviews $2.55. The planning and review layers cost more than the code.
 
-What it produced beyond the code: `.planning/` with PROJECT, ROADMAP and STATE, three phases of wave-ordered plans with verification commands, a SUMMARY per plan, a REVIEW per phase with fixes applied, and one commit per plan (about 25 commits per run). Gap found: the plan and context files are written but never committed (the build commits only code and state).
+What it produced beyond the code: `.planning/` with PROJECT, ROADMAP and STATE, three phases of wave-ordered plans with verification commands, a SUMMARY per plan, a REVIEW per phase with fixes applied, and one commit per plan (about 25 commits per run). Gap found: the plan and context files are written but never committed (the build commits only code and state). Fixed in 0.9.1: `/triad:build` commits the project files and the phase's plans before it runs any plan.
 
 Gap fixed: the wave executor picked each plan's model from its persona's tier, so the AI plan ran on Sonnet even with the Opus coder in place. Plans now take `model: opus`, `/triad:plan` sets it for open-ended work, and `build_phase` runs those plans on `triad:triad-opus-coder`. `bench/run_rebuild.sh` then rewound both runs to the end of phase 2 and rebuilt phase 3 with the AI plan on Opus (`wf090o`). Both rebuilds ran out the 40-minute command timeout inside the AI plan (the plan's budget was "10 minutes of benchmark runtime", which the coder's own time does not count against); the code on disk scored 52/52 on both. Cost about $2.35 (a) and $4.1 (b), almost all the Opus coder.
 

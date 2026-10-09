@@ -235,6 +235,13 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
     await io.write('.planning/STATE.md', state)
   }
   const resultsHeading = `## Phase ${n} Results`
+  // The plans go into history before any code: /triad:start and /triad:plan only write them.
+  if (autoCommit) {
+    const docs = []
+    for (const f of ['.planning/PROJECT.md', '.planning/ROADMAP.md', '.planning/STATE.md']) if ((await io.read(f)) !== undefined) docs.push(f)
+    const err = await commit(io, [...docs, ph.rel], `docs(${prefix}): plan phase ${n} — ${phaseName}\n\n${planned} plans across ${waves.waves.length} waves.`)
+    if (err) warnings.push(err)
+  }
   if (!getSection(state, new RegExp(`^##\\s+Phase ${n} Results`))) state = appendToSection(state, resultsHeading, `(build started ${date})`)
   await saveState({ phase: `${n} of ${total} (executing)`, status: `Phase ${n} executing — ${planned} plans across ${waves.waves.length} waves`, lastActivity: `Phase ${n} build (${date})` })
 
