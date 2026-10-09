@@ -54,17 +54,17 @@ Flags: `--dry-run`, `--auto` (board quick-assess, spec, proposals, critique, des
 
 ### /triad:auto
 
-`/triad:auto [project goal | path to a spec] [--until N]`
+`/triad:auto [project goal | path to a spec] [--until N] [--estimate]`
 
 Run the whole project hands-off: start (if needed), then plan, build and review every phase with no questions; resumes where it stopped.
 
-The first run needs a goal or a spec path; `/triad:start` then takes its answers from them and records open choices as assumed decisions. Each step runs the phase's command with `--auto` (confirmation gates take their defaults), chosen from `planning_status`, so a second `/triad:auto` picks up where the last one stopped. Stops on the spending budget (`maxSpend`), a planning BLOCKER, a build that fails twice, a review that ends ESCALATED or STALE, or no progress; never fixes code or overrides a review between steps. Ends with a report per phase; `/triad:ship` is suggested, never run. Permissions are not loosened.
+The first run needs a goal or a spec path; `/triad:start` then takes its answers from them and records open choices as assumed decisions. Planning runs `/triad:plan N --auto`; builds and reviews call `build_phase` and `review_phase` directly, with every tool loaded once at the start and the next step taken from each result, which keeps the orchestrator's turns (and its share of the cost) down. Polish runs after a full-process review; a light phase relies on the review's minor-fix round. A second `/triad:auto` picks up where the last one stopped. `--estimate` plans the phases not yet planned, then shows the `estimate` tool's table (per phase: plan, build and review cost from the plan counts, the process and Opus plans, fitted to measured runs, with a range) and stops before any build. Stops on a spending budget (`maxSpend`, `maxProjectSpend`), a planning BLOCKER, a build that fails twice, a review that ends ESCALATED or STALE, or no progress; never fixes code or overrides a review between steps. Ends with a report per phase; `/triad:ship` is suggested, never run. Permissions are not loosened.
 
 ### /triad:build
 
 `/triad:build [phase number] [--wave N] [--rerun] [--dry-run] [--just-harden | --just-document | --skip-frontend | --skip-backend] [--two-wave | --single-wave] [--skip-gates] [--auto]`
 
-Execute a planned phase with the wave executor (one agent per plan, verification in code, a commit per plan); intent flags, two-wave mode and dry runs.
+Execute a planned phase with the wave executor (one agent per plan, verification in code, a commit per plan); intent flags, two-wave mode and dry runs. Before the first plan it commits the project files and the phase's plans, with `.gitignore` lines added for the caches and build output of the languages the plans write (Python, Node, Rust, Go, Java).
 
 Wave executor in mod code: one agent per plan at its persona's tier (haiku personas on triad-helper, opus personas with the opus model), plans of a wave in parallel unless they share files, verification commands run by the mod, one follow-up fix on a failed check, a SUMMARY.md per plan (failures too), STATE/ROADMAP after every plan and wave, Legion's commit messages. Resumes from the first plan without a successful summary.
 
@@ -76,7 +76,7 @@ Flags: intent flags validated in code (`--just-harden` ad-hoc team, `--just-docu
 
 Review a built phase: reviewer panel or classic, findings triaged in code, fixes routed to agents, up to 3 cycles.
 
-Panel (2-4 reviewers by divisions touched, always one Testing) or classic; a small phase (at most `lightPlans` plans, default 2) with no mode asked for gets the light review (two reviewers, no multi-pass evaluators, at most two cycles); reports parsed and triaged in code (confidence ≥80 actioned, 50-79 deferred, <50 dropped; dedup by file and overlapping lines); must-fix findings (blocker/critical/major) routed to fix agents by file; re-review of changed files; stale-loop abort; up to `review.max_cycles`; NN-REVIEW.md, STATE, ROADMAP `[x]`.
+Panel (2-4 reviewers by divisions touched, always one Testing) or classic; a small phase (at most `lightPlans` plans, default 2) with no mode asked for gets the light review (two reviewers, no multi-pass evaluators, at most two cycles); reports parsed and triaged in code (confidence ≥80 actioned, 50-79 deferred, <50 dropped; dedup by file and overlapping lines); must-fix findings (blocker/critical/major) routed to fix agents by file; re-review of changed files; stale-loop abort; up to `review.max_cycles`; after a pass, with `fixMinor` (default on), one fix round for the minor and medium-confidence findings, kept only if the verification commands still pass; NN-REVIEW.md, STATE, ROADMAP `[x]`.
 
 Flags: `--security` / `--just-security` (scan in code, OWASP/STRIDE by the security persona, unresolved CRITICAL/HIGH block ship), `--dry-run`, domain reviews.
 

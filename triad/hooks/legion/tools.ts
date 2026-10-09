@@ -45,6 +45,11 @@ const PLAN = {
 
 export const LEGION_TOOLS = [
   {
+    name: 'estimate',
+    description: 'Estimated cost of each phase still to plan, build or review, computed in code from the plan counts (actual for planned phases, the roadmap\'s otherwise), the light or full process, and plans set to model opus. Rates are fitted to measured runs; it shows a range.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'planning_status',
     description: 'Legion project (.planning/) dashboard computed in code: position, progress, phases, and the next command. Also returns the validation summary.',
     inputSchema: { type: 'object', properties: {} },

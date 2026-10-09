@@ -18,14 +18,16 @@ export type Options = {
   coderMinutes: number
   allOpus: boolean
   maxSpend: number
+  maxProjectSpend: number
   lightPlans: number
+  fixMinor: boolean
 }
 
 export const DEFAULTS: Options = {
   maxDepth: 2, maxCoders: 4, maxHelpers: 6, maxRetries: 1, strictMenu: true,
   compress: true, compressThreshold: 4_000, deferTools: true,
   haikuCeiling: 95_000, haikuWrapAt: 80_000, openPane: false, coderMinutes: 20, allOpus: false,
-  maxSpend: 0, lightPlans: 2,
+  maxSpend: 0, maxProjectSpend: 0, lightPlans: 2, fixMinor: true,
 }
 
 // Plugin agent types are namespaced (`triad:triad-coder`); match the suffix.

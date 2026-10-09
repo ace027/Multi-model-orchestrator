@@ -42,6 +42,7 @@ export const registerPane = (on: Parameters<Register>[0]) => {
         ))}
         <Box key="total"><Text bold wrap="truncate">{fit('total', usd(v.total), cols)}</Text></Box>
         {v.maxSpend !== undefined && <Box key="budget"><Text color={Math.max(v.total, v.measuredUsd ?? 0) >= v.maxSpend * 0.8 ? 'yellow' : undefined} dimColor={Math.max(v.total, v.measuredUsd ?? 0) < v.maxSpend * 0.8} wrap="truncate">{fit('budget', usd(v.maxSpend), cols)}</Text></Box>}
+        {v.project !== undefined && <Box key="project"><Text color={v.project.spent >= v.project.max * 0.8 ? 'yellow' : undefined} dimColor={v.project.spent < v.project.max * 0.8} wrap="truncate">{fit('project', `${usd(v.project.spent)} / ${usd(v.project.max)}`, cols)}</Text></Box>}
         {v.measuredUsd !== undefined && <Box key="measured"><Text dimColor wrap="truncate">{fit('session (measured)', usd(v.measuredUsd), cols)}</Text></Box>}
         <Text> </Text>
         <Box key="budgets"><Text dimColor wrap="wrap">
