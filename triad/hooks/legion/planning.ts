@@ -240,10 +240,12 @@ const strList = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : ty
 // `agents:`, a scalar list) is normalized for use; schemaErrors keep the truth.
 // Two-wave keys (wave-executor section 7) are not in Legion's plan schema,
 // which forbids extra keys: they are checked here and left out of the schema check.
-const TWO_WAVE_KEYS = ['wave_role', 'wave_a_outputs', 'authority_scope', 'service_group']
+// `model` (Triad's own: opus runs the plan on the Opus coder) is checked the same way.
+const TWO_WAVE_KEYS = ['wave_role', 'wave_a_outputs', 'authority_scope', 'service_group', 'model']
 function schemaCheck(raw: Record<string, unknown>): string[] {
   const rest = Object.fromEntries(Object.entries(raw).filter(([k]) => !TWO_WAVE_KEYS.includes(k)))
   const errs = validate(SCHEMAS.plan, rest)
+  if (raw.model !== undefined && raw.model !== 'opus') errs.push(`model must be opus when set (got ${JSON.stringify(raw.model)})`)
   if (raw.wave_role !== undefined && !['build', 'analysis', 'execution', 'remediation'].includes(raw.wave_role as string)) errs.push(`wave_role must be one of build, analysis, execution, remediation (got ${JSON.stringify(raw.wave_role)})`)
   return errs
 }

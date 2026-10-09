@@ -156,6 +156,16 @@ describe('build and review', () => {
     const again = await build(io, agents, { phase: 1 })
     expect(again.plans.every(p => p.skipped)).toBe(true)
   })
+  test('runs a plan marked model: opus on the Opus coder and the rest at the persona tier', async () => {
+    const io = await newProject()
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts'), plan(2, 1, 'src/ai.ts', { model: 'opus' })] })
+    expect(io.files.get('.planning/phases/01-core/01-02-PLAN.md')).toMatch(/^model: opus$/m)
+    expect(parsePlan('01-02-PLAN.md', io.files.get('.planning/phases/01-core/01-02-PLAN.md')!, 1).schemaErrors).toEqual([])
+    const agents = fakeAgents(io)
+    expect((await build(io, agents)).ok).toBe(true)
+    expect(agents.spawned).toContain('plan 01-02 @opus')
+    expect(agents.spawned).toContain('plan 01-01 @sonnet')
+  })
   test('a failed verification stops the build after its wave', async () => {
     const io = await newProject()
     await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts', { verification_commands: ['test -f src/never.ts'] }), plan(2, 2, 'src/b.ts', { depends_on: ['01-01'] })] })

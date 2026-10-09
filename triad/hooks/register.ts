@@ -1,7 +1,9 @@
 import type { BuiltinToolName, Register } from 'claude-code'
-import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, schemaProblems, type Options, type Role } from './policy.ts'
-import { emptyLedger, ensureAgent, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
-import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
+import { DEFAULTS, MODEL_FOR, agentIdIn, approxTokens, mayWrite, pathsInBrief, parseReply, roleOfType, modelOfType, schemaProblems, type Options, type Role } from './policy.ts'
+import { atom, update } from 'claude-code'
+import { emptyLedger, ensureAgent, paneView, promptTokens, recordCompletion, recordStep, render, type Ledger } from './ledger.ts'
+import { PANE, registerPane } from './pane.tsx'
+import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, TIME_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
 import { LEGION_TOOLS } from './legion/tools.ts'
 import { personaRank, planCheck, planWrite, projectInit, statusText, validateText } from './legion/handlers.ts'
 import { buildRun } from './legion/buildrun.ts'
@@ -59,17 +61,21 @@ const LEGION_WAIT = 60 * 60_000
 
 // Byte-stable (no dates, no per-session data) so it caches with the prefix.
 const ORCHESTRATOR_GUIDE = `# Triad orchestration
-You are the orchestrator. Decompose the work, make the architecture decisions, review results and decide retries. Do not implement, or read files at length, yourself.
-- Implementation goes to triad:triad-coder (Sonnet), one well-scoped task per agent. Brief it with file paths, acceptance criteria, constraints and the verify command; no pasted code. Launch independent tasks in parallel (several Agent calls in one message).
+You are the orchestrator. Decompose the work, make the architecture decisions, review results and decide retries. Each of your turns rereads the whole context, so keep them few: brief fully, wait, review once.
+- A change of a few lines in files you already know: make it yourself.
+- Well-specified implementation goes to triad:triad-coder (Sonnet); open-ended pieces (a game AI, architecture, tuning, visual polish) to triad:triad-opus-coder (Opus). Give one coder a whole cohesive deliverable in one complete brief: file paths, acceptance criteria, constraints and the verify command; no pasted code. Split only into independent tasks, launched in parallel.
+- A quality goal tests do not capture (an AI's strength, speed, looks): name it in the brief with a budget (about 5 rounds or 10 minutes); the coder measures it and iterates within that budget.
+- Fixes and follow-ups go to the same coder with SendMessage (its context is kept), not to a fresh agent. Retry a task at most once.
 - Menial work (search, running a test suite and summarizing failures, log triage, a checklist, boilerplate you have designed) goes to triad:triad-helper (Haiku). Name the files it may write.
-- Every agent returns status, summary, changes and verify. On blocked, rebrief, split the task, or take it over; retry a task at most once.
-- A helper that reaches its token limit is stopped and returns partial with what is done and what is left. Review what it wrote, then give what is left to a fresh helper as a narrower job.
+- Every agent returns status, summary, changes and verify. On blocked, rebrief, split the task, or take it over.
+- A helper that reaches its token limit returns partial with what is done and what is left; give what is left to a fresh helper as a narrower job.
 - Check results with the verify commands and git diff --stat, not by reading whole files.
 - Long tool output may come back compressed, with the path of the full text in .triad/out/.
 - /triad shows the agent tree and the tokens and cost per tier.
-- Legion projects (.planning/) run through /triad:start, /triad:plan, /triad:build, /triad:review and /triad:quick; /triad status and /triad validate are computed in code.
+- Legion projects (.planning/) run through the /triad:* commands (start, plan, build, review, quick and the rest); each brings its coordination rules. /triad status and /triad validate are computed in code.`
 
-## Legion coordination
+// Sent only with a /triad:* prompt (prompt.submit context), not in every request.
+const LEGION_GUIDE = `## Legion coordination
 You hold the agents-orchestrator role yourself; that persona is never spawned. The workflow is start, plan, build, review, ship, retro, then the next phase's plan.
 - Nine divisions of specialist personas: Engineering, Design, Marketing, Testing, Product, Project Management, Support, Spatial Computing, Specialized. Pick personas with persona_brief (hybrid selection: recommend, the user confirms or overrides).
 - Authority: each persona owns exclusive domains (.planning/config/authority-matrix.yaml). Briefs list them; reviews drop out-of-domain findings from non-owners, except blockers. Agents may decide alone only inside their plan's files_modified, tests for their code, declared dependencies and formatting.
@@ -81,9 +87,9 @@ You hold the agents-orchestrator role yourself; that persona is never spawned. T
   - autonomous: checks only warn and log; confirmation gates are skipped with their defaults. Permissions are never loosened.
 - Every question to the user (confirmation gates, choices, persona swaps) uses AskUserQuestion with a closed set of options, never a question in plain text.`
 
-// The guide plus the knowledge index built at session start from the plugin's
-// own files (byte-stable for a plugin version).
-let guide = ORCHESTRATOR_GUIDE
+// The Legion guide plus the knowledge index built at session start from the
+// plugin's own files (byte-stable for a plugin version).
+let legionGuide = LEGION_GUIDE
 
 const depthOf = (id: string | undefined): number => (id ? 1 + depthOf(parents[id]) : 0)
 const runDir = () => `${cwd}/.triad/run`
@@ -105,11 +111,29 @@ function refuse(reason: string) {
 async function save($: any) {
   await $.fs.write(`${cwd}/.triad/ledger.json`, JSON.stringify(ledger, null, 2) + '\n')
   if (sessionId) await $.store.set(`ledger:${sessionId}`, ledger)
+  await publish($)
+}
+
+// The pane's view (pane.tsx draws it); the state scan wants the atom in each file that uses it.
+const paneState = atom({ plugin: 'triad', key: 'view' } as const, null)
+const budgets = () => ({ coders: [running.coder.size, opts.maxCoders] as [number, number], helpers: [running.helper.size, opts.maxHelpers] as [number, number], maxDepth: opts.maxDepth })
+
+// The pane's view; a failed write never costs the ledger or the hook.
+async function publish($: any) {
+  try {
+    const view = paneView(ledger, budgets())
+    await update($, paneState, () => view)
+  } catch { /* the pane shows the last view */ }
 }
 
 // Waits for an agent's turn.complete without spending the hook's own budget:
 // the wait runs in a child process that polls for the marker the turn.complete
 // hook writes (SPIKE.md, hook budget).
+const startedAt: Record<string, number> = {}
+async function nowMs($: any): Promise<number> {
+  try { return Number(await $.clock.now()) } catch { return Date.now() }
+}
+
 async function waitForAnswer($: any, agentId: string, ms: number): Promise<string | undefined> {
   let answer: string | undefined = finished[agentId]
   delete finished[agentId]
@@ -226,7 +250,7 @@ function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
       const helper = persona.tier === 'haiku'
       const description = `${LEGION_MARK}${label} #${++seq}`
       if (persona.tier === 'opus') modelFor[description] = 'opus'
-      const s: any = await $.agent.spawn({ subagentType: helper ? HELPER_TYPE : 'triad:triad-coder', prompt: brief, description, model: helper ? 'haiku' : persona.tier === 'opus' ? 'opus' : 'sonnet' })
+      const s: any = await $.agent.spawn({ subagentType: helper ? HELPER_TYPE : persona.tier === 'opus' ? 'triad:triad-opus-coder' : 'triad:triad-coder', prompt: brief, description, model: helper ? 'haiku' : persona.tier === 'opus' ? 'opus' : 'sonnet' })
       delete modelFor[description]
       if (!s?.agentId) {
         log(`${label}: not started (${s?.deny ?? JSON.stringify(s)})`)
@@ -297,6 +321,10 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
 
 export const register: Register = (on, options) => {
   opts = { ...DEFAULTS, ...(options as Partial<Options>) }
+  // Comparison baseline: the same workflow with every agent on Opus. The Haiku
+  // ceiling exists for Haiku's pricing line, so it is off too.
+  if (opts.allOpus) opts.haikuCeiling = 0
+  registerPane(on)
 
   on('session.start', async ($, e, next) => {
     const r = await next(e)
@@ -322,9 +350,11 @@ export const register: Register = (on, options) => {
     })
     for (const t of LEGION_TOOLS) await $.tool.register({ ...t, isDeferred: true })
     try {
-      guide = `${ORCHESTRATOR_GUIDE}\n\n${await loadKnowledgeIndex(ioOf($, $.plugin.root))}`
-    } catch { guide = ORCHESTRATOR_GUIDE }
-    await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project', argumentHint: '[status | validate [--ci] [--fix]]' })
+      legionGuide = `${LEGION_GUIDE}\n\n${await loadKnowledgeIndex(ioOf($, $.plugin.root))}`
+    } catch { legionGuide = LEGION_GUIDE }
+    await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `pane` opens it as a live pane; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project', argumentHint: '[pane | status | validate [--ci] [--fix]]' })
+    await publish($)
+    if (opts.openPane) void $.ui.open({ id: PANE, title: 'Triad' })
     return r
   })
 
@@ -333,7 +363,16 @@ export const register: Register = (on, options) => {
   on('prompt.section', { name: 'communication' }, async ($, e, next) => {
     const r = await next(e)
     ledger.contextInjections = (ledger.contextInjections ?? 0) + 1
-    return { text: (r.text ? r.text + '\n\n' : '') + guide }
+    return { text: (r.text ? r.text + '\n\n' : '') + ORCHESTRATOR_GUIDE }
+  })
+
+  // The Legion coordination rules and the command and persona index ride with
+  // the /triad:* prompt that needs them, so plain sessions never pay for them.
+  // (Context a command.run hook adds to a markdown command does not reach the
+  // model; prompt.submit context does.)
+  on('prompt.submit', async ($, e, next) => {
+    if (!/^\/triad:/.test(e.text.trimStart())) return next(e)
+    return next({ ...e, context: [...(e.context ?? []), legionGuide] })
   })
 
   on('tool.describe', async ($, e, next) => {
@@ -354,7 +393,7 @@ export const register: Register = (on, options) => {
     const type: string = e.subagentType ?? (e as any).subagent_type ?? 'general-purpose'
     const role = roleOfType(type)
     if (!role || role === 'orchestrator') {
-      if (opts.strictMenu) return refuse(`agent type "${type}" bypasses the tiers. Use triad:triad-coder (Sonnet, implements one task) or triad:triad-helper (Haiku, menial work).`)
+      if (opts.strictMenu) return refuse(`agent type "${type}" bypasses the tiers. Use triad:triad-coder (Sonnet, a well-specified task), triad:triad-opus-coder (Opus, open-ended design or tuning) or triad:triad-helper (Haiku, menial work).`)
       return next(e)
     }
     // A delegate_menial spawn runs in the main loop, so the caller rides in the description.
@@ -369,7 +408,7 @@ export const register: Register = (on, options) => {
     reserved[role]++
     let r
     try {
-      r = await next({ ...e, model: modelFor[e.description] ?? MODEL_FOR[role], background: false })
+      r = await next({ ...e, model: opts.allOpus ? 'opus' : modelFor[e.description] ?? modelOfType(type) ?? MODEL_FOR[role], background: false })
     } finally {
       reserved[role]--
     }
@@ -385,8 +424,10 @@ export const register: Register = (on, options) => {
         written[id] = new Set()
       }
       tasks[id] = e.prompt
+      if (role === 'coder') startedAt[id] = await nowMs($)
       if (e.description.startsWith(LEGION_MARK)) legion.add(id)
       ensureAgent(ledger, id, { role, type, parent: parent ?? 'main', depth, status: 'running' })
+      await publish($)
     }
     return r
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the spawn check failed, so the spawn was refused. Try again.' }))
@@ -412,7 +453,17 @@ export const register: Register = (on, options) => {
       }
     }
     const r = yield* next(e)
-    if (r?.usage) recordStep(ledger, id, r.usage.model || e.model, r.usage)
+    if (r?.usage) {
+      recordStep(ledger, id, r.usage.model || e.model, r.usage)
+      await publish($)
+    }
+    // Coder time budget: one note once the coder has worked coderMinutes, so an
+    // open-ended tuning loop ends with a report instead of running on.
+    const t0 = id && roles[id] === 'coder' && opts.coderMinutes > 0 ? startedAt[id] : undefined
+    if (t0 !== undefined && (await nowMs($)) - t0 >= opts.coderMinutes * 60_000) {
+      delete startedAt[id!]
+      try { await $.session.send({ to: { agentId: id! }, text: TIME_NOTE(opts.coderMinutes) }) } catch { /* best effort */ }
+    }
     if (m && r?.usage) {
       m.lastPrompt = promptTokens(r.usage)
       if (chars !== undefined) m.charsAtLast = chars
@@ -594,12 +645,10 @@ export const register: Register = (on, options) => {
     if (/^status\b/.test(args)) return { text: `${await statusText(ioOf($), { dryRun: /--dry-run\b/.test(args) })}\n${controlModeLine(await controlMode(ioOf($)))}` }
     if (/^validate\b/.test(args)) return validateText(ioOf($), args)
     await save($)
-    return {
-      text: render(ledger, {
-        coders: [running.coder.size, opts.maxCoders],
-        helpers: [running.helper.size, opts.maxHelpers],
-        maxDepth: opts.maxDepth,
-      }),
+    if (/^pane\b/.test(args)) {
+      await $.ui.open({ id: PANE, title: 'Triad' })
+      return { text: 'Triad pane opened: the agent tree and spend, updated as agents run.' }
     }
+    return { text: render(ledger, budgets()) }
   })
 }

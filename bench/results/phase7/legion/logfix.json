@@ -1,0 +1,31 @@
+{
+  "task": "logfix",
+  "config": "legion",
+  "options": null,
+  "seconds": 80,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 test files changed: True",
+  "cost": 0.4842446000000001,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 26,
+    "outputTokens": 7281,
+    "cacheReadInputTokens": 324628,
+    "cacheCreationInputTokens": 54719
+  },
+  "totalTokens": 386654,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 26,
+      "outputTokens": 7281,
+      "cacheReadInputTokens": 324628,
+      "cacheCreationInputTokens": 54719,
+      "costUSD": 0.4842446000000001
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-legion-logfix-997e1yr5/repo"
+}

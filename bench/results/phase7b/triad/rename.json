@@ -1,0 +1,51 @@
+{
+  "task": "rename",
+  "config": "triad",
+  "options": {},
+  "seconds": 40,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 legacy refs left 0 legacy.py exists False calls unchanged True",
+  "cost": 0.1580562,
+  "turns": 7,
+  "tokens": {
+    "inputTokens": 14,
+    "outputTokens": 2557,
+    "cacheReadInputTokens": 123576,
+    "cacheCreationInputTokens": 16429
+  },
+  "totalTokens": 142576,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 2557,
+      "cacheReadInputTokens": 123576,
+      "cacheCreationInputTokens": 16429,
+      "costUSD": 0.1580562
+    }
+  },
+  "compression": {
+    "calls": 1,
+    "rawTokens": 4142,
+    "outTokens": 408
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 7
+    },
+    "compressor": {
+      "role": "compressor",
+      "depth": 0,
+      "requests": 1
+    }
+  },
+  "work": "/tmp/bench-triad-rename-x171p_zv/repo"
+}

@@ -1,0 +1,59 @@
+{
+  "task": "logfix",
+  "config": "triad",
+  "options": {},
+  "seconds": 74,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 test files changed: True",
+  "cost": 0.19586999999999996,
+  "turns": 6,
+  "tokens": {
+    "inputTokens": 22,
+    "outputTokens": 4786,
+    "cacheReadInputTokens": 137310,
+    "cacheCreationInputTokens": 20297
+  },
+  "totalTokens": 162415,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 2997,
+      "cacheReadInputTokens": 99095,
+      "cacheCreationInputTokens": 15907,
+      "costUSD": 0.15934199999999998
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 1789,
+      "cacheReadInputTokens": 38215,
+      "cacheCreationInputTokens": 4390,
+      "costUSD": 0.036528000000000005
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 6
+    },
+    "a3c0373408195ea6f": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 5
+    }
+  },
+  "work": "/tmp/bench-triad-logfix-cl0lwr0o/repo"
+}

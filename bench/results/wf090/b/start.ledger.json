@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 4,
+      "input": 8,
+      "output": 4312,
+      "cacheRead": 62288,
+      "cacheWrite": 26960,
+      "cost": 0.31440959999999996
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 4,
+      "input": 8,
+      "output": 4312,
+      "cacheRead": 62288,
+      "cacheWrite": 26960,
+      "cost": 0.31440959999999996,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 26962
+    }
+  },
+  "haiku": {
+    "requests": 0,
+    "maxPrompt": 0,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "ceiling": {
+    "wrapNotes": 0,
+    "stops": 0,
+    "trimmed": 0,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 95000,
+    "haikuWrapAt": 80000,
+    "openPane": false
+  },
+  "contextInjections": 1
+}

@@ -1,0 +1,35 @@
+{
+  "task": "tron",
+  "config": "opus",
+  "options": null,
+  "seconds": 1010,
+  "exit": 0,
+  "success": true,
+  "check": "score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']",
+  "score": [
+    52.0,
+    52.0
+  ],
+  "cost": 1.6570502000000003,
+  "turns": 40,
+  "tokens": {
+    "inputTokens": 72,
+    "outputTokens": 47996,
+    "cacheReadInputTokens": 1802661,
+    "cacheCreationInputTokens": 67262
+  },
+  "totalTokens": 1917991,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 72,
+      "outputTokens": 47996,
+      "cacheReadInputTokens": 1802661,
+      "cacheCreationInputTokens": 67262,
+      "costUSD": 1.6570502000000003
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-tron-oltc2_ke/repo"
+}

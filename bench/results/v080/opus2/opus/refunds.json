@@ -1,0 +1,35 @@
+{
+  "task": "refunds",
+  "config": "opus",
+  "options": null,
+  "seconds": 53,
+  "exit": 0,
+  "success": true,
+  "check": "score 18/18 own-tests pass tests-added True failed=[]",
+  "score": [
+    18.0,
+    18.0
+  ],
+  "cost": 0.2073708,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 10,
+    "outputTokens": 5531,
+    "cacheReadInputTokens": 94954,
+    "cacheCreationInputTokens": 15544
+  },
+  "totalTokens": 116039,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 5531,
+      "cacheReadInputTokens": 94954,
+      "cacheCreationInputTokens": 15544,
+      "costUSD": 0.2073708
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-refunds-okm59vnf/repo"
+}

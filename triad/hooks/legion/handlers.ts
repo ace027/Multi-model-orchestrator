@@ -144,7 +144,7 @@ export function personaQuery(input: { task?: string; agent?: string }): string {
     const f = findPersona(input.agent)
     if (!f.persona) return f.ambiguous ? `Ambiguous: ${f.ambiguous.join(', ')}` : `No persona "${input.agent}".`
     const p = f.persona
-    return `id: ${p.id}\ntier: ${p.tier} (spawn as ${p.tier === 'haiku' ? 'triad:triad-helper' : 'triad:triad-coder'}${p.tier === 'opus' ? ' with model opus' : ''})\n\nPut this at the top of the agent's brief:\n\n# Persona: ${p.name}\n${p.core}`
+    return `id: ${p.id}\ntier: ${p.tier} (spawn as ${p.tier === 'haiku' ? 'triad:triad-helper' : p.tier === 'opus' ? 'triad:triad-opus-coder' : 'triad:triad-coder'})\n\nPut this at the top of the agent's brief:\n\n# Persona: ${p.name}\n${p.core}`
   }
   const top = rank(input.task ?? '', p => p.tier !== 'opus').slice(0, 6)
   return top.map(r => `${r.persona.id} (${r.persona.division}, tier ${r.persona.tier}): score ${r.score} — ${r.persona.description}`).join('\n')

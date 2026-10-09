@@ -1,0 +1,63 @@
+{
+  "task": "refunds",
+  "config": "triad",
+  "options": {},
+  "seconds": 65,
+  "exit": 0,
+  "success": true,
+  "check": "score 18/18 own-tests pass tests-added True failed=[]",
+  "score": [
+    18,
+    18
+  ],
+  "cost": 0.2595699,
+  "turns": 6,
+  "tokens": {
+    "inputTokens": 20,
+    "outputTokens": 6796,
+    "cacheReadInputTokens": 118542,
+    "cacheCreationInputTokens": 31267
+  },
+  "totalTokens": 156625,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 3136,
+      "cacheReadInputTokens": 85519,
+      "cacheCreationInputTokens": 23324,
+      "costUSD": 0.1964918
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 8,
+      "outputTokens": 3660,
+      "cacheReadInputTokens": 33023,
+      "cacheCreationInputTokens": 7943,
+      "costUSD": 0.0630781
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 6
+    },
+    "af41c41dbb812517a": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 4
+    }
+  },
+  "work": "/tmp/bench-triad-refunds-5eg4ysq3/repo"
+}

@@ -1,0 +1,50 @@
+{
+  "task": "csvimport",
+  "config": "triad",
+  "options": {},
+  "seconds": 119,
+  "exit": 0,
+  "success": true,
+  "check": "score 30/30 own-tests pass tests-added True failed=[]",
+  "score": [
+    30.0,
+    30.0
+  ],
+  "cost": 0.36376919999999996,
+  "turns": 6,
+  "tokens": {
+    "inputTokens": 12,
+    "outputTokens": 11277,
+    "cacheReadInputTokens": 107731,
+    "cacheCreationInputTokens": 23327
+  },
+  "totalTokens": 142347,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 11277,
+      "cacheReadInputTokens": 107731,
+      "cacheCreationInputTokens": 23327,
+      "costUSD": 0.36376919999999996
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 6
+    }
+  },
+  "work": "/tmp/bench-triad-csvimport-1mi13aic/repo"
+}

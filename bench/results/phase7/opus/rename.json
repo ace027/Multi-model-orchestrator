@@ -1,0 +1,31 @@
+{
+  "task": "rename",
+  "config": "opus",
+  "options": null,
+  "seconds": 33,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 legacy refs left 0 legacy.py exists False calls unchanged True",
+  "cost": 0.2130332,
+  "turns": 8,
+  "tokens": {
+    "inputTokens": 16,
+    "outputTokens": 2732,
+    "cacheReadInputTokens": 197821,
+    "cacheCreationInputTokens": 23753
+  },
+  "totalTokens": 224322,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 16,
+      "outputTokens": 2732,
+      "cacheReadInputTokens": 197821,
+      "cacheCreationInputTokens": 23753,
+      "costUSD": 0.2130332
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-rename-5gib4oej/repo"
+}

@@ -1,0 +1,31 @@
+{
+  "task": "noisy",
+  "config": "legion",
+  "options": null,
+  "seconds": 26,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 tests changed: [] probe 268 -13 14",
+  "cost": 0.16252439999999999,
+  "turns": 6,
+  "tokens": {
+    "inputTokens": 12,
+    "outputTokens": 1829,
+    "cacheReadInputTokens": 156382,
+    "cacheCreationInputTokens": 18924
+  },
+  "totalTokens": 177147,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 1829,
+      "cacheReadInputTokens": 156382,
+      "cacheCreationInputTokens": 18924,
+      "costUSD": 0.16252439999999999
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-legion-noisy-lo2_wiop/repo"
+}

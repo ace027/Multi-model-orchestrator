@@ -88,6 +88,25 @@ describe('hooks', () => {
     expect(((await $.agent.spawn({ subagentType: 'general-purpose', prompt: 'p', description: 'd' })) as any).deny).toMatch(/bypasses the tiers/)
   })
 
+  test('allOpus runs coders and helpers on Opus', { options: { allOpus: true } }, async ($, on) => {
+    const log = { writes: {}, spawns: [] as any[] }
+    world(on, log)
+    await start($)
+    await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'do it', description: 'c' })
+    await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'list files in src/', description: 'h' })
+    expect(log.spawns.map(s => s.model)).toEqual(['opus', 'opus'])
+  })
+
+  test('runs the Opus coder on Opus, counted against the coder cap', async ($, on) => {
+    const log = { writes: {}, spawns: [] as any[] }
+    world(on, log)
+    await start($)
+    await $.agent.spawn({ subagentType: 'triad:triad-opus-coder', prompt: 'build the AI', description: 'ai', model: 'sonnet' })
+    expect(log.spawns[0].model).toBe('opus')
+    await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'do it', description: 'y' })
+    expect(log.spawns[1].model).toBe('sonnet')
+  })
+
   test('refuses a coder over the concurrency cap until one finishes', { options: { maxCoders: 1 } }, async ($, on) => {
     world(on, { writes: {}, spawns: [] })
     on('turn.complete', (_$: any, e: any) => ({ text: e.answer }))
@@ -250,6 +269,20 @@ describe('hooks', () => {
     expect((await $.prompt.section({ name: 'communication', text: 'base' })).text).toMatch(/^base\n\n# Triad orchestration/)
     expect((await $.prompt.section({ name: 'env_info_model', text: 'model' })).text).toBe('model')
   })
+
+  test('keeps the Legion rules out of the system prompt and sends them with /triad:* prompts only', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    on('prompt.section', (_$: any, e: any) => ({ text: e.text }))
+    const seen: any[] = []
+    on('prompt.submit', (_$: any, e: any) => { seen.push(e); return { text: e.text, context: e.context } })
+    await start($)
+    expect((await $.prompt.section({ name: 'communication', text: 'base' })).text).not.toMatch(/Legion coordination/)
+    await $.prompt.submit({ text: 'fix the parser' } as any)
+    await $.prompt.submit({ text: '/triad:plan 2' } as any)
+    expect(seen[0].context ?? []).toEqual([])
+    expect(seen[1].context).toHaveLength(1)
+    expect(seen[1].context[0]).toMatch(/^## Legion coordination/)
+  })
 })
 
 // A helper's conversation in both forms, grown by `chars` of tool output, plus the
@@ -304,6 +337,26 @@ describe('haiku ceiling', () => {
     state.chars += 5_000 // ~2k tokens
     await step($, h.agentId!, 1)
     expect(state.steps).toBe(2)
+  })
+
+  test('tells a coder to wrap up once it has worked coderMinutes, once', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    let now = 0
+    on('clock.now', () => ({ value: now }))
+    await start($)
+    const c = await $.agent.spawn({ subagentType: 'triad:triad-opus-coder', prompt: 'tune the AI', description: 'c' })
+    now = 19 * 60_000
+    await step($, c.agentId!, 0)
+    expect(state.sent.length).toBe(0)
+    now = 21 * 60_000
+    await step($, c.agentId!, 1)
+    now = 30 * 60_000
+    await step($, c.agentId!, 2)
+    expect(state.sent.length).toBe(1)
+    expect(state.sent[0]).toMatch(/worked for 20 minutes/)
+    expect(state.steps).toBe(3) // a note, never a stop
   })
 
   test('never stops a coder on token grounds', async ($, on) => {

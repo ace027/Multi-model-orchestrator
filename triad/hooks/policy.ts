@@ -14,24 +14,34 @@ export type Options = {
   deferTools: boolean
   haikuCeiling: number
   haikuWrapAt: number
+  openPane: boolean
+  coderMinutes: number
+  allOpus: boolean
 }
 
 export const DEFAULTS: Options = {
   maxDepth: 2, maxCoders: 4, maxHelpers: 6, maxRetries: 1, strictMenu: true,
   compress: true, compressThreshold: 4_000, deferTools: true,
-  haikuCeiling: 95_000, haikuWrapAt: 80_000,
+  haikuCeiling: 95_000, haikuWrapAt: 80_000, openPane: false, coderMinutes: 20, allOpus: false,
 }
 
 // Plugin agent types are namespaced (`triad:triad-coder`); match the suffix.
 export function roleOfType(subagentType: string | undefined): Role | undefined {
   if (!subagentType) return undefined
   const name = subagentType.split(':').pop()
-  if (name === 'triad-coder') return 'coder'
+  if (name === 'triad-coder' || name === 'triad-opus-coder') return 'coder'
   if (name === 'triad-helper') return 'helper'
   return undefined
 }
 
 export const MODEL_FOR: Record<Exclude<Role, 'orchestrator'>, Tier> = { coder: 'sonnet', helper: 'haiku' }
+
+// The Opus coder shares the coder role (caps, depth, report format) but not its tier.
+export function modelOfType(subagentType: string | undefined): Tier | undefined {
+  if (subagentType?.split(':').pop() === 'triad-opus-coder') return 'opus'
+  const role = roleOfType(subagentType)
+  return role && role !== 'orchestrator' ? MODEL_FOR[role] : undefined
+}
 
 export function tierOfModel(model: string | undefined): Tier | 'other' {
   const m = (model ?? '').toLowerCase()

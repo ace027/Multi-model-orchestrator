@@ -52,7 +52,7 @@ Triad names: judgment workflows become plugin commands (`/triad:<name>`). Determ
 | `commands/ship.md` (`/legion:ship`) | Pre-ship gates, ship report, PR via `gh`, post-ship checks, canary monitoring | Improved | Gates and PR creation in code via `gh`; canary checks scheduled with `$.clock.after` at 1, 5 and 15 minutes; always-on security gate hook on `gh pr create` |
 | `commands/learn.md` (`/legion:learn`) | Record, recall, list and prune project lessons in `.planning/memory/` | Improved | Memory manager in code; Opus classifies the lesson; four-bracket decay; archive, never delete |
 | `commands/polish.md` (`/legion:polish`) | 4-pass code cleanup, capped at 50 files, reverts files whose tests regress | Improved | One Sonnet code polisher runs the 4 passes; the 50-file cap, test and type-check baseline and per-file revert run in code |
-| `commands/validate.md` (`/legion:validate`) | Validates `.planning/` files, schemas, cross-refs, roster and config | Improved | Pure code against `docs/schemas/` and `settings.schema.json`, no model |
+| `commands/validate.md` (`/legion:validate`) | Validates `.planning/` files, schemas, cross-refs, roster and config | Improved | Pure code with the schemas (and `settings.schema.json`) built in, no model |
 | `commands/update.md` (`/legion:update [--check]`) | Detects runtime, checks npm for latest version, reinstalls | Replaced | Replaced by `claude plugin update` and the marketplace |
 
 ### 1a. Command options and modes
@@ -480,7 +480,7 @@ Spec: port schema conformance, cross-reference validation and `lint-commands` as
 | `.codex-plugin/plugin.json` | Codex plugin manifest | Not applicable | Codex runtime |
 | `.kilo/plans/1778433176734-proud-planet.md` | Kilo dev plan for installer fix | Not applicable | Other-runtime dev note |
 | `.gitignore` | Ignore rules | Improved | The mod writes `.triad/.gitignore` (`*`) at session start, so Triad's output never needs a root entry |
-| `README.md` | User docs (says 19 commands, 33 skills, 49 agents) | Replaced | Triad docs (phase 7) |
+| `README.md` | User docs (says 19 commands, 33 skills, 49 agents) | Replaced | Triad docs: `README.md`, `triad/README.md` (install, use, options, how it works), `docs/commands.md` (all 20 commands), `docs/control-modes.md`, `docs/results.md` |
 | `CHANGELOG.md` | Legion release history | Not applicable | Legion history |
 | `CONTRIBUTING.md` | Contribution guide | Replaced | Triad's own `CONTRIBUTING.md`: setup, the four CI checks, test rules, PARITY.md upkeep |
 | `REVIEW.md` | PR review guide for the Legion repo | Replaced | Triad's own `REVIEW.md` review checklist |

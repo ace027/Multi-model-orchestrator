@@ -1,0 +1,69 @@
+{
+  "success": true,
+  "score": [
+    52.0,
+    52
+  ],
+  "cost": 4.8992,
+  "seconds": 3924,
+  "phases": 3,
+  "steps": {
+    "build1": {
+      "cost": 0.5217151000000001,
+      "turns": 5,
+      "error": false
+    },
+    "build2": {
+      "cost": 0.6239853000000001,
+      "turns": 5,
+      "error": false
+    },
+    "build3": {
+      "cost": null,
+      "turns": null,
+      "error": null
+    },
+    "plan1": {
+      "cost": 0.6287491999999999,
+      "turns": 16,
+      "error": false
+    },
+    "plan2": {
+      "cost": 0.850361025,
+      "turns": 20,
+      "error": false
+    },
+    "plan3": {
+      "cost": 0.725401505,
+      "turns": 20,
+      "error": false
+    },
+    "review1": {
+      "cost": 0.5345907000000001,
+      "turns": 12,
+      "error": false
+    },
+    "review2": {
+      "cost": 0.6493723999999997,
+      "turns": 12,
+      "error": false
+    },
+    "review3": {
+      "cost": 0.12210860000000001,
+      "turns": 3,
+      "error": false
+    },
+    "start": {
+      "cost": 0.24287879999999998,
+      "turns": 9,
+      "error": false
+    }
+  },
+  "byModel": {
+    "claude-opus-5-5": 2.8862,
+    "claude-sonnet-5-5": 2.0029,
+    "claude-haiku-5-5": 0.0101
+  },
+  "check": "score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']",
+  "work": "/tmp/wf-tron-iC7Q/repo"
+}

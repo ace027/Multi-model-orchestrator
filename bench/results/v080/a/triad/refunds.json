@@ -1,0 +1,50 @@
+{
+  "task": "refunds",
+  "config": "triad",
+  "options": {},
+  "seconds": 56,
+  "exit": 0,
+  "success": true,
+  "check": "score 18/18 own-tests pass tests-added True failed=[]",
+  "score": [
+    18.0,
+    18.0
+  ],
+  "cost": 0.2122018,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 10,
+    "outputTokens": 5545,
+    "cacheReadInputTokens": 77609,
+    "cacheCreationInputTokens": 17148
+  },
+  "totalTokens": 100312,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 5545,
+      "cacheReadInputTokens": 77609,
+      "cacheCreationInputTokens": 17148,
+      "costUSD": 0.2122018
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 5
+    }
+  },
+  "work": "/tmp/bench-triad-refunds-prghal64/repo"
+}

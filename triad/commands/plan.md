@@ -18,6 +18,7 @@ Plan a phase of the Triad project in `.planning/`. Phase: $ARGUMENTS (default: t
    - lists every file it may change in `files_modified` and what it must not touch in `files_forbidden`;
    - has plan-level `verification_commands` that prove the plan as a whole;
    - names its persona in `agents` (first one runs it; call `persona_brief` with the plan's task to choose);
+   - sets `model: opus` when its work is open-ended (a game AI, architecture, tuning against a measurement, visual polish), so it runs on the Opus coder; well-specified plans leave it out and run on Sonnet;
    - sits in a wave: plans in the same wave run in parallel and must not share files; a plan depends only on earlier waves (`depends_on`: "NN-PP").
    Make the decisions here. Nothing may say "decide later", "TBD" or "as needed".
 4b. Hybrid agent selection (gate): show a table of the plans with the recommended persona for each (from `persona_brief`, with its score and one-line reason) and ask the user with AskUserQuestion: "Accept all (Recommended)", "Change some" (then, per plan to change, offer the next ranked personas from `persona_brief` as options), or "Cancel". Put the chosen persona first in each plan's `agents`. Gates off: accept the recommendations. Never offer `agents-orchestrator`; it is never spawned.

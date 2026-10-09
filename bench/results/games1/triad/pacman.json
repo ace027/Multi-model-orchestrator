@@ -1,0 +1,80 @@
+{
+  "task": "pacman",
+  "config": "triad",
+  "options": {},
+  "seconds": 532,
+  "exit": 0,
+  "success": true,
+  "check": "score 44/44 rules 32/32 ui 8/8 replay 4/4 own-tests pass tests-added True failed=[]",
+  "score": [
+    44.0,
+    44.0
+  ],
+  "cost": 1.334894055,
+  "turns": 23,
+  "tokens": {
+    "inputTokens": 86,
+    "outputTokens": 74709,
+    "cacheReadInputTokens": 1027533,
+    "cacheCreationInputTokens": 147920
+  },
+  "totalTokens": 1250248,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 40,
+      "outputTokens": 12173,
+      "cacheReadInputTokens": 569842,
+      "cacheCreationInputTokens": 58666,
+      "costUSD": 0.6509183999999999
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 22,
+      "outputTokens": 46337,
+      "cacheReadInputTokens": 260238,
+      "cacheCreationInputTokens": 62013,
+      "costUSD": 0.6704941
+    },
+    "claude-haiku-5-5": {
+      "inputTokens": 24,
+      "outputTokens": 16199,
+      "cacheReadInputTokens": 197453,
+      "cacheCreationInputTokens": 27241,
+      "costUSD": 0.013481555
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 20
+    },
+    "a801b5a25e1c67a5e": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 8
+    },
+    "a94e67ad9d57e1bba": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    },
+    "a6d151a49baa840ba": {
+      "role": "helper",
+      "depth": 1,
+      "requests": 12
+    }
+  },
+  "work": "/tmp/bench-triad-pacman-bk2kkeya/repo"
+}

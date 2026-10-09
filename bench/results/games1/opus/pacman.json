@@ -1,0 +1,35 @@
+{
+  "task": "pacman",
+  "config": "opus",
+  "options": null,
+  "seconds": 418,
+  "exit": 0,
+  "success": true,
+  "check": "score 44/44 rules 32/32 ui 8/8 replay 4/4 own-tests pass tests-added True failed=[]",
+  "score": [
+    44.0,
+    44.0
+  ],
+  "cost": 1.1414562000000001,
+  "turns": 25,
+  "tokens": {
+    "inputTokens": 46,
+    "outputTokens": 34110,
+    "cacheReadInputTokens": 1016511,
+    "cacheCreationInputTokens": 51154
+  },
+  "totalTokens": 1101821,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 46,
+      "outputTokens": 34110,
+      "cacheReadInputTokens": 1016511,
+      "cacheCreationInputTokens": 51154,
+      "costUSD": 1.1414562000000001
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-pacman-rew2xkzl/repo"
+}

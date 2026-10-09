@@ -1,7 +1,10 @@
 {
   "name": "triad",
-  "version": "0.6.0",
-  "description": "Tiered-model orchestration: Opus orchestrates, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
+  "version": "0.9.0",
+  "author": { "name": "ace027" },
+  "homepage": "https://github.com/ace027/Multi-model-orchestrator",
+  "description": "Tiered-model orchestration: Opus orchestrates and takes open-ended coding, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
+  "types": "./types/index.d.ts",
   "userConfig": {
     "maxDepth": {
       "type": "number",
@@ -12,7 +15,7 @@
     "maxCoders": {
       "type": "number",
       "title": "Max concurrent coders",
-      "description": "triad-coder agents (Sonnet) running at once.",
+      "description": "Coder agents (triad-coder and triad-opus-coder) running at once.",
       "default": 4
     },
     "maxHelpers": {
@@ -20,6 +23,18 @@
       "title": "Max concurrent helpers",
       "description": "triad-helper agents (Haiku) running at once.",
       "default": 6
+    },
+    "coderMinutes": {
+      "type": "number",
+      "title": "Coder time budget (minutes)",
+      "description": "After this long a coder is told to stop tuning, check its work and report. 0 turns it off.",
+      "default": 20
+    },
+    "allOpus": {
+      "type": "boolean",
+      "title": "Run every agent on Opus",
+      "description": "A comparison baseline: the same workflow and limits, with coders and helpers on Opus instead of Sonnet and Haiku.",
+      "default": false
     },
     "maxRetries": {
       "type": "number",
@@ -62,6 +77,12 @@
       "title": "Haiku wrap-up threshold (tokens)",
       "description": "At this prompt size a helper is told to finish and return.",
       "default": 80000
+    },
+    "openPane": {
+      "type": "boolean",
+      "title": "Open the Triad pane at start",
+      "description": "Open the agent tree and spend pane when a session starts (it seats from 144 terminal columns). `/triad pane` opens it at any width.",
+      "default": false
     }
   }
 }

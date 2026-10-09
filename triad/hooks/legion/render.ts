@@ -119,6 +119,7 @@ export type PlanInput = {
   tasks: TaskInput[]
   success_criteria?: string[]
   wave_role?: 'build' | 'analysis' | 'execution' | 'remediation'
+  model?: 'opus'
 }
 
 export function planFrontmatter(n: number, slug: string, p: PlanInput): Record<string, unknown> {
@@ -140,6 +141,7 @@ export function planFrontmatter(n: number, slug: string, p: PlanInput): Record<s
     verification_commands: p.verification_commands,
     must_haves: { truths: p.truths?.length ? p.truths : (p.success_criteria ?? [p.objective]) },
     ...(p.wave_role ? { wave_role: p.wave_role } : {}),
+    ...(p.model === 'opus' ? { model: 'opus' } : {}),
   }
 }
 

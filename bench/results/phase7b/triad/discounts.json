@@ -1,0 +1,59 @@
+{
+  "task": "discounts",
+  "config": "triad",
+  "options": {},
+  "seconds": 53,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 cli 900 unknown-code exit 2",
+  "cost": 0.2220991,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 16,
+    "outputTokens": 5628,
+    "cacheReadInputTokens": 78598,
+    "cacheCreationInputTokens": 31456
+  },
+  "totalTokens": 115698,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 2237,
+      "cacheReadInputTokens": 62073,
+      "cacheCreationInputTokens": 19615,
+      "costUSD": 0.1552696
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 6,
+      "outputTokens": 3391,
+      "cacheReadInputTokens": 16525,
+      "cacheCreationInputTokens": 11841,
+      "costUSD": 0.0668295
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow",
+    "SubagentHandback"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 5
+    },
+    "a8ccfe8bff0c52168": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-triad-discounts-ct82yqsz/repo"
+}

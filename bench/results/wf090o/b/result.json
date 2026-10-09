@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "score": [
+    52.0,
+    52
+  ],
+  "cost": 0.1206,
+  "seconds": 2415,
+  "steps": {
+    "build3": {
+      "cost": null,
+      "turns": null,
+      "error": null
+    },
+    "review3": {
+      "cost": 0.12063700000000002,
+      "turns": 3,
+      "error": false
+    }
+  },
+  "byModel": {
+    "claude-opus-5-5": 0.1206
+  },
+  "check": "score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']",
+  "work": "/tmp/wfo-6Dib/repo"
+}

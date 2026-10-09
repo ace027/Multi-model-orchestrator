@@ -1,0 +1,3 @@
+20:54:39 build3: /triad:build 3 --auto
+21:34:41 review3: /triad:review 3 --auto
+21:35:16 done ok=1

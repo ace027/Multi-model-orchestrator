@@ -48,6 +48,10 @@ export const WRAP_UP_NOTE = (tokens: number, ceiling: number) =>
   `triad: your conversation is about ${Math.round(tokens / 1000)}k tokens; the limit is ${Math.round(ceiling / 1000)}k. ` +
   `Finish the step you are on, do not start new reads, and return now with status partial (what is done, and what is left) or done.`
 
+export const TIME_NOTE = (minutes: number) =>
+  `triad: you have worked for ${minutes} minutes, the time budget for one task. Stop tuning and exploring: ` +
+  `make sure what is on disk works and its tests pass, then return now with status done, or partial with what is left and the last measurement.`
+
 export const TRIMMED_RESULT = (tokens: number, path: string) =>
   `[triad: this output is about ${tokens} tokens, more than your remaining budget, so it was not shown. ` +
   `It is saved in ${path}. Do not read it whole: return status partial now, saying what is done and what is left.]`

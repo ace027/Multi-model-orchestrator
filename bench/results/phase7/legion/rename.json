@@ -1,0 +1,31 @@
+{
+  "task": "rename",
+  "config": "legion",
+  "options": null,
+  "seconds": 85,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 legacy refs left 0 legacy.py exists False calls unchanged True",
+  "cost": 0.4946766,
+  "turns": 8,
+  "tokens": {
+    "inputTokens": 30,
+    "outputTokens": 7706,
+    "cacheReadInputTokens": 428933,
+    "cacheCreationInputTokens": 50930
+  },
+  "totalTokens": 487599,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 30,
+      "outputTokens": 7706,
+      "cacheReadInputTokens": 428933,
+      "cacheCreationInputTokens": 50930,
+      "costUSD": 0.4946766
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-legion-rename-nztfz6tf/repo"
+}

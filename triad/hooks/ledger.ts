@@ -1,5 +1,6 @@
 // Token ledger: per-tier and per-agent usage and cost. Pure; the hooks persist it.
 import { tierOfModel, type Tier } from './policy.ts'
+import type { PaneView } from '../types'
 
 export type Usage = {
   input_tokens: number
@@ -145,4 +146,33 @@ export function render(l: Ledger, budgets: { coders: [number, number]; helpers: 
   out.push('', `Compression: ${c.calls} outputs, ~${k(c.rawTokens)} tokens in, ~${k(c.outTokens)} out` + (comp ? ` (summaries cost ${usd(comp.cost)})` : ''))
   if (l.deferredTools?.length) out.push(`Deferred tool descriptions: ${l.deferredTools.join(', ')}`)
   return out.join('\n')
+}
+
+// The pane's view of the ledger: the tree flattened in drawing order, the
+// tiers, and the running counts against their caps.
+export function paneView(l: Ledger, budgets: { coders: [number, number]; helpers: [number, number]; maxDepth: number }): PaneView {
+  const kids: Record<string, string[]> = {}
+  for (const [id, a] of Object.entries(l.agents)) if (id !== 'main') (kids[a.parent ?? 'main'] ??= []).push(id)
+  const tokens = (t: Totals) => t.input + t.output + t.cacheRead + t.cacheWrite
+  const rows: PaneView['rows'] = []
+  const seen = new Set<string>()
+  const walk = (id: string, depth: number) => {
+    const a = l.agents[id]
+    if (!a || seen.has(id)) return
+    seen.add(id)
+    const tiers = [...new Set(a.models.map(tierOfModel))]
+    rows.push({
+      id, depth, label: id === 'main' ? 'orchestrator' : `${a.role} ${id.slice(0, 8)}`,
+      tier: tiers.join('+') || '-', status: a.status ?? '', requests: a.requests, tokens: tokens(a), cost: a.cost,
+    })
+    for (const c of kids[id] ?? []) walk(c, depth + 1)
+  }
+  walk('main', 0)
+  // An agent whose parent never made the ledger still shows, under the orchestrator.
+  for (const id of Object.keys(l.agents)) if (!seen.has(id)) walk(id, 1)
+  const tiers = ['opus', 'sonnet', 'haiku', 'other'].filter(t => l.tiers[t]).map(t => ({ tier: t, requests: l.tiers[t]!.requests, tokens: tokens(l.tiers[t]!), cost: l.tiers[t]!.cost }))
+  return {
+    rows, tiers, total: tiers.reduce((n, t) => n + t.cost, 0), ...(l.measuredUsd !== undefined ? { measuredUsd: l.measuredUsd } : {}),
+    coders: budgets.coders, helpers: budgets.helpers, maxDepth: budgets.maxDepth, refusals: l.refusals.length,
+  }
 }

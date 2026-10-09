@@ -1,0 +1,31 @@
+{
+  "task": "discounts",
+  "config": "opus",
+  "options": null,
+  "seconds": 40,
+  "exit": 0,
+  "success": true,
+  "check": "tests 0 cli 900 unknown-code exit 2",
+  "cost": 0.165196,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 10,
+    "outputTokens": 4483,
+    "cacheReadInputTokens": 87655,
+    "cacheCreationInputTokens": 11593
+  },
+  "totalTokens": 103741,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 4483,
+      "cacheReadInputTokens": 87655,
+      "cacheCreationInputTokens": 11593,
+      "costUSD": 0.165196
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-discounts-zgihwpao/repo"
+}

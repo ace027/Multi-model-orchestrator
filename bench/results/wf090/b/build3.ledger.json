@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 6,
+      "input": 12,
+      "output": 1277,
+      "cacheRead": 88566,
+      "cacheWrite": 33704,
+      "cost": 0.31293319999999997
+    },
+    "sonnet": {
+      "requests": 43,
+      "input": 86,
+      "output": 47434,
+      "cacheRead": 1619447,
+      "cacheWrite": 79169,
+      "cost": 0.9963239
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 6,
+      "input": 12,
+      "output": 1277,
+      "cacheRead": 88566,
+      "cacheWrite": 33704,
+      "cost": 0.31293319999999997,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 23170
+    },
+    "a66adbcaa98ce1560": {
+      "requests": 5,
+      "input": 10,
+      "output": 11751,
+      "cacheRead": 91821,
+      "cacheWrite": 23581,
+      "cost": 0.1948467,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "maxPrompt": 29094,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    },
+    "ac711c7ea8ab9407a": {
+      "requests": 38,
+      "input": 76,
+      "output": 35683,
+      "cacheRead": 1527626,
+      "cacheWrite": 55588,
+      "cost": 0.8014772,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-sonnet-5-5"
+      ],
+      "maxPrompt": 61101,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "partial"
+    }
+  },
+  "haiku": {
+    "requests": 0,
+    "maxPrompt": 0,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "ceiling": {
+    "wrapNotes": 0,
+    "stops": 0,
+    "trimmed": 0,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 95000,
+    "haikuWrapAt": 80000,
+    "openPane": false
+  },
+  "contextInjections": 1
+}
