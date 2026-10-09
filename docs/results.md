@@ -15,6 +15,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 8 | Triad 0.8.0 (twice) and Opus (again) on the games and harder tasks | about $8.6 |
 | 9 | Structured workflow (Triad 0.9.0) on Tron, twice, plus phase 3 rebuilt on the Opus coder | about $19.2 |
 | 9 | The same workflow with every agent on Opus (`allOpus`) | about $12.1 (plus about $2.0 for a run stopped at the API usage limit) |
+| 10 | `/triad:auto` on a small CLI, 0.10.0 then 0.11.0 | $1.43 |
 
 ## Phase 2 acceptance
 
@@ -360,4 +361,15 @@ Crossplay with the all-Opus AI added (`bench/results/wfopus/crossplay.txt`, poin
 Findings:
 - Triad's tiers run the same process at about half the cost of all Opus, and match it on the graded checks.
 - On the open-ended piece (AI strength), all Opus is ahead: level with Opus alone and the reference. The rebuilt Opus-coder AIs sat with the Sonnet ones here. Both were cut off by the command timeout before the time note existed, so they show the cost of an unbounded tuning loop more than the coder's ceiling.
+
+## /triad:auto, 0.10.0 against 0.11.0
+
+The same goal both times, run headless from an empty git repository with a clean HOME and the plugin installed through its marketplace: "A Python command-line temperature converter (Celsius, Fahrenheit, Kelvin) with input validation and unittest tests. Standard library only." Both runs planned one phase of two plans, which got the light process, and passed review in one cycle.
+
+| Version | Total (CLI) | Opus | Sonnet | Orchestrator turns | Tests | Left untracked |
+|---|---|---|---|---|---|---|
+| 0.10.0 | $0.77 | $0.56 | $0.21 | 34 | 15 pass | `__pycache__/`, `.planning/phases/.gitkeep` |
+| 0.11.0 | $0.66 | $0.42 | $0.24 | 18 | 22 pass | `.planning/SPEND.json` (fixed after the run: it is now written as a workflow step starts) |
+
+In 0.11.0 the orchestrator loads its tools in one search, calls `build_phase` and `review_phase` directly, and skips polish on a light phase. That took a quarter off the Opus cost. The minor-fix round cost about $0.03 of Sonnet: it fixed three of the four findings and left the fourth with a reason. The plan commit added the Python `.gitignore` lines.
 

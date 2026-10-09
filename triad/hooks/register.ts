@@ -136,7 +136,11 @@ let spendWritten = -1
 const projectSpent = () => earlier + spentOf(ledger)
 const budget = () => bindingBudget(spentOf(ledger), opts.maxSpend, projectSpent(), opts.maxProjectSpend)
 const budgetLevel = () => budget().level
-// Keeps this session's line in SPEND.json current (once a project exists; to the cent).
+// Brings this session's line in SPEND.json up to date (once a project exists; to
+// the cent). It runs as a workflow step starts, so the step's own commits carry
+// it and the tree is clean after. The turns after a session's last step (its
+// report, a few cents) are left out of the file; within the session the budget
+// counts every request.
 async function recordSpend($: any) {
   const spent = Math.round(spentOf(ledger) * 100) / 100
   if (!sessionId || spent === spendWritten) return
@@ -149,7 +153,6 @@ async function recordSpend($: any) {
   try { await io.write(SPEND_FILE, JSON.stringify(f, null, 2) + '\n'); spendWritten = spent } catch { /* next step tries again */ }
 }
 async function checkBudget($: any) {
-  await recordSpend($)
   const level = budgetLevel()
   const b = (ledger.budget ??= {})
   // A raised limit (options reload) re-arms the notices.
@@ -692,6 +695,7 @@ export const register: Register = (on, options) => {
       if (e.agentId) return { deny: 'triad: the Legion workflow tools run in the main loop only.' }
       if (budgetLevel() === 'over' && !FREE_TOOLS.has(t.name)) return { result: BUDGET_OVER(budget()), isError: true }
       try {
+        await recordSpend($)
         return { result: (await legionTool($, t.name, e)) + budgetNote() }
       } catch (err) {
         return { result: `triad: ${t.name} failed: ${err instanceof Error ? err.message : String(err)}`, isError: true }

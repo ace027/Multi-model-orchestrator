@@ -75,7 +75,7 @@ Set them in `/plugin` settings, or for a headless run with `--settings '{"plugin
 | `coderMinutes` | 20 | After this long a coder is told to stop tuning, check its work and report (0: off). |
 | `allOpus` | false | Comparison baseline: every agent runs on Opus (and the Haiku ceiling is off). |
 | `maxSpend` | 0 | Spending budget per session, in USD (0: none). At 80% a notice; at the limit running agents are told to wrap up, and new agents and workflow steps are refused until it is raised. |
-| `maxProjectSpend` | 0 | The same budget across every session on the project, in USD (0: none). Each session's spend is kept in `.planning/SPEND.json`, committed with the plans, so a resumed `/triad:auto` or a fresh clone still counts it. |
+| `maxProjectSpend` | 0 | The same budget across every session on the project, in USD (0: none). Each session's spend is kept in `.planning/SPEND.json`, written as each workflow step starts and committed with it, so a resumed `/triad:auto` or a fresh clone still counts it (all but the last few turns of each session). |
 | `lightPlans` | 2 | A phase with at most this many plans runs the light process: planning skips the board, spec, proposals, persona table and security and design passes, and review uses two reviewers for at most two cycles. 0: always the full process. |
 | `fixMinor` | true | After a review passes, one coder round fixes its minor and medium-confidence findings; the checks run again and the round is undone if one fails. |
 | `openPane` | false | Open the Triad pane at session start. A pane opened this way seats from 144 terminal columns; `/triad pane` opens it at any width. |

@@ -19,6 +19,16 @@ import { findingErrors, intentFilter } from './review.ts'
 import { loadIntentConfig, resolveTeam } from './intents.ts'
 
 export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void; intent?: string; lightPlans?: number; fixMinor?: boolean }
+// A reply's issues: lines (the findings a fix agent did not fix, with why).
+function issuesOf(answer: string): string[] {
+  const lines = answer.replace(/```[a-z]*\n?/gi, '').split('\n')
+  const i = lines.findIndex(l => /^\s*issues:/i.test(l))
+  if (i < 0) return []
+  const out = [lines[i]!.replace(/^\s*issues:\s*/i, '').trim()]
+  for (let j = i + 1; j < lines.length && !/^\s*[a-z_]+:/i.test(lines[j]!); j++) out.push(lines[j]!.trim().replace(/^-\s*/, ''))
+  return out.filter(l => l && !/^none\.?$/i.test(l)).map(l => l.replace(/\|/g, '/'))
+}
+
 // The most minor findings one fixMinor round takes on.
 const MINOR_CAP = 8
 
@@ -263,7 +273,10 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
         await io.run(['git', 'clean', '-fdq', '--', ...changed])
       }
       const applied = changed.length && okNow
+      // What a fix agent chose to leave, from its reply's issues: list.
+      const kept = runs.flatMap(r => issuesOf(r.r.answer ?? ''))
       minorNote = `minor findings: ${runs.map(r => `${r.id} on ${r.fs.map(f => f.id).join(', ')} (${parseReply(r.r.answer ?? '').status ?? 'no answer'})`).join('; ')}; ` +
+        (kept.length ? `left as is: ${kept.join(' / ')}; ` : '') +
         (!changed.length ? 'no changes' : applied ? `checks ${verify.length}/${verify.length} passed, ${changed.length} file(s) changed` : `checks failed (${verify.filter(v => !v.passed).length}/${verify.length}), changes undone`)
       fixes.push(minorNote)
       if (applied && settings.execution.auto_commit !== false) {

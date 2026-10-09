@@ -395,6 +395,8 @@ describe('haiku ceiling', () => {
     await start($)
     const c = await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'build it', description: 'c' })
     await step($, c.agentId!, 0) // $0.001 earlier + about $0.00104 now: over $0.0015
+    expect(log.writes['/repo/.planning/SPEND.json']).toBeUndefined() // written as a workflow step starts
+    await $.tool.call({ tool: 'mcp__triad__planning_status', tool_use_id: 's' } as any)
     const saved = JSON.parse(log.writes['/repo/.planning/SPEND.json']!)
     expect(Object.keys(saved.sessions).sort()).toEqual(['old', 'sess-1'])
     expect(((await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'x', description: 'h' })) as any).deny).toMatch(/project spending budget is reached .* across sessions/)
