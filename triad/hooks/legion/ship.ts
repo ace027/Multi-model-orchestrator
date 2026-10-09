@@ -9,7 +9,7 @@ import { ensureLabel, ghInfo, ghRecordPr, issueOf, phaseBranch, FOOTER } from '.
 import type { VerifyRun } from './render.ts'
 import { preShipAudit } from './gates.ts'
 
-export type Check = { name: string; pass: boolean; detail: string[]; extra?: string }
+export type Check = { name: string; pass: boolean; detail: string[]; extra?: string; skipped?: boolean }
 export type Gate = { n: number; name: string; ph: PhaseFiles; checks: Check[]; verify: VerifyRun[]; test?: VerifyRun; testCommand?: string }
 
 // Test command: settings adapter.test_command, else from the manifests.
@@ -69,12 +69,58 @@ export async function resolveScope(io: Io, p: Project, phase?: number): Promise<
   return { n, name: rm?.phases.find(x => x.phase === n)?.name ?? row?.name ?? '' }
 }
 
+// The gate's commands (every plan's verification commands, then the test
+// suite) run in a script the session starts with Bash, not inside this tool
+// call: a suite can take many minutes, and a remote session blocked that long
+// in one tool call, with nothing in its transcript, has been stopped and
+// restarted mid-ship. The script records each command's exit code and output
+// under GATE_DIR; ship check reads them back. They hold for the commit they
+// ran on, so publish (and a ship run again after a restart) reuses them.
+export const GATE_DIR = '.triad/ship-gate'
+export const GATE_SCRIPT = `${GATE_DIR}/run.sh`
+export type GateMeta = { phase: number; head: string; commands: { plan?: string; command: string }[] }
+const headOf = async (io: Io) => { const r = await io.run(['git', 'rev-parse', 'HEAD']); return r.exitCode === 0 ? r.stdout.trim() : '' }
+
+export function gateScript(meta: GateMeta): string {
+  return ['#!/usr/bin/env bash', `# Triad pre-ship gate for Phase ${meta.phase} at ${meta.head.slice(0, 12) || 'the working tree'}, written by ship check.`,
+    '# Each command runs from the project root; its exit code and output go to out/. Call ship check again when it finishes.',
+    'cd "$(dirname "$0")/../.." || exit 1', `D=${GATE_DIR}`, 'rm -rf "$D/out"; mkdir -p "$D/out"; echo $$ > "$D/out/running"', `n=${meta.commands.length}; fails=0`,
+    'for i in $(seq 1 $n); do',
+    '  echo "[$i/$n] $(head -c 200 "$D/cmd/$i.sh")"', '  t0=$(date +%s)',
+    '  bash "$D/cmd/$i.sh" > "$D/out/$i.log" 2>&1; code=$?', '  echo $code > "$D/out/$i.exit"',
+    '  echo "  exit $code after $(( $(date +%s) - t0 ))s"',
+    '  if [ $code -ne 0 ]; then fails=$((fails+1)); tail -n 20 "$D/out/$i.log"; fi',
+    'done', 'rm -f "$D/out/running"', 'echo "Gate commands: $((n - fails))/$n passed. Call ship check again to read the results."', ''].join('\n')
+}
+
+// The recorded runs, when they are complete and for these commands on this commit.
+async function gateRuns(io: Io, meta: GateMeta): Promise<{ runs?: VerifyRun[]; partial: boolean; running?: number }> {
+  let old: GateMeta | undefined
+  try { old = JSON.parse((await io.read(`${GATE_DIR}/meta.json`)) ?? '') } catch { old = undefined }
+  if (!old || JSON.stringify(old) !== JSON.stringify(meta)) return { partial: false }
+  const runs: VerifyRun[] = []
+  for (const [i, c] of meta.commands.entries()) {
+    const code = (await io.read(`${GATE_DIR}/out/${i + 1}.exit`))?.trim()
+    if (code === undefined || !/^\d+$/.test(code)) {
+      // A script still running (its pid alive) is waited for, never restarted under it.
+      const pid = (await io.read(`${GATE_DIR}/out/running`))?.trim()
+      if (pid && /^\d+$/.test(pid) && (await io.run(['bash', '-c', `kill -0 ${pid}`])).exitCode === 0) return { partial: false, running: i }
+      return { partial: i > 0 || code !== undefined }
+    }
+    runs.push({ command: c.command, exitCode: Number(code), passed: code === '0', output: ((await io.read(`${GATE_DIR}/out/${i + 1}.log`)) ?? '').slice(-4000) })
+  }
+  return { runs, partial: false }
+}
+
 export async function shipGate(io: Io, opts: { phase?: number }): Promise<Gate | string> {
   const p = await loadProject(io)
   const s = await resolveScope(io, p, opts.phase)
   if (s.error) return s.error
   const n = s.n!
   const ph = await loadPhase(io, p, n)
+  const own = `${ph.rel}/SHIP-REPORT.md`
+  // The report `check` writes is ours, and .triad/ is Triad's own: neither makes the tree dirty for the gate.
+  const dirty = [...(await dirtyFiles(io))].filter(f => f !== own && !f.startsWith('.triad/'))
   const checks: Check[] = []
   const missing = ph.plans.filter(pl => !ph.summaries[pl.id])
   checks.push({ name: 'Build complete', pass: ph.plans.length > 0 && !missing.length, detail: ph.plans.length ? missing.length ? [`GATE FAIL: ${missing.length} plans missing build output. Run /triad:build to complete.`, ...missing.map(m => `- ${m.id}`)] : [] : ['GATE FAIL: no plans in this phase. Run /triad:plan and /triad:build.'] })
@@ -83,30 +129,41 @@ export async function shipGate(io: Io, opts: { phase?: number }): Promise<Gate |
   checks.push({ name: 'Review passed', pass: !!ph.review && !blockers.length, detail: !ph.review ? ['GATE FAIL: No review found. Run /triad:review before shipping.'] : blockers.length ? [`GATE FAIL: ${blockers.length} unresolved blockers in review.`, ...blockers.map(b => `- ${b}`)] : [] })
   const esc = Object.values(ph.summaries).reduce((a, t) => a + blockerEscalations(t), 0)
   checks.push({ name: 'No blocker escalations', pass: esc === 0, detail: esc ? [`GATE FAIL: ${esc} unresolved blocker escalations.`] : [] })
-  const verify: VerifyRun[] = []
-  const vdetail: string[] = []
-  for (const pl of ph.plans) {
-    const runs = await runVerification(io, pl.fm.verification_commands ?? [])
-    verify.push(...runs)
-    for (const r of runs.filter(r => !r.passed)) vdetail.push(`GATE FAIL: Verification command failed: \`${r.command}\` — exit code ${r.exitCode} (plan ${pl.id})`, tail(r.output ?? '', 10))
-  }
-  checks.push({ name: 'Verification commands', pass: !vdetail.length, detail: vdetail, extra: `${verify.filter(v => v.passed).length}/${verify.length}` })
+  const clean: Check = { name: 'Clean working tree', pass: !dirty.length, detail: dirty.length ? ['GATE FAIL: Uncommitted changes in working tree. Commit or stash before shipping.', ...dirty.slice(0, 20).map(f => `- ${f}`)] : [] }
   const testCommand = await detectTestCommand(io, p.settings)
-  let test: VerifyRun | undefined
-  if (testCommand) {
-    test = (await runVerification(io, [testCommand]))[0]
-    checks.push({ name: 'Tests pass', pass: test!.passed, detail: test!.passed ? [] : ['GATE FAIL: Test suite failed.', tail(test!.output ?? '', 20)] })
-  } else checks.push({ name: 'Tests pass', pass: true, detail: [], extra: 'no test command found' })
-  const dirty = [...(await dirtyFiles(io))]
-  checks.push({ name: 'Clean working tree', pass: !dirty.length, detail: dirty.length ? ['GATE FAIL: Uncommitted changes in working tree. Commit or stash before shipping.', ...dirty.slice(0, 20).map(f => `- ${f}`)] : [] })
+  const meta: GateMeta = { phase: n, head: await headOf(io), commands: [...ph.plans.flatMap(pl => (pl.fm.verification_commands ?? []).map(command => ({ plan: pl.id, command }))), ...(testCommand ? [{ command: testCommand }] : [])] }
+  const quickFail = checks.some(c => !c.pass) || !clean.pass
+  const got = quickFail || !meta.commands.length ? { runs: [] as VerifyRun[], partial: false } : await gateRuns(io, meta)
+  if ('running' in got && got.running !== undefined) return `Ship scope: Phase ${n} — ${s.name}\n\nGATE RUN IN PROGRESS: ${got.running} of ${meta.commands.length} command(s) finished. Wait for the background \`bash ${GATE_SCRIPT}\` task to finish, then call ship action \`check\` again; do not start it a second time.`
+  if (!got.runs) {
+    // Not run yet on this commit (or the run was cut short): write the script and hand it to the session.
+    await io.write(`${GATE_DIR}/meta.json`, JSON.stringify(meta))
+    for (const [i, c] of meta.commands.entries()) await io.write(`${GATE_DIR}/cmd/${i + 1}.sh`, `${c.command}\n`)
+    await io.write(GATE_SCRIPT, gateScript(meta))
+    await io.run(['rm', '-rf', `${GATE_DIR}/out`])
+    return [`Ship scope: Phase ${n} — ${s.name}`, '', `Build, review, escalations and the working tree pass. ${got.partial ? 'The gate commands did not finish on this commit (the run was cut short); they run again from the start.' : `The gate commands have not run on this commit yet: ${meta.commands.length} command(s), the test suite last${testCommand ? ` (\`${testCommand}\`)` : ''}.`}`,
+      '', `GATE RUN NEEDED: run \`bash ${GATE_SCRIPT}\` with the Bash tool and run_in_background true (a test suite can outlast a foreground call), wait for it to finish, then call ship action \`check\` again with the same arguments. Do not run the commands any other way, and do not read the results yourself: check reads them.`,
+      '', 'Commands:', ...meta.commands.map((c, i) => `${i + 1}. \`${c.command}\`${c.plan ? ` (plan ${c.plan})` : ' (test suite)'}`)].join('\n')
+  }
+  const runs = got.runs
+  const verify = runs.slice(0, runs.length - (testCommand ? 1 : 0))
+  const test = testCommand && !quickFail ? runs[runs.length - 1] : undefined
+  const vdetail = meta.commands.flatMap((c, i) => c.plan && runs[i] && !runs[i]!.passed ? [`GATE FAIL: Verification command failed: \`${c.command}\` — exit code ${runs[i]!.exitCode} (plan ${c.plan})`, tail(runs[i]!.output ?? '', 10)] : [])
+  // With an earlier gate failing the commands do not run: the verdict is already no.
+  const skipped = quickFail && meta.commands.length > 0
+  if (skipped) checks.push({ name: 'Verification commands', pass: false, skipped, detail: [] })
+  else checks.push({ name: 'Verification commands', pass: !vdetail.length, detail: vdetail, extra: `${verify.filter(v => v.passed).length}/${verify.length}` })
+  if (testCommand) checks.push(skipped ? { name: 'Tests pass', pass: false, skipped, detail: [] } : { name: 'Tests pass', pass: !!test?.passed, detail: test?.passed ? [] : ['GATE FAIL: Test suite failed.', tail(test?.output ?? '', 20)] })
+  else checks.push({ name: 'Tests pass', pass: true, detail: [], extra: 'no test command found' })
+  checks.push(clean)
   return { n, name: s.name!, ph, checks, verify, test, testCommand }
 }
 
 export function renderGate(g: Gate): string {
   const passed = g.checks.filter(c => c.pass).length
-  const out = [`## Pre-Ship Gate: Phase ${g.n}`, '| Check | Status |', '|-------|--------|', ...g.checks.map(c => `| ${c.name} | ${c.pass ? 'Pass' : 'FAIL'}${c.extra ? ` (${c.extra})` : ''} |`), '', `**Result**: ${passed} of 6 gates passed`]
+  const out = [`## Pre-Ship Gate: Phase ${g.n}`, '| Check | Status |', '|-------|--------|', ...g.checks.map(c => `| ${c.name} | ${c.skipped ? 'Not run' : c.pass ? 'Pass' : 'FAIL'}${c.extra ? ` (${c.extra})` : ''} |`), '', `**Result**: ${passed} of 6 gates passed`]
   const fails = g.checks.filter(c => !c.pass)
-  if (fails.length) out.push('', ...fails.flatMap(c => c.detail), '', 'Ship blocked — resolve the above issues and re-run /triad:ship.')
+  if (fails.length) out.push('', ...fails.flatMap(c => c.detail), ...(g.checks.some(c => c.skipped) ? ['The verification commands and tests did not run: the gates above fail first.'] : []), '', 'Ship blocked — resolve the above issues and re-run /triad:ship.')
   return out.join('\n')
 }
 
@@ -171,10 +228,7 @@ export async function shipCheck(io: Io, opts: { phase?: number; dry_run?: boolea
 export async function shipPublish(io: Io, opts: { phase?: number; method: 'pr' | 'push' | 'mark' }): Promise<string> {
   const g = await shipGate(io, opts)
   if (typeof g === 'string') return g
-  // The report written by `check` makes the tree dirty; that file is ours, so it does not fail the gate here.
   const own = reportPath(g)
-  const clean = g.checks.find(c => c.name === 'Clean working tree')!
-  if (!clean.pass && clean.detail.slice(1).every(l => l === `- ${own}`)) { clean.pass = true; clean.detail = [] }
   if (g.checks.some(c => !c.pass)) return renderGate(g)
   const p = await loadProject(io)
   const out: string[] = []
@@ -196,22 +250,29 @@ export async function shipPublish(io: Io, opts: { phase?: number; method: 'pr' |
     if (push.exitCode !== 0) return [...out, `Push failed; no PR created: ${(push.stderr || push.stdout).trim()}`].join('\n')
     out.push(`Pushed ${branch}.`)
     if (opts.method === 'pr') {
-      await ensureLabel(io, 'triad-ship', '0E8A16', 'Shipped by Triad')
-      await ensureLabel(io, `phase-${pad2(g.n)}`, 'C5DEF5', `Phase ${g.n}`)
-      const audit = await preShipAudit(io, 'gh pr create')
-      if (audit) return [...out, audit].join('\n')
-      const bodyFile = '.triad/pr-body.md'
-      await io.write(bodyFile, renderPrBody(g, await issueOf(io, g.n)))
-      const pr = await io.run(['gh', 'pr', 'create', '--title', `Phase ${pad2(g.n)}: ${g.name}`, '--body-file', bodyFile, '--base', base, '--head', branch, '--label', 'triad-ship', '--label', `phase-${pad2(g.n)}`, '--assignee', '@me'])
-      if (pr.exitCode !== 0) return [...out, `PR creation failed: ${(pr.stderr || pr.stdout).trim()}`].join('\n')
-      prUrl = pr.stdout.trim().split('\n').find(l => /^https?:\/\//.test(l))
+      // A ship stopped after its PR was opened (a session restart) finds that PR again.
+      const open = await io.run(['gh', 'pr', 'list', '--head', branch, '--base', base, '--state', 'open', '--json', 'url', '--jq', '.[0].url'])
+      prUrl = open.exitCode === 0 ? open.stdout.trim().split('\n').find(l => /^https?:\/\//.test(l)) : undefined
+      if (prUrl) out.push(`PR already open: ${prUrl}`)
+      else {
+        await ensureLabel(io, 'triad-ship', '0E8A16', 'Shipped by Triad')
+        await ensureLabel(io, `phase-${pad2(g.n)}`, 'C5DEF5', `Phase ${g.n}`)
+        const audit = await preShipAudit(io, 'gh pr create')
+        if (audit) return [...out, audit].join('\n')
+        const bodyFile = '.triad/pr-body.md'
+        await io.write(bodyFile, renderPrBody(g, await issueOf(io, g.n)))
+        const pr = await io.run(['gh', 'pr', 'create', '--title', `Phase ${pad2(g.n)}: ${g.name}`, '--body-file', bodyFile, '--base', base, '--head', branch, '--label', 'triad-ship', '--label', `phase-${pad2(g.n)}`, '--assignee', '@me'])
+        if (pr.exitCode !== 0) return [...out, `PR creation failed: ${(pr.stderr || pr.stdout).trim()}`].join('\n')
+        prUrl = pr.stdout.trim().split('\n').find(l => /^https?:\/\//.test(l))
+        out.push(`PR: ${prUrl}`)
+      }
       prNumber = Number(prUrl?.split('/').pop()) || undefined
-      out.push(`PR: ${prUrl}`)
       if (prNumber) { const w = await ghRecordPr(io, g.n, g.name, prNumber); if (w) out.push(w) }
     }
   }
-  // Post-ship verification (warn only).
-  const post = await runVerification(io, g.ph.plans.flatMap(pl => pl.fm.verification_commands ?? []))
+  // Post-ship verification (warn only): publishing pushed the commit the gate
+  // verified, unchanged, so the gate's runs on it stand for it.
+  const post = g.verify
   for (const r of post.filter(r => !r.passed)) out.push(`Post-ship verification failure: \`${r.command}\``)
   await io.write(own, renderShipReport(g, io.now(), prUrl))
   const date = today(io)

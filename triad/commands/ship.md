@@ -8,6 +8,8 @@ Load the tools: ToolSearch with query `select:mcp__triad__ship,mcp__triad__githu
 
 0. `--dry-run`: call `dry_run` with command `ship` (and the phase from `--phase`), show the prerequisite report and stop: no gates run, no files, agents or git changes.
 1. Call ship action `check` with `phase` (from `--phase`) and `dry_run` (true with `--preview`). It resolves the phase, runs all six gates (build complete, review passed including unresolved CRITICAL/HIGH security findings, no open blocker escalations, verification commands, tests, clean tree) and writes `SHIP-REPORT.md`. If it returns an error (no project, phase not reviewed), show it and stop.
+   - The verification commands and the test suite never run inside the tool call. When the result says `GATE RUN NEEDED`, run the script it names with the Bash tool and `run_in_background: true` (start any service the tests need first, as you would for a test run), wait for the background task to finish, then call `check` again with the same arguments. Do not run the commands another way or judge the results yourself: `check` reads them. The results hold for the commit they ran on, so `publish` and a second `check` reuse them.
+   - After a session restart, call `check` again: a run that was cut short is asked for again from the start.
 2. Show the gate table. If any gate failed, show the failures with their fix hints and stop: the verdict is final, do not offer to override it. With `--preview`, show the gate results and the PR preview and stop: nothing was written.
 3. Ask the user how to publish with AskUserQuestion. The check result says whether `gh` is ready for this repo:
    - gh ready: "Create PR (Recommended)" (method `pr`), "Push to current branch" (`push`), "Mark shipped only" (`mark`).

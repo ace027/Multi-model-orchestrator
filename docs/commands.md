@@ -106,6 +106,8 @@ Ship a reviewed phase: 6 pre-ship gates in code, ship report, PR or push, post-s
 
 Six pre-ship gates and the ship report in code; PR, push or mark via `git`/`gh`; canary on the mod clock (never auto-rollback).
 
+The verification commands and the test suite run in a script, `.triad/ship-gate/run.sh`, that the session starts with Bash in the background; `check` writes it, then reads each command's exit code and output back. A suite of several minutes inside one tool call left a remote session with nothing in its transcript, and the session was stopped and restarted mid-ship. The results hold for the commit they ran on: `publish` and post-ship verification reuse them, a ship run again after a restart asks only for a run that did not finish, and `publish` finds a PR it already opened instead of creating a second.
+
 ## Decide and advise
 
 ### /triad:board
