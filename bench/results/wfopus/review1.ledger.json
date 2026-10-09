@@ -1,0 +1,244 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 53,
+      "input": 106,
+      "output": 22397,
+      "cacheRead": 773470,
+      "cacheWrite": 144940,
+      "cost": 1.3751039999999997
+    },
+    "haiku": {
+      "requests": 7,
+      "input": 68789,
+      "output": 8921,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "cost": 0.011339400000000001
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 9,
+      "input": 18,
+      "output": 1933,
+      "cacheRead": 184207,
+      "cacheWrite": 15782,
+      "cost": 0.20182940000000002,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 25421
+    },
+    "a0bf875f4bfaf9aab": {
+      "requests": 5,
+      "input": 10,
+      "output": 2338,
+      "cacheRead": 63102,
+      "cacheWrite": 15153,
+      "cost": 0.1351854,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 20694,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "ab41488a4e3fa50c5": {
+      "requests": 4,
+      "input": 8,
+      "output": 2239,
+      "cacheRead": 50160,
+      "cacheWrite": 13743,
+      "cost": 0.123559,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 19284,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "a24e7a6c979ce4cfb": {
+      "requests": 5,
+      "input": 10,
+      "output": 2282,
+      "cacheRead": 60411,
+      "cacheWrite": 13131,
+      "cost": 0.1234172,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 18672,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "ab7229cdb352a1a42": {
+      "requests": 2,
+      "input": 4,
+      "output": 1331,
+      "cacheRead": 15456,
+      "cacheWrite": 5378,
+      "cost": 0.056617200000000006,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 10919,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "compressor": {
+      "requests": 7,
+      "input": 68789,
+      "output": 8921,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "cost": 0.011339400000000001,
+      "role": "compressor",
+      "depth": 0,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 20207
+    },
+    "a64f028e2454f8dd4": {
+      "requests": 7,
+      "input": 14,
+      "output": 2815,
+      "cacheRead": 109998,
+      "cacheWrite": 21100,
+      "cost": 0.18385559999999998,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 26641,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "a63127f82dd820c1c": {
+      "requests": 5,
+      "input": 10,
+      "output": 1723,
+      "cacheRead": 68095,
+      "cacheWrite": 18099,
+      "cost": 0.138614,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 23640,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "a758bcfe582092126": {
+      "requests": 3,
+      "input": 6,
+      "output": 2039,
+      "cacheRead": 24863,
+      "cacheWrite": 6927,
+      "cost": 0.0804116,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 12468,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "abbfd0d681a74e642": {
+      "requests": 5,
+      "input": 10,
+      "output": 1740,
+      "cacheRead": 63831,
+      "cacheWrite": 17111,
+      "cost": 0.13316119999999998,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 22652,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "no status"
+    },
+    "a548d5becca662597": {
+      "requests": 8,
+      "input": 16,
+      "output": 3957,
+      "cacheRead": 133347,
+      "cacheWrite": 18516,
+      "cost": 0.1984534,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 24057,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    }
+  },
+  "haiku": {
+    "requests": 7,
+    "maxPrompt": 20207,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 7,
+    "rawTokens": 41282,
+    "outTokens": 6389
+  },
+  "ceiling": {
+    "wrapNotes": 0,
+    "stops": 0,
+    "trimmed": 0,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 0,
+    "haikuWrapAt": 80000,
+    "openPane": false,
+    "coderMinutes": 0,
+    "allOpus": true
+  },
+  "contextInjections": 1
+}

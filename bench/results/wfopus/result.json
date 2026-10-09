@@ -1,0 +1,67 @@
+{
+  "success": true,
+  "score": [
+    52.0,
+    52
+  ],
+  "cost": 8.766,
+  "seconds": 4315,
+  "phases": 3,
+  "steps": {
+    "build1": {
+      "cost": 1.2166648,
+      "turns": 5,
+      "error": false
+    },
+    "build2": {
+      "cost": 1.2619491999999999,
+      "turns": 5,
+      "error": false
+    },
+    "build3": {
+      "cost": null,
+      "turns": null,
+      "error": null
+    },
+    "plan1": {
+      "cost": 1.1204939999999999,
+      "turns": 17,
+      "error": false
+    },
+    "plan2": {
+      "cost": 1.0983376,
+      "turns": 20,
+      "error": false
+    },
+    "plan3": {
+      "cost": 0.8746402,
+      "turns": 20,
+      "error": false
+    },
+    "review1": {
+      "cost": 1.3277579999999993,
+      "turns": 10,
+      "error": false
+    },
+    "review2": {
+      "cost": 1.4913199999999998,
+      "turns": 11,
+      "error": false
+    },
+    "review3": {
+      "cost": 0.11982019999999999,
+      "turns": 3,
+      "error": false
+    },
+    "start": {
+      "cost": 0.2550186,
+      "turns": 9,
+      "error": false
+    }
+  },
+  "byModel": {
+    "claude-opus-5-5": 8.7659
+  },
+  "check": "score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']",
+  "work": "/tmp/wf-tron-kjba/repo"
+}

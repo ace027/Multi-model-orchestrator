@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 24,
+      "input": 48,
+      "output": 32264,
+      "cacheRead": 502714,
+      "cacheWrite": 94130,
+      "cost": 1.2487948000000002
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 5,
+      "input": 10,
+      "output": 913,
+      "cacheRead": 85527,
+      "cacheWrite": 10710,
+      "cost": 0.12108539999999998,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 20349
+    },
+    "a2e0cf35882394c47": {
+      "requests": 6,
+      "input": 12,
+      "output": 15236,
+      "cacheRead": 136142,
+      "cacheWrite": 32894,
+      "cost": 0.49646640000000003,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 38435,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    },
+    "ab7ba2d826231f62b": {
+      "requests": 6,
+      "input": 12,
+      "output": 9412,
+      "cacheRead": 140638,
+      "cacheWrite": 28082,
+      "cost": 0.3568256,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 33623,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    },
+    "a83510e948a0a7cd7": {
+      "requests": 7,
+      "input": 14,
+      "output": 6703,
+      "cacheRead": 140407,
+      "cacheWrite": 22444,
+      "cost": 0.2744174,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 27985,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    }
+  },
+  "haiku": {
+    "requests": 0,
+    "maxPrompt": 0,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "ceiling": {
+    "wrapNotes": 0,
+    "stops": 0,
+    "trimmed": 0,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 0,
+    "haikuWrapAt": 80000,
+    "openPane": false,
+    "coderMinutes": 0,
+    "allOpus": true
+  },
+  "contextInjections": 1
+}
