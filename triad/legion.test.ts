@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { Io, RunResult } from './hooks/legion/io.ts'
 import type { Agents } from './hooks/legion/build.ts'
 import { build, gitignoreLines } from './hooks/legion/build.ts'
-import { estimate } from './hooks/legion/estimate.ts'
+import { calibrate, estimate, phaseShape, predicted, type StepRecord } from './hooks/legion/estimate.ts'
 import { review } from './hooks/legion/reviewrun.ts'
 import { planCheck, planWrite, processLine, projectInit, statusText, validateText } from './hooks/legion/handlers.ts'
 import { getField, parsePlan, parseRoadmap, parseState, planWaves, progressBar, setField, setRoadmapRow, summaryStatus, updateState } from './hooks/legion/planning.ts'
@@ -261,6 +261,27 @@ describe('build and review', () => {
     await build(io, fakeAgents(io))
     expect((await estimate(io, { lightPlans: 2 })).phases[0]!.build).toBe(0)
     expect((await estimate(memIo(), { lightPlans: 2 })).text).toMatch(/No Legion project/)
+  })
+  test('estimate: calibrated from the measured cost of past steps', async () => {
+    const rec = (project: string, step: StepRecord['step'], usd: number, plans = 2): StepRecord => ({ project, session: 's', phase: 1, step, plans, opusPlans: 0, light: false, usd, at: '' })
+    expect(calibrate(undefined)).toEqual({ plan: 1, build: 1, review: 1, n: 0 })
+    // Builds cost twice the rate on three projects: median 2, pulled to 1 + 1 * 3/5.
+    const twice = predicted('build', { plans: 2, opusPlans: 0, light: false }) * 2
+    const c = calibrate([rec('a', 'build', twice), rec('b', 'build', twice), rec('c', 'build', twice / 2), rec('c', 'build', twice / 2), rec('d', 'plan', 0)])
+    expect(Math.abs(c.build - 1.6)).toBeLessThan(1e-9)
+    expect(c.plan).toBe(1)
+    expect(c.n).toBe(3)
+    // One wild run moves little and never past 3x.
+    expect(calibrate(Array.from({ length: 20 }, (_, i) => rec(String(i), 'review', 100))).review).toBe(3)
+    const io = memIo()
+    await projectInit(io, { name: 'Demo', description: 'A demo.', phases: [{ name: 'Core', goal: 'Build the core API', plans: 2 }] } as any)
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts'), plan(2, 1, 'src/b.ts')] })
+    expect(await phaseShape(io, 1, 2)).toEqual({ phase: 1, plans: 2, opusPlans: 0, light: true })
+    const plain = await estimate(io, { lightPlans: 2 })
+    const cal = await estimate(io, { lightPlans: 2, history: [rec('a', 'build', twice), rec('b', 'build', twice), rec('c', 'build', twice)] })
+    expect(Math.abs(cal.phases[0]!.build - plain.phases[0]!.build * 1.6)).toBeLessThan(1e-9)
+    expect(cal.text).toMatch(/calibrated from 3 past steps of your own runs \(plan x1\.00, build x1\.60/)
+    expect(plain.text).toMatch(/your own runs calibrate them/)
   })
   test('planning_status names the light and full phases', async () => {
     const io = memIo()

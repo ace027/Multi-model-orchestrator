@@ -1,6 +1,6 @@
 {
   "name": "triad",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "author": { "name": "ace027" },
   "homepage": "https://github.com/ace027/Multi-model-orchestrator",
   "description": "Tiered-model orchestration: Opus orchestrates and takes open-ended coding, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
@@ -46,6 +46,12 @@
       "type": "boolean",
       "title": "Offer only Triad agent types",
       "description": "Hide and refuse built-in and other plugins' agent types, which would bypass the tiers.",
+      "default": true
+    },
+    "notify": {
+      "type": "boolean",
+      "title": "Notify when /triad:auto ends",
+      "description": "When /triad:auto finishes or stops, send a one-line push notification (phases done, why it stopped, spend). Needs push notifications on in Claude Code.",
       "default": true
     },
     "compress": {

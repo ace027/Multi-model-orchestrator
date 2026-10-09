@@ -8,7 +8,7 @@ import { LEGION_TOOLS } from './legion/tools.ts'
 import { BUDGET_AGENT_NOTE, BUDGET_OVER, BUDGET_WARN, SPEND_FILE, bindingBudget, earlierSpend, parseSpend, spentOf } from './budget.ts'
 import { personaRank, planCheck, planWrite, processLine, projectInit, statusText, validateText } from './legion/handlers.ts'
 import { buildRun } from './legion/buildrun.ts'
-import { estimate } from './legion/estimate.ts'
+import { estimate, phaseShape, type StepKind, type StepRecord } from './legion/estimate.ts'
 import { review } from './legion/reviewrun.ts'
 import { checkWrite, controlMode, controlModeLine, type Scope } from './legion/settings.ts'
 import { checkMapping, loadKnowledgeIndex, logDecision, prepareRun } from './legion/authority.ts'
@@ -151,6 +151,37 @@ async function recordSpend($: any) {
   earlier = earlierSpend(f, sessionId)
   f.sessions[sessionId] = { usd: spent, at: new Date().toISOString() }
   try { await io.write(SPEND_FILE, JSON.stringify(f, null, 2) + '\n'); spendWritten = spent } catch { /* next step tries again */ }
+}
+// What each plan, build and review step cost, kept in the plugin store across
+// projects (the last STEPS_KEPT), so estimates scale to the user's own runs.
+// Not in SPEND.json: a step's cost is known only after its commits.
+const STEPS_KEY = 'steps'
+const STEPS_KEPT = 200
+// Spend when this session's planning started (Skill triad:plan, /triad:plan).
+let planMark: number | undefined
+async function recordStepUsd($: any, step: StepKind, phase: number | undefined, usd: number) {
+  if (!sessionId || !(usd > 0)) return
+  try {
+    const shape = await phaseShape(ioOf($), phase, opts.lightPlans)
+    if (!shape?.plans) return
+    const all = ((await $.store.get(STEPS_KEY)) as StepRecord[] | undefined) ?? []
+    const rec: StepRecord = { project: cwd, session: sessionId, phase: shape.phase, step, plans: shape.plans, opusPlans: shape.opusPlans, light: shape.light, ...(opts.allOpus ? { allOpus: true } : {}), usd: Math.round(usd * 10000) / 10000, at: new Date().toISOString() }
+    const i = all.findIndex(x => x.project === cwd && x.session === sessionId && x.phase === rec.phase && x.step === step)
+    // Planning is measured from its start, so its line is replaced; a resumed
+    // build or review adds to the line.
+    if (i < 0) all.push(rec)
+    else all[i] = step === 'plan' ? rec : { ...rec, usd: all[i]!.usd + rec.usd }
+    await $.store.set(STEPS_KEY, all.slice(-STEPS_KEPT))
+  } catch { /* a missed record only leaves the estimate less calibrated */ }
+}
+async function recordStepCost($: any, tool: string, input: any, before: number) {
+  const phase = input.phase === undefined ? undefined : Number(input.phase)
+  if (tool === 'build_phase' || tool === 'review_phase') {
+    planMark = undefined
+    if (!input.flags?.includes?.('--dry-run')) await recordStepUsd($, tool === 'build_phase' ? 'build' : 'review', phase, spentOf(ledger) - before)
+  } else if ((tool === 'plan_write' || tool === 'plan_check') && planMark !== undefined && phase) {
+    await recordStepUsd($, 'plan', phase, spentOf(ledger) - planMark)
+  }
 }
 async function checkBudget($: any) {
   const level = budgetLevel()
@@ -360,9 +391,9 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
         opts.maxProjectSpend > 0 ? `$${projectSpent().toFixed(2)} of $${opts.maxProjectSpend.toFixed(2)} spent on the project (maxProjectSpend)` : '',
       ].filter(Boolean)
       const spend = lines.length ? `\nBudget: ${lines.join('; ')}${b.level === 'over' ? `: ${b.option} reached, stop` : ''}.` : ''
-      return `${await statusText(io)}\n\nValidate: ${v.text}\n${controlModeLine(await controlMode(io))}\n${await processLine(io, opts.lightPlans)}${spend}`
+      return `${await statusText(io)}\n\nValidate: ${v.text}\n${controlModeLine(await controlMode(io))}\n${await processLine(io, opts.lightPlans)}${spend}${opts.notify ? '' : '\nNotify: off (option notify).'}`
     }
-    case 'estimate': return (await estimate(io, { lightPlans: opts.lightPlans, allOpus: opts.allOpus })).text
+    case 'estimate': return (await estimate(io, { lightPlans: opts.lightPlans, allOpus: opts.allOpus, history: (await $.store.get(STEPS_KEY)) as StepRecord[] | undefined })).text
     case 'project_init': return projectInit(io, input)
     case 'plan_write': return planWrite(io, input)
     case 'plan_check': return planCheck(io, Number(input.phase))
@@ -428,6 +459,7 @@ export const register: Register = (on, options) => {
   // model; prompt.submit context does.)
   on('prompt.submit', async ($, e, next) => {
     if (!/^\/triad:/.test(e.text.trimStart())) return next(e)
+    if (/^\/triad:plan\b/.test(e.text.trimStart())) planMark = spentOf(ledger)
     return next({ ...e, context: [...(e.context ?? []), legionGuide] })
   })
 
@@ -688,6 +720,12 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Planning's cost runs from here to its last plan_write or plan_check.
+  on('tool.call', { tool: 'Skill' }, async ($, e, next) => {
+    if (!e.agentId && (e as any).skill === 'triad:plan') planMark = spentOf(ledger)
+    return next(e)
+  })
+
   // Read-only tools that spend nothing stay open once a budget is reached.
   const FREE_TOOLS = new Set(['planning_status', 'estimate'])
   for (const t of LEGION_TOOLS) {
@@ -696,7 +734,10 @@ export const register: Register = (on, options) => {
       if (budgetLevel() === 'over' && !FREE_TOOLS.has(t.name)) return { result: BUDGET_OVER(budget()), isError: true }
       try {
         await recordSpend($)
-        return { result: (await legionTool($, t.name, e)) + budgetNote() }
+        const before = spentOf(ledger)
+        const result = await legionTool($, t.name, e)
+        await recordStepCost($, t.name, e, before)
+        return { result: result + budgetNote() }
       } catch (err) {
         return { result: `triad: ${t.name} failed: ${err instanceof Error ? err.message : String(err)}`, isError: true }
       }

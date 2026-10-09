@@ -46,7 +46,7 @@ For a structured project, use the Legion workflow:
 | `/triad:explore`, `/triad:start` | Research an idea; start a project (`PROJECT.md`, `ROADMAP.md`, `STATE.md` in `.planning/`). |
 | `/triad:spec`, `/triad:plan` | Spec a phase; decompose it into wave-ordered plans with a critique. |
 | `/triad:build`, `/triad:review`, `/triad:ship` | Execute the plans, review the result and fix findings, ship it behind six gates. |
-| `/triad:auto` | The whole project hands-off: start if needed, then plan, build and review each phase with no questions. Run it again to resume. `--estimate` plans every phase and shows the expected cost per phase without building. Pair it with `maxProjectSpend`. |
+| `/triad:auto` | The whole project hands-off: start if needed, then plan, build and review each phase with no questions. Run it again to resume. `--estimate` plans every phase and shows the expected cost per phase without building; the rates scale to what your own past steps cost. Pair it with `maxProjectSpend`. Sends a push notification when it finishes or stops (option `notify`). |
 | `/triad:quick` | One small task outside the plan. |
 | `/triad status`, `/triad validate` | Where the project is and what to run next; schema checks. No model calls. |
 
@@ -78,6 +78,7 @@ Set them in `/plugin` settings, or for a headless run with `--settings '{"plugin
 | `maxProjectSpend` | 0 | The same budget across every session on the project, in USD (0: none). Each session's spend is kept in `.planning/SPEND.json`, written as each workflow step starts and committed with it, so a resumed `/triad:auto` or a fresh clone still counts it (all but the last few turns of each session). |
 | `lightPlans` | 2 | A phase with at most this many plans runs the light process: planning skips the board, spec, proposals, persona table and security and design passes, and review uses two reviewers for at most two cycles. 0: always the full process. |
 | `fixMinor` | true | After a review passes, one coder round fixes its minor and medium-confidence findings; the checks run again and the round is undone if one fails. |
+| `notify` | true | When `/triad:auto` finishes or stops, send one push notification line: how far it got, why it stopped, the spend. Needs push notifications on in Claude Code. |
 | `openPane` | false | Open the Triad pane at session start. A pane opened this way seats from 144 terminal columns; `/triad pane` opens it at any width. |
 
 A helper brief over 40k tokens is refused at spawn: give the job to a coder, or split it.
@@ -108,4 +109,4 @@ The ledger prices every request per tier, including Haiku's rate above 100k prom
 
 `claude plugin test triad` runs the test suites; [`../CONTRIBUTING.md`](../CONTRIBUTING.md) has the other checks and the conventions. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the `delegate_menial` round trip is covered by the live run in `bench/run_accept.sh` instead.
 
-Version 0.11.0.
+Version 0.12.0.

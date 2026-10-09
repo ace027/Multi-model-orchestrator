@@ -2,6 +2,8 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import { mayWrite, pathsInBrief, schemaProblems } from './hooks/policy.ts'
 import { costOf, emptyLedger, recordStep } from './hooks/ledger.ts'
 import { chunks, errorLines, eligible } from './hooks/compress.ts'
+import { memIo } from './testkit.ts'
+import { planWrite, projectInit } from './hooks/legion/handlers.ts'
 import { newMeter, parseProgress, partialReply, project, resultOverflows, transcriptTail } from './hooks/ceiling.ts'
 
 const GOOD = 'status: done\nsummary: added the parser\nchanges:\n- src/a.ts | added | parser\nverify: npm test => 4 passed'
@@ -403,6 +405,34 @@ describe('haiku ceiling', () => {
     const r: any = await $.tool.call({ tool: 'mcp__triad__build_phase', tool_use_id: 'b' } as any)
     expect(r.result).toMatch(/raising maxProjectSpend/)
     expect((await $.command.run({ command: 'triad' } as any) as any).text).toMatch(/project spend \$0\.0020 of \$0\.0015 across sessions/)
+  })
+
+  test('records what a plan step cost, and estimate uses it', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const io = memIo()
+    await projectInit(io, { name: 'Demo', description: 'A demo.', phases: [{ name: 'Core', goal: 'Build the core API', plans: 2 }] } as any)
+    const pl = (p: number, file: string) => ({
+      plan: p, title: `Plan ${p}`, wave: 1, agents: ['engineering-backend-architect'], depends_on: [], files_modified: [file], files_forbidden: ['secrets/'],
+      verification_commands: [`test -f ${file}`], expected_artifacts: [{ path: file, provides: 'code', required: true }], truths: ['it works'],
+      objective: `Write ${file}.`, tasks: [{ name: 'write', files: [file], action: `Create ${file}.`, verification: [`test -f ${file}`], done: `${file} exists` }], success_criteria: [`${file} exists`],
+    })
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [pl(1, 'src/a.ts'), pl(2, 'src/b.ts')] } as any)
+    const rel = (path: string) => path.replace(/^\/repo\//, '')
+    on('fs.read', (_$: any, e: any) => { const t = io.files.get(rel(e.path)); if (t === undefined) throw new Error('ENOENT'); return { value: t } })
+    on('fs.list', async (_$: any, e: any) => ({ value: (await io.list(rel(e.path))).map(x => ({ name: x.name, kind: x.dir ? 'dir' : 'file' })) }))
+    on('prompt.submit', (_$: any, e: any) => ({ text: e.text, context: e.context }))
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    await start($)
+    await $.prompt.submit({ text: '/triad:plan 1 --auto' } as any)
+    const c = await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'plan it', description: 'c' })
+    await step($, c.agentId!, 0)
+    await $.tool.call({ tool: 'mcp__triad__plan_check', tool_use_id: 'p', phase: 1 } as any)
+    // The plan step is done (planned) so it costs nothing now, but its measured
+    // cost (about a tenth of a cent against a $0.25 rate) sets the plan factor.
+    const r: any = await $.tool.call({ tool: 'mcp__triad__estimate', tool_use_id: 'e' } as any)
+    expect(r.result).toMatch(/calibrated from 1 past steps of your own runs \(plan x0\.\d\d, build x1\.00, review x1\.00\)/)
+    expect(r.result).not.toMatch(/plan x1\.00/)
   })
 
   test('maxSpend 0 is no limit', async ($, on) => {
