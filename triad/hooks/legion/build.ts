@@ -64,8 +64,12 @@ export type BuildReport = { ok: boolean; phase?: number; error?: string; warning
 
 const VERIFY_TIMEOUT = 10 * 60_000
 
-export async function runVerification(io: Io, cmds: string[], wt?: Worktree): Promise<VerifyRun[]> {
+export async function runVerification(io: Io, cmds: string[], wt?: Worktree, label = 'verification'): Promise<VerifyRun[]> {
   const out: VerifyRun[] = []
+  if (io.long && cmds.length) {
+    const rs = await io.long(cmds.map(c => inWorktree(wt, c)), label)
+    return cmds.map((command, i) => { const r = rs[i] ?? { exitCode: 124, stdout: '', stderr: 'no result' }; return { command, exitCode: r.exitCode, passed: r.exitCode === 0, output: (r.stdout + r.stderr).slice(-4000) } })
+  }
   for (const command of cmds) {
     let r
     try {
@@ -380,7 +384,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
           let answer = r.answer ?? ''
           const cmds = verificationCommands(plan)
           if (!r.deny && cmds.length) log(`${plan.id}: running ${cmds.length} verification command${cmds.length === 1 ? '' : 's'}`)
-          let verify = r.deny ? [] : await runVerification(io, cmds, wt)
+          let verify = r.deny ? [] : await runVerification(io, cmds, wt, `plan ${plan.id} verification`)
           // BLOCKER/ENVIRONMENT classification of a failed check or a blocked agent
           // (workflow-common Auto-Remediation): ENVIRONMENT gets one automatic retry, BLOCKER escalates.
           const failing = () => {
@@ -394,7 +398,7 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
             log(`${plan.id}: ENVIRONMENT ISSUE: ${failure.reason}. Attempting remediation...`)
             const again = await agents.followUp(r.agentId, envRetryBrief(failure, why!))
             if (again) answer = again
-            verify = await runVerification(io, cmds, wt)
+            verify = await runVerification(io, cmds, wt, `plan ${plan.id} verification`)
             const still = failing()
             failure = still === undefined ? { ...failure, retried: true, remediated: true } : { kind: 'BLOCKER', reason: `ENVIRONMENT issue persisted after one automatic retry: ${classifyFailure(still).reason}`, retried: true }
             why = still ?? why

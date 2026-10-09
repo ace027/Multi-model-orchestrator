@@ -1,6 +1,6 @@
 {
   "name": "triad",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "author": { "name": "ace027" },
   "homepage": "https://github.com/ace027/Multi-model-orchestrator",
   "description": "Tiered-model orchestration: Opus orchestrates and takes open-ended coding, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",

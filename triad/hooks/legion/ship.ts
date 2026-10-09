@@ -70,47 +70,14 @@ export async function resolveScope(io: Io, p: Project, phase?: number): Promise<
 }
 
 // The gate's commands (every plan's verification commands, then the test
-// suite) run in a script the session starts with Bash, not inside this tool
-// call: a suite can take many minutes, and a remote session blocked that long
-// in one tool call, with nothing in its transcript, has been stopped and
-// restarted mid-ship. The script records each command's exit code and output
-// under GATE_DIR; ship check reads them back. They hold for the commit they
-// ran on, so publish (and a ship run again after a restart) reuses them.
+// suite) run through runVerification, as a job a runner agent waits on
+// (runner.ts), never as one silent child process of this call. Results that
+// all passed are kept for the commit they ran on, so publish, and a ship run
+// again after a session restart, reuse them instead of running the suite again.
 export const GATE_DIR = '.triad/ship-gate'
-export const GATE_SCRIPT = `${GATE_DIR}/run.sh`
+const GATE_CACHE = `${GATE_DIR}/results.json`
 export type GateMeta = { phase: number; head: string; commands: { plan?: string; command: string }[] }
 const headOf = async (io: Io) => { const r = await io.run(['git', 'rev-parse', 'HEAD']); return r.exitCode === 0 ? r.stdout.trim() : '' }
-
-export function gateScript(meta: GateMeta): string {
-  return ['#!/usr/bin/env bash', `# Triad pre-ship gate for Phase ${meta.phase} at ${meta.head.slice(0, 12) || 'the working tree'}, written by ship check.`,
-    '# Each command runs from the project root; its exit code and output go to out/. Call ship check again when it finishes.',
-    'cd "$(dirname "$0")/../.." || exit 1', `D=${GATE_DIR}`, 'rm -rf "$D/out"; mkdir -p "$D/out"; echo $$ > "$D/out/running"', `n=${meta.commands.length}; fails=0`,
-    'for i in $(seq 1 $n); do',
-    '  echo "[$i/$n] $(head -c 200 "$D/cmd/$i.sh")"', '  t0=$(date +%s)',
-    '  bash "$D/cmd/$i.sh" > "$D/out/$i.log" 2>&1; code=$?', '  echo $code > "$D/out/$i.exit"',
-    '  echo "  exit $code after $(( $(date +%s) - t0 ))s"',
-    '  if [ $code -ne 0 ]; then fails=$((fails+1)); tail -n 20 "$D/out/$i.log"; fi',
-    'done', 'rm -f "$D/out/running"', 'echo "Gate commands: $((n - fails))/$n passed. Call ship check again to read the results."', ''].join('\n')
-}
-
-// The recorded runs, when they are complete and for these commands on this commit.
-async function gateRuns(io: Io, meta: GateMeta): Promise<{ runs?: VerifyRun[]; partial: boolean; running?: number }> {
-  let old: GateMeta | undefined
-  try { old = JSON.parse((await io.read(`${GATE_DIR}/meta.json`)) ?? '') } catch { old = undefined }
-  if (!old || JSON.stringify(old) !== JSON.stringify(meta)) return { partial: false }
-  const runs: VerifyRun[] = []
-  for (const [i, c] of meta.commands.entries()) {
-    const code = (await io.read(`${GATE_DIR}/out/${i + 1}.exit`))?.trim()
-    if (code === undefined || !/^\d+$/.test(code)) {
-      // A script still running (its pid alive) is waited for, never restarted under it.
-      const pid = (await io.read(`${GATE_DIR}/out/running`))?.trim()
-      if (pid && /^\d+$/.test(pid) && (await io.run(['bash', '-c', `kill -0 ${pid}`])).exitCode === 0) return { partial: false, running: i }
-      return { partial: i > 0 || code !== undefined }
-    }
-    runs.push({ command: c.command, exitCode: Number(code), passed: code === '0', output: ((await io.read(`${GATE_DIR}/out/${i + 1}.log`)) ?? '').slice(-4000) })
-  }
-  return { runs, partial: false }
-}
 
 export async function shipGate(io: Io, opts: { phase?: number }): Promise<Gate | string> {
   const p = await loadProject(io)
@@ -133,19 +100,16 @@ export async function shipGate(io: Io, opts: { phase?: number }): Promise<Gate |
   const testCommand = await detectTestCommand(io, p.settings)
   const meta: GateMeta = { phase: n, head: await headOf(io), commands: [...ph.plans.flatMap(pl => (pl.fm.verification_commands ?? []).map(command => ({ plan: pl.id, command }))), ...(testCommand ? [{ command: testCommand }] : [])] }
   const quickFail = checks.some(c => !c.pass) || !clean.pass
-  const got = quickFail || !meta.commands.length ? { runs: [] as VerifyRun[], partial: false } : await gateRuns(io, meta)
-  if ('running' in got && got.running !== undefined) return `Ship scope: Phase ${n} — ${s.name}\n\nGATE RUN IN PROGRESS: ${got.running} of ${meta.commands.length} command(s) finished. Wait for the background \`bash ${GATE_SCRIPT}\` task to finish, then call ship action \`check\` again; do not start it a second time.`
-  if (!got.runs) {
-    // Not run yet on this commit (or the run was cut short): write the script and hand it to the session.
-    await io.write(`${GATE_DIR}/meta.json`, JSON.stringify(meta))
-    for (const [i, c] of meta.commands.entries()) await io.write(`${GATE_DIR}/cmd/${i + 1}.sh`, `${c.command}\n`)
-    await io.write(GATE_SCRIPT, gateScript(meta))
-    await io.run(['rm', '-rf', `${GATE_DIR}/out`])
-    return [`Ship scope: Phase ${n} — ${s.name}`, '', `Build, review, escalations and the working tree pass. ${got.partial ? 'The gate commands did not finish on this commit (the run was cut short); they run again from the start.' : `The gate commands have not run on this commit yet: ${meta.commands.length} command(s), the test suite last${testCommand ? ` (\`${testCommand}\`)` : ''}.`}`,
-      '', `GATE RUN NEEDED: run \`bash ${GATE_SCRIPT}\` with the Bash tool and run_in_background true (a test suite can outlast a foreground call), wait for it to finish, then call ship action \`check\` again with the same arguments. Do not run the commands any other way, and do not read the results yourself: check reads them.`,
-      '', 'Commands:', ...meta.commands.map((c, i) => `${i + 1}. \`${c.command}\`${c.plan ? ` (plan ${c.plan})` : ' (test suite)'}`)].join('\n')
+  let runs: VerifyRun[] = []
+  if (!quickFail && meta.commands.length) {
+    let cached: { meta: GateMeta; runs: VerifyRun[] } | undefined
+    try { cached = JSON.parse((await io.read(GATE_CACHE)) ?? '') } catch { cached = undefined }
+    if (meta.head && cached && JSON.stringify(cached.meta) === JSON.stringify(meta)) runs = cached.runs
+    else {
+      runs = await runVerification(io, meta.commands.map(c => c.command), undefined, `ship phase ${n} gate`)
+      if (meta.head && runs.every(r => r.passed)) await io.write(GATE_CACHE, JSON.stringify({ meta, runs }))
+    }
   }
-  const runs = got.runs
   const verify = runs.slice(0, runs.length - (testCommand ? 1 : 0))
   const test = testCommand && !quickFail ? runs[runs.length - 1] : undefined
   const vdetail = meta.commands.flatMap((c, i) => c.plan && runs[i] && !runs[i]!.passed ? [`GATE FAIL: Verification command failed: \`${c.command}\` — exit code ${runs[i]!.exitCode} (plan ${c.plan})`, tail(runs[i]!.output ?? '', 10)] : [])
@@ -293,12 +257,14 @@ export async function shipPublish(io: Io, opts: { phase?: number; method: 'pr' |
 
 // One canary check against the gate's verification baseline.
 export type CanaryResult = { status: 'HEALTHY' | 'DEGRADED' | 'REGRESSION'; passed: number; total: number; regressions: string[] }
-export async function canaryCheck(io: Io, phase: number, extra: string[] = []): Promise<CanaryResult> {
+// waitSeconds: a pause in the same job before the checks run.
+export async function canaryCheck(io: Io, phase: number, extra: string[] = [], waitSeconds = 0): Promise<CanaryResult> {
   const p = await loadProject(io)
   const ph = await loadPhase(io, p, phase)
   const cmds = [...ph.plans.flatMap(pl => pl.fm.verification_commands ?? []), ...extra]
   const test = await detectTestCommand(io, p.settings)
-  const runs = await runVerification(io, test ? [...cmds, test] : cmds)
+  const all = test ? [...cmds, test] : cmds
+  const runs = (await runVerification(io, waitSeconds > 0 ? [`sleep ${Math.round(waitSeconds)}`, ...all] : all, undefined, `canary phase ${phase} check`)).slice(waitSeconds > 0 ? 1 : 0)
   const failed = runs.filter(r => !r.passed)
   // Every one of these passed at the gate, so a failure now is a regression.
   return { status: failed.length ? 'REGRESSION' : 'HEALTHY', passed: runs.length - failed.length, total: runs.length, regressions: failed.map(f => f.command) }

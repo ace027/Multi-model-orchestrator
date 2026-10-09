@@ -49,7 +49,7 @@ Triad names: judgment workflows become plugin commands (`/triad:<name>`). Determ
 | `commands/explore.md` (`/legion:explore`) | Polymath pre-flight research and clarification, then writes a design doc | Improved | Opus with the Polymath persona; Haiku fans out research; saves to `.planning/explorations/` |
 | `commands/board.md` (`/legion:board meet\|review`) | Board-of-directors deliberation (meet) or quick parallel assessment (review) | Ported | Opus convenes; members are parallel Sonnet agents; votes and artifacts persisted to `.planning/board/` |
 | `commands/retro.md` (`/legion:retro`) | Structured retrospective; saves RETRO.md; supports cross-project mode | Improved | Metrics and evidence gathered in code; a Sonnet persona (studio operations) writes the retrospective; saved to RETRO.md in code |
-| `commands/ship.md` (`/legion:ship`) | Pre-ship gates, ship report, PR via `gh`, post-ship checks, canary monitoring | Improved | Gates and PR creation in code via `gh`; canary checks scheduled with `$.clock.after` at 1, 5 and 15 minutes; always-on security gate hook on `gh pr create` |
+| `commands/ship.md` (`/legion:ship`) | Pre-ship gates, ship report, PR via `gh`, post-ship checks, canary monitoring | Improved | Gates and PR creation in code via `gh`; canary checks at 1, 5 and 15 minutes as runner jobs inside the call; always-on security gate hook on `gh pr create` |
 | `commands/learn.md` (`/legion:learn`) | Record, recall, list and prune project lessons in `.planning/memory/` | Improved | Memory manager in code; Opus classifies the lesson; four-bracket decay; archive, never delete |
 | `commands/polish.md` (`/legion:polish`) | 4-pass code cleanup, capped at 50 files, reverts files whose tests regress | Improved | One Sonnet code polisher runs the 4 passes; the 50-file cap, test and type-check baseline and per-file revert run in code |
 | `commands/validate.md` (`/legion:validate`) | Validates `.planning/` files, schemas, cross-refs, roster and config | Improved | Pure code with the schemas (and `settings.schema.json`) built in, no model |
@@ -72,7 +72,7 @@ Triad names: judgment workflows become plugin commands (`/triad:<name>`). Determ
 | `map --check/--refresh/--scope/--query` | Freshness check, incremental refresh, scoped map, index query | Improved | Per spec, code-built index |
 | `learn --recall/--list/--prune` | Recall, list and archive-prune memory | Improved | Code |
 | `retro --milestone M` and cross-project mode | Milestone-level or cross-project retrospectives | Ported | Same flow, tiered as for `retro` |
-| `ship --canary` | Post-deploy canary monitor | Improved | Canary checks scheduled in code with `$.clock.after` (1, 5 and 15 minutes); never auto-rollback |
+| `ship --canary` | Post-deploy canary monitor | Improved | Canary checks in code at 1, 5 and 15 minutes, as runner jobs inside the call; never auto-rollback |
 | `polish --scope=changed\|dependents\|directory`, `<target-path>` | Scope selection | Ported | Per spec |
 | `validate --fix`, `--ci` | Auto-fix and CI exit codes | Improved | Code |
 | `update --check` | Version check only | Replaced | Plugin update shows available versions |

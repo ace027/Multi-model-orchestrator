@@ -12,7 +12,7 @@ const usage = (input: number, output: number, read = 0, write = 0, model = 'clau
 })
 
 // The engine beneath the plugin: just enough of it for session.start and the ledger.
-function world(on: any, log: { writes: Record<string, string>; spawns: any[]; tools?: any[] }) {
+function world(on: any, log: { writes: Record<string, string>; spawns: any[]; tools?: any[]; ids?: string }) {
   mock.store(on)
   on('session.start', () => ({ cwd: '/repo' }))
   on('session.id', () => ({ value: 'sess-1' }))
@@ -20,8 +20,21 @@ function world(on: any, log: { writes: Record<string, string>; spawns: any[]; to
   on('command.register', (_$: any, e: any) => ({ value: { command: e.name } }))
   on('fs.write', (_$: any, e: any) => { log.writes[e.path] = e.text; return { value: undefined } })
   let n = 0
-  on('agent.spawn', (_$: any, e: any) => { log.spawns.push(e); return { model: e.model, agentId: `agent${++n}` } })
+  on('agent.spawn', (_$: any, e: any) => { log.spawns.push(e); return { model: e.model, agentId: `${log.ids ?? 'agent'}${++n}` } })
 }
+
+// What a runner job (hooks/legion/runner.ts) does, on the in-memory project:
+// each cmd/N.sh "runs" (`test -f X` checks the file) and its exit code is recorded.
+function runJob(io: ReturnType<typeof memIo>, runSh: string) {
+  const dir = runSh.replace(/^\/repo\//, '').replace(/\/run\.sh$/, '')
+  for (let i = 1; io.files.has(`${dir}/cmd/${i}.sh`); i++) {
+    const m = io.files.get(`${dir}/cmd/${i}.sh`)!.trim().match(/^test -f (\S+)$/)
+    io.files.set(`${dir}/out/${i}.exit`, `${m && !io.files.has(m[1]!) ? 1 : 0}\n`)
+    io.files.set(`${dir}/out/${i}.log`, `ran ${i}\n`)
+  }
+  io.files.set(`${dir}/done`, '')
+}
+const isStart = (argv: string[]) => argv[0] === 'bash' && /setsid nohup/.test(argv[2] ?? '')
 
 async function start($: any) {
   await $.session.start({ cwd: '/repo', surface: null, isInteractive: false })
@@ -452,7 +465,8 @@ describe('haiku ceiling', () => {
     on('fs.read', (_$: any, e: any) => { const t = io.files.get(rel(e.path)); if (t === undefined) throw new Error('ENOENT'); return { value: t } })
     on('fs.list', async (_$: any, e: any) => ({ value: (await io.list(rel(e.path))).map(x => ({ name: x.name, kind: x.dir ? 'dir' : 'file' })) }))
     const runs: string[][] = []
-    on('process.run', (_$: any, e: any) => { runs.push(e.argv); if (e.argv[0] === 'rm') io.files.delete(e.argv[2]); return { value: { exitCode: e.argv[1] === 'diff' ? 1 : 0, stdout: '', stderr: '' } } })
+    // The verification job finishes as soon as it starts: no runner is needed.
+    on('process.run', (_$: any, e: any) => { runs.push(e.argv); if (e.argv[0] === 'rm') io.files.delete(e.argv[2]); if (isStart(e.argv)) runJob(io, e.argv[4]); return { value: { exitCode: e.argv[1] === 'diff' ? 1 : 0, stdout: '', stderr: '' } } })
     const shown: string[] = []
     on('ui.log', (_$: any, e: any) => { shown.push(e.text); return { value: undefined } })
     on('ui.status', () => ({ value: undefined }))
@@ -463,8 +477,64 @@ describe('haiku ceiling', () => {
     expect(r.result).toMatch(/01-01 .*: Complete/)
     expect(shown.some(l => /^triad build_phase: 01-01: verifying the answer its agent gave before the build was interrupted/.test(l))).toBe(true)
     expect(shown.some(l => /^triad build_phase: 01-01: running 1 verification command/.test(l))).toBe(true)
+    expect(shown.some(l => /^triad build_phase: plan 01-01 verification: 1 command\(s\) running as job /.test(l))).toBe(true)
+    expect(runs.filter(isStart)).toHaveLength(1)
+    expect(runs.some(a => a[0] === 'bash' && a[2] === 'test -f src/a.ts')).toBe(false) // never run inside the call
     expect(runs.some(a => a[0] === 'git' && a[1] === 'commit' && /execute plan 01-01/.test(a.join(' ')))).toBe(true)
     expect(io.files.has('.triad/legion/answers/01-01-01.json')).toBe(false)
+  })
+
+  // The kit drops `agentId` from a plugin's own spawns, so this covers the
+  // runner's brief and the fallback (the call waits on the job itself); the
+  // wait on the runner's answer is the one every Legion agent uses.
+  test('a long verification job gets a Haiku runner, and only its wait script is allowed while it runs', async ($, on) => {
+    const io = memIo()
+    const rel = (path: string) => path.replace(/^\/repo\//, '')
+    const log = { writes: new Proxy({} as Record<string, string>, { set: (_t, k, v) => (io.files.set(rel(String(k)), v), true) }), spawns: [] as any[] }
+    world(on, log)
+    await projectInit(io, { name: 'Demo', description: 'A demo.', phases: [{ name: 'Core', goal: 'Build the core API', plans: 1 }] } as any)
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [{
+      plan: 1, title: 'Plan 1', wave: 1, agents: ['engineering-backend-architect'], depends_on: [], files_modified: ['src/a.ts'], files_forbidden: ['secrets/'],
+      verification_commands: ['test -f src/a.ts'], expected_artifacts: [{ path: 'src/a.ts', provides: 'code', required: true }], truths: ['it works'],
+      objective: 'Write src/a.ts.', tasks: [{ name: 'write', files: ['src/a.ts'], action: 'Create src/a.ts.', verification: ['test -f src/a.ts'], done: 'src/a.ts exists' }], success_criteria: ['src/a.ts exists'],
+    }] } as any)
+    await io.write('src/a.ts', '// written\n')
+    await io.write('.triad/legion/answers/01-01-01.json', JSON.stringify({ answer: 'status: done\nsummary: wrote a\nchanges:\n- src/a.ts | added | a\nverify: ok', files: ['src/a.ts'], at: '2026-10-09T06:44:25Z' }))
+    on('fs.read', (_$: any, e: any) => { const t = io.files.get(rel(e.path)); if (t === undefined) throw new Error('ENOENT'); return { value: t } })
+    on('fs.list', async (_$: any, e: any) => ({ value: (await io.list(rel(e.path))).map(x => ({ name: x.name, kind: x.dir ? 'dir' : 'file' })) }))
+    let runSh = ''
+    const checks: string[] = []
+    const waits: string[][] = []
+    on('process.run', async (_$: any, e: any) => {
+      if (e.argv[0] === 'rm') io.files.delete(e.argv[2])
+      if (isStart(e.argv)) runSh = e.argv[4] // started, still running
+      // A wait call on the job: while it runs, the wait script (and nothing else) passes.
+      if (e.argv[0] === 'bash' && /wait\.sh$/.test(e.argv[1])) {
+        waits.push(e.argv)
+        checks.push((await $.tool.check({ tool: 'Bash', input: { command: `bash ${e.argv[1]}` } } as any)).decision)
+        checks.push((await $.tool.check({ tool: 'Bash', input: { command: `bash ${e.argv[1]}; cat src/a.ts` } } as any)).decision)
+        runJob(io, runSh)
+        return { value: { exitCode: 0, stdout: 'JOB DONE: 1 command(s) finished.', stderr: '' } }
+      }
+      return { value: { exitCode: e.argv[1] === 'diff' ? 1 : 0, stdout: '', stderr: '' } }
+    })
+    on('tool.check', () => ({ decision: 'ask' }))
+    const shown: string[] = []
+    on('ui.log', (_$: any, e: any) => { shown.push(e.text); return { value: undefined } })
+    on('ui.status', () => ({ value: undefined }))
+    await start($)
+    const r: any = await $.tool.call({ tool: 'mcp__triad__build_phase', tool_use_id: 'b', phase: 1 } as any)
+    await new Promise(res => setTimeout(res, 20))
+    expect(log.spawns).toHaveLength(1)
+    expect(log.spawns[0].subagent_type).toBe('triad:triad-helper')
+    expect(log.spawns[0].model).toBe('haiku')
+    expect(log.spawns[0].prompt).toMatch(/Run this exact command with the Bash tool, with timeout 600000: `bash \/repo\/\.triad\/run\/[\w-]+\/wait\.sh`/)
+    expect(shown.some(l => /no runner agent .*waiting on the job directly/.test(l))).toBe(true)
+    expect(waits).toHaveLength(1)
+    expect(checks).toEqual(['allow', 'ask'])
+    expect(r.result).toMatch(/01-01 .*: Complete/)
+    // Once the job is over its wait script asks again like any command.
+    expect((await $.tool.check({ tool: 'Bash', input: { command: `bash ${runSh.replace(/run\.sh$/, 'wait.sh')}` } } as any)).decision).toBe('ask')
   })
 
   test('maxSpend 0 is no limit', async ($, on) => {
