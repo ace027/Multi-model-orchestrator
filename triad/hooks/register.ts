@@ -88,7 +88,8 @@ You hold the agents-orchestrator role yourself; that persona is never spawned. T
   - advisory: read-only; agents return suggestions, nothing is committed.
   - autonomous: checks only warn and log; confirmation gates are skipped with their defaults. Permissions are never loosened.
 - Every question to the user (confirmation gates, choices, persona swaps) uses AskUserQuestion with a closed set of options, never a question in plain text.
-- A turn resumed after a session restart, with a build_phase or review_phase call that never returned: call the same tool again. A build resumes where it stopped and verifies and commits an agent answer saved before the restart without running the agent again. Never verify or commit a plan by hand.`
+- A turn resumed after a session restart, with a build_phase or review_phase call that never returned: call the same tool again. A build resumes where it stopped and verifies and commits an agent answer saved before the restart without running the agent again. Never verify or commit a plan by hand.
+- ship check that says GATE RUN NEEDED: run the script it names with Bash (run_in_background true), then call ship check again; never run the gate commands another way.`
 
 // The Legion guide plus the knowledge index built at session start from the
 // plugin's own files (byte-stable for a plugin version).

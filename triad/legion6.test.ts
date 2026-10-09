@@ -12,7 +12,7 @@ import { BY_ID, rank } from './hooks/legion/registry.ts'
 import { CUSTOM_CATALOG, agentCreate, loadCustomPersonas, validateAgent, type AgentInput } from './hooks/legion/custom.ts'
 import { GAP_REPORT, coverage, gapAnalysis, gapSummary, gaps, intentCheck, limitStatus, severityOf, type GapConfig } from './hooks/legion/gaps.ts'
 import { REGISTRY, parseRegistry, portfolioAddDep, portfolioDashboard, portfolioRegister, portfolioUnregister } from './hooks/legion/portfolio.ts'
-import { renderCanary, shipCheck, shipPublish } from './hooks/legion/ship.ts'
+import { GATE_DIR, GATE_SCRIPT, renderCanary, shipCheck, shipPublish } from './hooks/legion/ship.ts'
 import { ghClosePhase, ghMode, ghPhaseIssue, ghTickPlan, setGhMode } from './hooks/legion/github.ts'
 import { secretScan, securitySave, securityScan, securityTrigger, verdictOf } from './hooks/legion/security.ts'
 import { polishRun, polishScope } from './hooks/legion/polish.ts'
@@ -359,6 +359,17 @@ function withRun(io: ReturnType<typeof memIo>, fake: (argv: string[]) => { exitC
   return calls
 }
 
+// What `bash .triad/ship-gate/run.sh` does, through the io: each command's exit code and output.
+async function runGate(io: ReturnType<typeof memIo>, code?: (cmd: string) => number) {
+  const meta = JSON.parse(io.files.get(`${GATE_DIR}/meta.json`)!)
+  for (const [i, c] of meta.commands.entries()) {
+    const r = await io.run(['bash', '-c', c.command])
+    io.files.set(`${GATE_DIR}/out/${i + 1}.exit`, `${code ? code(c.command) : r.exitCode}\n`)
+    io.files.set(`${GATE_DIR}/out/${i + 1}.log`, `ran ${c.command}\n`)
+  }
+  return meta.commands.map((c: any) => c.command)
+}
+
 async function shippable() {
   const io = await project(1)
   await planWrite(io, { phase: 1, context: { goal: 'g' }, plans: [plan(1, 1, 'src/a.ts')] })
@@ -373,13 +384,42 @@ describe('ship', () => {
     const g = await shipCheck(io, { phase: 1 })
     expect(g).toContain('| Review passed | FAIL |')
     expect(g).toContain('GATE FAIL: No review found. Run /triad:review before shipping.')
-    expect(g).toContain('**Result**: 5 of 6 gates passed')
+    expect(g).toContain('| Verification commands | Not run |')
+    expect(g).toContain('**Result**: 4 of 6 gates passed')
+    expect(g).toContain('The verification commands and tests did not run: the gates above fail first.')
     expect(g).toContain('Ship blocked — resolve the above issues and re-run /triad:ship.')
   })
 
   test('dry run writes nothing; check writes the report; publish marks shipped and commits', async () => {
     const io = await shippable()
     await review(io, fakeAgents(io), {})
+    io.files.set('package.json', JSON.stringify({ scripts: { test: 'vitest run' } })) // detected as `npm test`
+    io.dirty.clear()
+    const origRun = io.run
+    // The gate's commands run in a script the session starts with Bash, never inside the tool call.
+    const first = await shipCheck(io, { dry_run: true })
+    expect(first).toContain('GATE RUN NEEDED: run `bash .triad/ship-gate/run.sh` with the Bash tool and run_in_background true')
+    expect(first).toContain('1. `test -f src/a.ts` (plan 01-01)')
+    expect(first).toContain('2. `npm test` (test suite)')
+    expect(io.files.get(GATE_SCRIPT)).toContain('bash "$D/cmd/$i.sh" > "$D/out/$i.log" 2>&1; code=$?')
+    expect(io.files.get(`${GATE_DIR}/cmd/2.sh`)).toBe('npm test\n')
+    // Still running: check waits for it and leaves its files alone.
+    io.files.set(`${GATE_DIR}/out/running`, '4242\n')
+    io.files.set(`${GATE_DIR}/out/1.exit`, '0\n')
+    const live = withRun(io, a => (a[2] === 'kill -0 4242' ? { exitCode: 0, stdout: '' } : undefined))
+    expect(await shipCheck(io, { dry_run: true })).toContain('GATE RUN IN PROGRESS: 1 of 2 command(s) finished.')
+    expect(live).toContainEqual(['bash', '-c', 'kill -0 4242'])
+    expect(io.files.get(`${GATE_DIR}/out/1.exit`)).toBe('0\n')
+    // Cut short (a restart: the pid is gone): the first command recorded, the suite not; check asks for the run again.
+    live.length = 0
+    io.run = (async (argv: string[], o: any) => (argv[2] === 'kill -0 4242' ? { exitCode: 1, stdout: '', stderr: 'no such process' } : origRun(argv, o))) as any
+    expect(await shipCheck(io, { dry_run: true })).toContain('The gate commands did not finish on this commit (the run was cut short)')
+    // The suite fails: the gate says so with its output.
+    await runGate(io, c => (c === 'npm test' ? 1 : 0))
+    const red = await shipCheck(io, { dry_run: true })
+    expect(red).toContain('| Tests pass | FAIL |')
+    expect(red).toContain('ran npm test')
+    await runGate(io)
     const dry = await shipCheck(io, { dry_run: true })
     expect(dry).toContain('DRY RUN — ship checks will run but no PRs, pushes, or state changes will be made')
     expect(dry).toContain('**Result**: 6 of 6 gates passed')
@@ -388,8 +428,12 @@ describe('ship', () => {
     const rep = io.files.get('.planning/phases/01-p1/SHIP-REPORT.md')!
     expect(rep).toContain('gate_result: PASSED')
     expect(rep).toContain('| 01-01 | engineering-backend-architect | Completed | 1 |')
+    // Publish reuses the runs on this commit: nothing runs again.
+    const calls = withRun(io, () => undefined)
     const out = await shipPublish(io, { method: 'mark' })
+    expect(calls.filter(a => a[0] === 'bash')).toEqual([])
     expect(out).toContain('Phase 1: P1 — Shipped!')
+    expect(io.files.get('.planning/phases/01-p1/SHIP-REPORT.md')).toContain('- **Command**: `npm test` — passed')
     expect(io.files.get('.planning/ROADMAP.md')).toMatch(/\|\s*1\s*\|.*Shipped/)
     expect(io.commits.at(-1)).toMatch(/^chore\(triad\): ship phase 1 — P1\n\nAll quality gates passed\. 1 plans shipped\.\nPR: N\/A/)
   })
@@ -397,7 +441,11 @@ describe('ship', () => {
   test('publish as a PR: branch, push, labels, gh pr create with the body file, PR recorded', async () => {
     const io = await shippable()
     await review(io, fakeAgents(io), {})
+    await shipCheck(io, {})
+    await runGate(io)
+    let open = ''
     const calls = withRun(io, a => {
+      if (a[0] === 'gh' && a[1] === 'pr' && a[2] === 'list') return { exitCode: 0, stdout: open }
       if (a[0] === 'gh' && a[1] === 'auth') return { exitCode: 0, stdout: '' }
       if (a[0] === 'git' && a[1] === 'remote') return { exitCode: 0, stdout: 'git@x:o/r.git' }
       if (a[0] === 'gh' && a[1] === 'repo') return { exitCode: 0, stdout: 'o/r main\n' }
@@ -408,11 +456,16 @@ describe('ship', () => {
     const out = await shipPublish(io, { method: 'pr' })
     expect(out).toContain('Created branch triad/phase-01-p1.')
     expect(out).toContain('PR: https://github.com/o/r/pull/7')
-    const pr = calls.find(a => a[0] === 'gh' && a[1] === 'pr')!
+    const pr = calls.find(a => a[0] === 'gh' && a[1] === 'pr' && a[2] === 'create')!
     expect(pr).toEqual(['gh', 'pr', 'create', '--title', 'Phase 01: P1', '--body-file', '.triad/pr-body.md', '--base', 'main', '--head', 'triad/phase-01-p1', '--label', 'triad-ship', '--label', 'phase-01', '--assignee', '@me'])
     expect(io.files.get('.triad/pr-body.md')).toContain('*Created by Triad*')
     expect(calls.some(a => a.join(' ') === 'git push --force')).toBe(false)
     expect(io.files.get('.planning/STATE.md')).toContain('| Phase 1: P1 | — | #7 | Open |')
+    // Run again after a restart: the open PR is found, not created twice.
+    open = 'https://github.com/o/r/pull/7\n'
+    const again = await shipPublish(io, { method: 'pr' })
+    expect(again).toContain('PR already open: https://github.com/o/r/pull/7')
+    expect(calls.filter(a => a[0] === 'gh' && a[1] === 'pr' && a[2] === 'create').length).toBe(1)
   })
 
   test('canary statuses', () => {
