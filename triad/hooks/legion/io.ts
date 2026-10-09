@@ -10,6 +10,9 @@ export interface Io {
   write(rel: string, text: string): Promise<void>
   list(rel: string): Promise<{ name: string; dir: boolean }[]> // [] when missing
   run(argv: string[], opts?: { timeoutMs?: number }): Promise<RunResult>
+  // Long shell commands (runner.ts): run as a job a runner agent waits on, one
+  // result per command. Absent (tests), they run one by one through run.
+  long?(commands: string[], label: string): Promise<RunResult[]>
   now(): Date
 }
 

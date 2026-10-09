@@ -83,7 +83,12 @@ export async function polishRun(io: Io, agents: Agents, opts: { phase?: number; 
   ].join('\n\n') || 'No CLAUDE.md or codebase map: infer conventions from the largest files in scope (sample up to 10).'
   const testCmd = await detectTestCommand(io, p.settings, 'polish')
   const typeCmd = await detectTypeCheck(io, p.settings)
-  const check = async () => ({ tests: testCmd ? (await runVerification(io, [testCmd]))[0]!.passed : undefined, types: typeCmd ? (await runVerification(io, [typeCmd]))[0]!.passed : undefined })
+  // Tests and type check run as one job (runner.ts).
+  const check = async () => {
+    const cmds = [testCmd, typeCmd].filter((c): c is string => !!c)
+    const rs = await runVerification(io, cmds, undefined, 'polish checks')
+    return { tests: testCmd ? rs[0]!.passed : undefined, types: typeCmd ? rs[cmds.length - 1]!.passed : undefined }
+  }
   const baseline = opts.dry_run ? { tests: undefined, types: undefined } : await check()
   const snapshot = new Map<string, string | undefined>()
   for (const f of sc.files) snapshot.set(f, await io.read(f))

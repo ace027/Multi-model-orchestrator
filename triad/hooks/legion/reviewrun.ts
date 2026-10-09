@@ -224,7 +224,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
       const r = await agents.run({ persona, brief: fixBrief(persona, fs, may, n, cycle), scope: { planId: `review-${pad2(n)}-fix`, mode: mode === 'autonomous' ? 'autonomous' : 'guarded', files_modified: may, files_forbidden: [] }, label: `fix ${id} cycle ${cycle}` })
       return { id, fs, r }
     }))
-    const verify = await runVerification(io, checks)
+    const verify = await runVerification(io, checks, undefined, `review phase ${n} checks`)
     const after = await dirtyFiles(io)
     const changed = [...after].filter(f => !before.has(f) && !f.startsWith('.triad/') && !f.startsWith('.planning/'))
     const notFixed = runs.flatMap(r => (parseReply(r.r.answer ?? '').status === 'done' ? [] : r.fs.map(f => f.id)))
@@ -266,7 +266,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
         return { id, fs, r }
       }))
       const changed = [...await dirtyFiles(io)].filter(f => !before.has(f) && !f.startsWith('.triad/') && !f.startsWith('.planning/'))
-      const verify = changed.length ? await runVerification(io, checks) : []
+      const verify = changed.length ? await runVerification(io, checks, undefined, `review phase ${n} minor-fix checks`) : []
       const okNow = verify.every(v => v.passed)
       if (changed.length && !okNow) {
         await io.run(['git', 'checkout', '--', ...changed])

@@ -14,9 +14,10 @@ import { checkWrite, controlMode, controlModeLine, type Scope } from './legion/s
 import { checkMapping, loadKnowledgeIndex, logDecision, prepareRun } from './legion/authority.ts'
 import { renderPersonaRuns, runPersonas } from './legion/personarun.ts'
 import { EXTENDED, extendedTool } from './legion/extended.ts'
+import { isWaitCommand, jobFiles, JOB_STOPPED, newJob, readJob, runnerBrief, startArgv } from './legion/runner.ts'
 import { loadCustomPersonas } from './legion/custom.ts'
 import { preBuildCheck, preShipAudit } from './legion/gates.ts'
-import type { Io } from './legion/io.ts'
+import type { Io, RunResult } from './legion/io.ts'
 import type { Agents } from './legion/build.ts'
 import { COMPRESS_TOOLS, SUMMARY_SYSTEM, chunks, describeCall, eligible, errorLines, headTail, mergePrompt, overThreshold, render as renderCompressed, summaryPrompt } from './compress.ts'
 
@@ -88,8 +89,7 @@ You hold the agents-orchestrator role yourself; that persona is never spawned. T
   - advisory: read-only; agents return suggestions, nothing is committed.
   - autonomous: checks only warn and log; confirmation gates are skipped with their defaults. Permissions are never loosened.
 - Every question to the user (confirmation gates, choices, persona swaps) uses AskUserQuestion with a closed set of options, never a question in plain text.
-- A turn resumed after a session restart, with a build_phase or review_phase call that never returned: call the same tool again. A build resumes where it stopped and verifies and commits an agent answer saved before the restart without running the agent again. Never verify or commit a plan by hand.
-- ship check that says GATE RUN NEEDED: run the script it names with Bash (run_in_background true), then call ship check again; never run the gate commands another way.`
+- A turn resumed after a session restart, with a build_phase or review_phase call that never returned: call the same tool again. A build resumes where it stopped and verifies and commits an agent answer saved before the restart without running the agent again. Never verify or commit a plan by hand.`
 
 // The Legion guide plus the knowledge index built at session start from the
 // plugin's own files (byte-stable for a plugin version).
@@ -313,8 +313,49 @@ function ioOf($: any, root = cwd): Io {
       const r: any = await $.process.run(argv, { cwd: root, timeoutMs: Math.min(600_000, o?.timeoutMs ?? 120_000) })
       return { exitCode: r.exitCode ?? 1, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') }
     },
+    long: (commands, label) => longRun($, root, commands, label),
     now: () => new Date(),
   }
+}
+
+// Long commands (runner.ts): start the job detached, then a Haiku runner calls
+// its wait script with Bash until it is done, while this call waits on the
+// runner as on any agent. A runner that cannot start, or stops early, is
+// replaced (up to RUNNER_TRIES); after that the call waits on the job itself.
+const RUNNER_MARK = 'triad runner: '
+const RUNNER_TRIES = 3
+const runners = new Set<string>()
+const activeJobs = new Set<string>() // absolute wait-script paths of jobs this session started
+let progress: (line: string) => void = () => {}
+async function longRun($: any, root: string, commands: string[], label: string): Promise<RunResult[]> {
+  const io = ioOf($, root)
+  const job = newJob(commands, `${Date.now().toString(36)}-${++seq}`)
+  for (const [path, text] of Object.entries(jobFiles(job))) await io.write(path, text)
+  const started = await io.run(startArgv(root, job), { timeoutMs: 30_000 })
+  if (started.exitCode !== 0) return commands.map(() => ({ exitCode: 1, stdout: '', stderr: `the job could not start: ${started.stderr.trim()}` }))
+  progress(`${label}: ${commands.length} command(s) running as job ${job.id}`)
+  const waitPath = `${root}/${job.dir}/wait.sh`
+  activeJobs.add(waitPath)
+  try {
+    for (let i = 0; i < RUNNER_TRIES && !(await readJob(io, job)).done; i++) {
+      const pid = (await io.read(`${job.dir}/pid`))?.trim()
+      if (i > 0 && pid && (await io.run(['bash', '-c', `kill -0 ${pid}`])).exitCode !== 0) break
+      const s: any = await $.agent.spawn({ subagentType: HELPER_TYPE, prompt: runnerBrief(root, job, label), description: `${RUNNER_MARK}${label}`.slice(0, 80), model: 'haiku' }).catch((e: unknown) => ({ deny: String(e) }))
+      if (!s?.agentId) { progress(`${label}: no runner agent (${s?.deny ?? 'not spawned'}); waiting on the job directly`); break }
+      runners.add(s.agentId)
+      try { await waitForAnswer($, s.agentId, 6 * 60 * 60_000) } finally { runners.delete(s.agentId) }
+    }
+    // No runner (or none finished it): wait on the job here, a wait call at a time.
+    for (let i = 0; i < 40 && !(await readJob(io, job)).done; i++) {
+      const w = await io.run(['bash', `${root}/${job.dir}/wait.sh`], { timeoutMs: 600_000 })
+      if (w.stdout.includes(JOB_STOPPED)) break
+    }
+  } finally { activeJobs.delete(waitPath) }
+  const { done, results } = await readJob(io, job)
+  // The results are read; a job that never finished keeps its files to look at.
+  if (done) await io.run(['rm', '-rf', `${root}/${job.dir}`]).catch(() => undefined)
+  progress(`${label}: ${done ? `${results.filter(r => r.exitCode === 0).length}/${results.length} passed` : 'the job stopped before it finished'}`)
+  return results
 }
 
 function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
@@ -375,7 +416,7 @@ function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
 // transcript, with a line every HEARTBEAT while it runs, so the session shows
 // what it is doing (a remote session that looked idle has been stopped mid-build).
 const HEARTBEAT = 5 * 60_000
-const LONG_TOOLS = new Set(['build_phase', 'review_phase', 'persona_run', 'polish'])
+const LONG_TOOLS = new Set(['build_phase', 'review_phase', 'persona_run', 'polish', 'ship'])
 async function legionTool($: any, name: string, input: any): Promise<string> {
   const io = ioOf($)
   // Progress goes to .triad/legion.log (tail -f it during a long build).
@@ -387,6 +428,7 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
     if (long) try { $.ui.log(`triad ${name}: ${line}`); $.ui.status(`triad ${name}: ${line}`.slice(0, 200)) } catch { /* the log file has it */ }
   }
   if (!long) return legionStep($, io, name, input, log)
+  progress = log
   const t0 = Date.now()
   let beat: { cancel(): void } | undefined
   try {
@@ -399,6 +441,7 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
   } finally {
     try { beat?.cancel() } catch { /* already gone */ }
     try { $.ui.status(undefined) } catch { /* best effort */ }
+    progress = () => {}
   }
 }
 
@@ -699,6 +742,16 @@ export const register: Register = (on, options) => {
     if (target && !r.deny && !r.isError) written[id]?.add(target.startsWith(cwd + '/') ? target.slice(cwd.length + 1) : target)
     return r
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'triad: the write check failed, so the write was refused.' }))
+
+  // A job's wait script (runner.ts) runs without asking, for the runner waiting
+  // on it; a runner may run nothing else.
+  on('tool.check', async ($, e, next) => {
+    const cmd = e.tool === 'Bash' ? String((e.input as any)?.command ?? '').trim() : ''
+    const path = cmd.replace(/^bash\s+/, '').replace(/^'(.*)'$/, '$1')
+    if (cmd && activeJobs.has(path) && isWaitCommand(cmd, path.slice(0, path.indexOf('/.triad/run/')))) return { decision: 'allow', reason: 'triad: a runner waiting on its job' }
+    if (e.agentId && runners.has(e.agentId)) return { decision: 'deny', reason: 'triad: a runner only runs its wait script; Triad reads the results itself.' }
+    return next(e)
+  }).catch(($, e, next) => next(e))
 
   // Legion's hooks, always on: STATE.md must be sane before an agent starts, and
   // `gh pr create` waits on a clean npm audit (critical level).

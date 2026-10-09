@@ -97,6 +97,7 @@ A helper brief over 40k tokens is refused at spawn: give the job to a coder, or 
 | `tool.call` `Bash`/`Grep`/`Read` | With `compress`, output over `compressThreshold` tokens (Read: log-like files only) is saved to `.triad/out/` and replaced by its error lines, verbatim, plus a Haiku summary (chunked at 60k tokens, merged). A failed Bash call keeps its failure. A helper whose next request would pass its ceiling gets a pointer to the saved output instead of the output. |
 | `turn.step` (helpers) | Haiku ceiling. Before each helper request, projects its prompt: the previous request's exact size plus the conversation's growth at 2.5 chars a token (errs high), plus a margin. At `haikuWrapAt` (80k) the helper is told to finish; when the projection passes `haikuCeiling` (95k) the hook answers the step itself with a `status: partial` reply (done and left, from a Haiku one-shot over the transcript's tail, plus the files it wrote), so the request is never sent. Coders and the orchestrator are never stopped; a coder that has worked `coderMinutes` gets one note to wrap up and report. |
 | `tool.call` `Edit`/`Write`/... | A helper may write only the files its brief names (`Writable files:` line, or the paths in the brief). |
+| `tool.check` `Bash` | While a runner job is running (long verification commands run detached under `.triad/run/`), its wait script is allowed without asking; a runner agent may run nothing else. |
 | `turn.step`, `turn.complete`, `session.measure` | Feed the ledger: per request usage by agent and tier, priced per tier, including Haiku's over-100k rate (cache reads and writes count toward the line). |
 | `command.run` `/triad` | Prints the tree, tokens and cost per tier, and budgets. `/triad pane` opens the same as a live pane. |
 | `ui.render` `Pane` `triad` | The Triad pane: the agent tree (role, tier, status, requests, tokens, cost per agent), spend per tier and in total, the session's measured cost once known, and running coders and helpers against their caps. It redraws on every spawn, request and finished turn, from a view the hooks keep in `$.state`. Under 60 columns each row shows cost only. |
@@ -109,4 +110,4 @@ The ledger prices every request per tier, including Haiku's rate above 100k prom
 
 `claude plugin test triad` runs the test suites; [`../CONTRIBUTING.md`](../CONTRIBUTING.md) has the other checks and the conventions. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the `delegate_menial` round trip is covered by the live run in `bench/run_accept.sh` instead.
 
-Version 0.12.2.
+Version 0.13.0.

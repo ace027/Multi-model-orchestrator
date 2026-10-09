@@ -8,7 +8,7 @@ import { loadPhase, loadProject, today, type Io } from './io.ts'
 import type { Plan } from './planning.ts'
 import { renderSummary } from './render.ts'
 import type { PersonaRunResult } from './personarun.ts'
-import { build, type BuildReport } from './build.ts'
+import { build, runVerification, type BuildReport } from './build.ts'
 import { runPersonas } from './personarun.ts'
 import { detectTestCommand } from './ship.ts'
 import type { Agents } from './build.ts'
@@ -170,8 +170,8 @@ export async function twoWaveBuild(io: Io, agents: Agents, opts: TwoWaveOptions 
       const p = await loadProject(io)
       const cmd = await detectTestCommand(io, p.settings)
       if (!cmd) return { ok: true, warnings: [], plans: [], text: 'No execution plans and no test command found; execution stream skipped.' } as BuildReport
-      const r = await io.run(['bash', '-c', cmd], { timeoutMs: 600000 })
-      return { ok: r.exitCode === 0, warnings: [], plans: [], text: `Tests (${cmd}): ${r.exitCode === 0 ? 'passed' : `FAILED (exit ${r.exitCode})\n${(r.stdout + r.stderr).slice(-1500)}`}` } as BuildReport
+      const r = (await runVerification(io, [cmd], undefined, `two-wave phase ${n} test suite`))[0]!
+      return { ok: r.passed, warnings: [], plans: [], text: `Tests (${cmd}): ${r.passed ? 'passed' : `FAILED (exit ${r.exitCode})\n${(r.output ?? '').slice(-1500)}`}` } as BuildReport
     })(),
     remB.length ? runPersonas(io, agents, { runs: remB.map(p => ({ agent: p.fm.agents[0] ?? 'engineering-infrastructure-devops', brief: readOnlyBrief(p, 'remediation', n, outputs), label: `remediation ${p.id}` })), read_only: true }, log) : Promise.resolve([]),
   ])

@@ -68,7 +68,7 @@ Execute a planned phase with the wave executor (one agent per plan, verification
 
 Wave executor in mod code: one agent per plan at its persona's tier (haiku personas on triad-helper, opus personas with the opus model), plans of a wave in parallel unless they share files, verification commands run by the mod, one follow-up fix on a failed check, a SUMMARY.md per plan (failures too), STATE/ROADMAP after every plan and wave, Legion's commit messages. Resumes from the first plan without a successful summary.
 
-Interrupted builds: each agent's answer is saved in `.triad/legion/answers/` before its plan is verified, and removed once the plan's SUMMARY is written. If the session restarts in between (a remote session stopped while it looked idle), the next `/triad:build` verifies and commits the saved answer without running the agent again, and `/triad status` names the plan under Interrupted build until then. While `build_phase` or `review_phase` runs, each progress line also goes into the transcript (and the status line), with a "still running" line every 5 minutes.
+Interrupted builds: each agent's answer is saved in `.triad/legion/answers/` before its plan is verified, and removed once the plan's SUMMARY is written. If the session restarts in between (a remote session stopped while it looked idle), the next `/triad:build` verifies and commits the saved answer without running the agent again, and `/triad status` names the plan under Interrupted build until then. While `build_phase` or `review_phase` runs, each progress line also goes into the transcript (and the status line), with a "still running" line every 5 minutes. Verification commands (each plan's, the review checks, polish's test and type checks, the two-wave test suite) run as a detached job under `.triad/run/` that a Haiku runner agent waits on with Bash, a few cheap turns per job, so a long suite never sits inside one silent tool call; if no runner can start, the call waits on the job itself.
 
 Flags: intent flags validated in code (`--just-harden` ad-hoc team, `--just-document`, `--skip-frontend`, `--skip-backend` plan filters), natural-language routing, `--dry-run`, two-wave mode (Wave A build + analysis, architecture gate, Wave B execution + remediation, production verdict, manifests).
 
@@ -104,9 +104,9 @@ Scope (cap 50 files), test and type-check baseline, four passes, per-file revert
 
 Ship a reviewed phase: 6 pre-ship gates in code, ship report, PR or push, post-ship verification, optional canary.
 
-Six pre-ship gates and the ship report in code; PR, push or mark via `git`/`gh`; canary on the mod clock (never auto-rollback).
+Six pre-ship gates and the ship report in code; PR, push or mark via `git`/`gh`; canary checks at 1, 5 and 15 minutes inside the call (never auto-rollback).
 
-The verification commands and the test suite run in a script, `.triad/ship-gate/run.sh`, that the session starts with Bash in the background; `check` writes it, then reads each command's exit code and output back. A suite of several minutes inside one tool call left a remote session with nothing in its transcript, and the session was stopped and restarted mid-ship. The results hold for the commit they ran on: `publish` and post-ship verification reuse them, a ship run again after a restart asks only for a run that did not finish, and `publish` finds a PR it already opened instead of creating a second.
+The verification commands and the test suite run as a detached job under `.triad/run/`, and a Haiku runner agent calls the job's wait script with Bash until it finishes; `check` then reads each command's exit code and output back. A suite of several minutes inside one silent tool call left a remote session with nothing in its transcript, and the session was stopped and restarted mid-ship; the runner's Bash calls keep the transcript moving. Passing results hold for the commit they ran on: `publish` and post-ship verification reuse them, and `publish` finds a PR it already opened instead of creating a second. Canary checks (1, 5 and 15 minutes after deploy) run the same way, inside the `canary` call.
 
 ## Decide and advise
 

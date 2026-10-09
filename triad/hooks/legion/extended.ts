@@ -1,6 +1,6 @@
 // Dispatch for the Phase 6 (extended Legion) tools.
 import { loadPhase, loadProject, type Io } from './io.ts'
-import type { Agents } from './build.ts'
+import { runVerification, type Agents } from './build.ts'
 import { agentScores, briefing, claudeMemoryNote, learnList, learnRecall, learnRecord, prune, recallOutcomes } from './memory.ts'
 import { milestoneArchive, milestoneComplete, milestoneDefine, milestoneFacts, milestoneStatus } from './milestone.ts'
 import { freshness, mapBuild, mapNarrate, mapQuery, renderFreshness } from './map.ts'
@@ -186,37 +186,34 @@ export async function extendedTool(io: Io, ctx: Ctx, name: string, input: any): 
   return `unknown tool ${name}`
 }
 
-const CANARY: [string, number][] = [['1 min', 60_000], ['5 min', 300_000], ['15 min', 900_000]]
+// Each check waits this many seconds after the one before: 1, 5 and 15 minutes after deploy.
+const CANARY: [string, number][] = [['1 min', 60], ['5 min', 240], ['15 min', 600]]
 
-// Deploy (adapter.deploy_command), then checks at 1, 5 and 15 minutes on the
-// clock, never a blocking wait. Each result goes into the ship report; anything
-// but a healthy check, and the final all-clear, comes back as a message.
-async function canary(io: Io, ctx: Ctx, settings: any, input: any): Promise<string> {
+// Deploy (adapter.deploy_command), then checks at 1, 5 and 15 minutes. The
+// deploy, each wait and each check run as runner jobs (runner.ts) inside this
+// call, so nothing depends on a timer outliving it: the call returns after the
+// last check (about 16 minutes) or the first unhealthy one. Each result goes
+// into the ship report.
+async function canary(io: Io, _ctx: Ctx, settings: any, input: any): Promise<string> {
   const deploy = settings?.adapter?.deploy_command
   if (!deploy) return 'Canary monitoring needs adapter.deploy_command in settings.json; nothing was deployed.'
-  if (!ctx.schedule || !ctx.notify) return 'Canary scheduling is not available here.'
   const phase = Number(input.phase ?? (await loadProject(io)).state?.phase)
-  const d = await io.run(['bash', '-c', String(deploy)], { timeoutMs: 600_000 })
-  if (d.exitCode !== 0) return `Deploy failed (exit ${d.exitCode}): ${(d.stderr || d.stdout).trim().split('\n').slice(-10).join('\n')}`
+  const d = (await runVerification(io, [String(deploy)], undefined, `canary phase ${phase} deploy`))[0]!
+  if (!d.passed) return `Deploy failed (exit ${d.exitCode}): ${(d.output ?? '').trim().split('\n').slice(-10).join('\n')}`
   const hash = (await io.run(['git', 'rev-parse', '--short', 'HEAD'])).stdout.trim()
-  let stopped = false
-  const record = async (text: string) => {
-    const log = '.planning/memory/OUTCOMES.md'
-    if ((await io.list('.planning/memory')).length) await io.write(log, ((await io.read(log)) ?? '').replace(/\s*$/, '\n\n') + `## Phase ${phase} — Canary ${new Date(io.now()).toISOString().slice(0, 16)}\ntask_type: canary\nagent: ship-pipeline\nresult: ${/REGRESSION/.test(text) ? 'failed' : 'success'}\n`)
+  const out = [`Deployed (${String(deploy)}).`]
+  const p = await loadProject(io)
+  const dir = p.phaseDirs.find(x => x.startsWith(String(phase).padStart(2, '0')))
+  for (const [label, wait] of CANARY) {
+    const r = await canaryCheck(io, phase, input.commands ?? [], wait)
+    const text = renderCanary(label, r, hash) + (r.status === 'HEALTHY' && label === '15 min' ? '\n\n## Canary Monitoring — ALL CLEAR' : '')
+    if (dir) { const f = `.planning/phases/${dir}/SHIP-REPORT.md`; const t = await io.read(f); if (t !== undefined) await io.write(f, t.replace(/\s*$/, '\n\n') + text + '\n') }
+    out.push('', text)
+    if (r.status !== 'HEALTHY' || label === '15 min') {
+      const log = '.planning/memory/OUTCOMES.md'
+      if ((await io.list('.planning/memory')).length) await io.write(log, ((await io.read(log)) ?? '').replace(/\s*$/, '\n\n') + `## Phase ${phase} — Canary ${new Date(io.now()).toISOString().slice(0, 16)}\ntask_type: canary\nagent: ship-pipeline\nresult: ${r.status === 'HEALTHY' ? 'success' : 'failed'}\n`)
+    }
+    if (r.status !== 'HEALTHY') { out.push('', 'Ask the user how to proceed (Rollback (Recommended) / Investigate first / Ignore); never run the revert without their yes.'); break }
   }
-  for (const [label, ms] of CANARY) {
-    ctx.schedule(ms, () => {
-      if (stopped) return
-      void (async () => {
-        const r = await canaryCheck(io, phase, input.commands ?? [])
-        const text = renderCanary(label, r, hash) + (r.status === 'HEALTHY' && label === '15 min' ? '\n\n## Canary Monitoring — ALL CLEAR' : '')
-        const p = await loadProject(io)
-        const dir = p.phaseDirs.find(x => x.startsWith(String(phase).padStart(2, '0')))
-        if (dir) { const f = `.planning/phases/${dir}/SHIP-REPORT.md`; const t = await io.read(f); if (t !== undefined) await io.write(f, t.replace(/\s*$/, '\n\n') + text + '\n') }
-        if (r.status !== 'HEALTHY') stopped = true
-        if (r.status !== 'HEALTHY' || label === '15 min') { await record(text); ctx.notify!(`triad canary for Phase ${phase}:\n\n${text}\n\nAsk the user how to proceed (Rollback (Recommended) / Investigate first / Ignore) when it is not healthy; never run the revert yourself without their yes.`) }
-      })().catch(() => undefined)
-    })
-  }
-  return `Deployed (${String(deploy)}). Canary checks are scheduled at 1, 5 and 15 minutes after deploy; results are appended to the ship report and arrive here as a message. Rollback is never automatic.`
+  return out.join('\n')
 }
