@@ -46,10 +46,11 @@ For a structured project, use the Legion workflow:
 | `/triad:explore`, `/triad:start` | Research an idea; start a project (`PROJECT.md`, `ROADMAP.md`, `STATE.md` in `.planning/`). |
 | `/triad:spec`, `/triad:plan` | Spec a phase; decompose it into wave-ordered plans with a critique. |
 | `/triad:build`, `/triad:review`, `/triad:ship` | Execute the plans, review the result and fix findings, ship it behind six gates. |
+| `/triad:auto` | The whole project hands-off: start if needed, then plan, build and review each phase with no questions. Run it again to resume. Pair it with `maxSpend`. |
 | `/triad:quick` | One small task outside the plan. |
 | `/triad status`, `/triad validate` | Where the project is and what to run next; schema checks. No model calls. |
 
-[`../docs/commands.md`](../docs/commands.md) lists all 20 commands with their arguments. [`../docs/control-modes.md`](../docs/control-modes.md) explains how much freedom agents get during a build.
+[`../docs/commands.md`](../docs/commands.md) lists all 21 commands with their arguments. [`../docs/control-modes.md`](../docs/control-modes.md) explains how much freedom agents get during a build.
 
 ### Legion projects
 
@@ -73,6 +74,8 @@ Set them in `/plugin` settings, or for a headless run with `--settings '{"plugin
 | `haikuWrapAt` | 80000 | At this prompt size a helper is told to finish. |
 | `coderMinutes` | 20 | After this long a coder is told to stop tuning, check its work and report (0: off). |
 | `allOpus` | false | Comparison baseline: every agent runs on Opus (and the Haiku ceiling is off). |
+| `maxSpend` | 0 | Spending budget per session, in USD (0: none). At 80% a notice; at the limit running agents are told to wrap up, and new agents and workflow steps are refused until it is raised. |
+| `lightPlans` | 2 | A phase with at most this many plans runs the light process: planning skips the board, spec, proposals, persona table and security and design passes, and review uses two reviewers for at most two cycles. 0: always the full process. |
 | `openPane` | false | Open the Triad pane at session start. A pane opened this way seats from 144 terminal columns; `/triad pane` opens it at any width. |
 
 A helper brief over 40k tokens is refused at spawn: give the job to a coder, or split it.
@@ -103,4 +106,4 @@ The ledger prices every request per tier, including Haiku's rate above 100k prom
 
 `claude plugin test triad` runs the test suites; [`../CONTRIBUTING.md`](../CONTRIBUTING.md) has the other checks and the conventions. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the `delegate_menial` round trip is covered by the live run in `bench/run_accept.sh` instead.
 
-Version 0.9.1.
+Version 0.10.0.

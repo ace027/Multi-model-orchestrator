@@ -105,7 +105,7 @@ export const LEGION_TOOLS = [
   {
     name: 'review_phase',
     description: 'Run the review loop on a built phase: reviewers (panel or classic) in parallel, findings triaged in code, fixes routed to agents, re-review of changed files, up to review.max_cycles; writes NN-REVIEW.md and updates STATE/ROADMAP. Blocks until done; returns the result.',
-    inputSchema: { type: 'object', properties: { phase: { type: 'integer' }, mode: { type: 'string', enum: ['panel', 'classic'] }, intent: { type: 'string', description: 'A filter_review intent (security-only for --just-security): only its team reviews and only findings in its domains count. Skips the multi-pass evaluators and coverage.' } } },
+    inputSchema: { type: 'object', properties: { phase: { type: 'integer' }, mode: { type: 'string', enum: ['panel', 'classic'], description: 'Only when the user asked for one (--panel, --classic). Left out: the light review for a small phase (lightPlans), else settings review.default_mode.' }, intent: { type: 'string', description: 'A filter_review intent (security-only for --just-security): only its team reviews and only findings in its domains count. Skips the multi-pass evaluators and coverage.' } } },
   },
   {
     name: 'persona_brief',

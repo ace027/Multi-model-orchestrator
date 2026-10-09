@@ -54,6 +54,8 @@ export type Ledger = {
   ceiling: { wrapNotes: number; stops: number; trimmed: number; refusedBriefs: number }
   deferredTools: string[]
   options?: Record<string, unknown>
+  // Spending budget notices already given (maxSpend).
+  budget?: { warned?: boolean; over?: boolean }
 }
 
 const zero = (): Totals => ({ requests: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 })
@@ -110,10 +112,12 @@ export function recordCompletion(l: Ledger, u: Usage) {
   l.agents.compressor!.parent = undefined
 }
 
+export type Budgets = { coders: [number, number]; helpers: [number, number]; maxDepth: number; maxSpend?: number }
+
 const usd = (n: number) => '$' + n.toFixed(n < 1 ? 4 : 2)
 const k = (n: number) => (n >= 10_000 ? Math.round(n / 1000) + 'k' : String(n))
 
-export function render(l: Ledger, budgets: { coders: [number, number]; helpers: [number, number]; maxDepth: number }): string {
+export function render(l: Ledger, budgets: Budgets): string {
   const out: string[] = ['Triad', '']
   const kids: Record<string, string[]> = {}
   for (const [id, a] of Object.entries(l.agents)) if (id !== 'main') (kids[a.parent ?? 'main'] ??= []).push(id)
@@ -136,6 +140,7 @@ export function render(l: Ledger, budgets: { coders: [number, number]; helpers: 
   }
   out.push(`  total  ${usd(total)} (agent requests only; the engine's own side calls, such as titles, are not counted)`)
   out.push('', 'Budgets:')
+  if (budgets.maxSpend) out.push(`  spend ${usd(Math.max(total, l.measuredUsd ?? 0))} of ${usd(budgets.maxSpend)} (maxSpend); at the limit new agents and workflow steps are refused`)
   out.push(`  coders running ${budgets.coders[0]}/${budgets.coders[1]}, helpers running ${budgets.helpers[0]}/${budgets.helpers[1]}, max depth ${budgets.maxDepth}`)
   out.push(`  Haiku: ${l.haiku.requests} requests, largest prompt ${k(l.haiku.maxPrompt)} of ${k(HAIKU_LINE)}, ${l.haiku.overLine} over the line`)
   const g = l.ceiling ?? { wrapNotes: 0, stops: 0, trimmed: 0, refusedBriefs: 0 }
@@ -150,7 +155,7 @@ export function render(l: Ledger, budgets: { coders: [number, number]; helpers: 
 
 // The pane's view of the ledger: the tree flattened in drawing order, the
 // tiers, and the running counts against their caps.
-export function paneView(l: Ledger, budgets: { coders: [number, number]; helpers: [number, number]; maxDepth: number }): PaneView {
+export function paneView(l: Ledger, budgets: Budgets): PaneView {
   const kids: Record<string, string[]> = {}
   for (const [id, a] of Object.entries(l.agents)) if (id !== 'main') (kids[a.parent ?? 'main'] ??= []).push(id)
   const tokens = (t: Totals) => t.input + t.output + t.cacheRead + t.cacheWrite
@@ -174,5 +179,6 @@ export function paneView(l: Ledger, budgets: { coders: [number, number]; helpers
   return {
     rows, tiers, total: tiers.reduce((n, t) => n + t.cost, 0), ...(l.measuredUsd !== undefined ? { measuredUsd: l.measuredUsd } : {}),
     coders: budgets.coders, helpers: budgets.helpers, maxDepth: budgets.maxDepth, refusals: l.refusals.length,
+    ...(budgets.maxSpend ? { maxSpend: budgets.maxSpend } : {}),
   }
 }

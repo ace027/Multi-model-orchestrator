@@ -2,7 +2,7 @@
 import { gapSummary } from './gaps.ts'
 import { parseGithubSection } from './github.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
-import { isPlanFile, pad2, parsePlan, setRoadmapRow, slugify, updateState, findPhaseDir } from './planning.ts'
+import { isLight, isPlanFile, pad2, parsePlan, setRoadmapRow, slugify, updateState, findPhaseDir } from './planning.ts'
 import { renderContext, renderPlan, renderProject, type ContextInput, type PlanInput, type ProjectInput } from './render.ts'
 import { critique, critiqueDoc, renderCritique } from './critique.ts'
 import { lifecyclePosition, nextAction, phaseNumbers, renderStatus, renderSuggestions } from './status.ts'
@@ -55,6 +55,20 @@ async function suggestionsFor(io: Io, p: Project, hasPlans: (n: number) => boole
   const nameOf = (k: number) => p.roadmap?.phases.find(x => x.phase === k)?.name ?? ''
   const s = renderSuggestions(contextSuggestions(config, pos, { phase: n, next_phase: next, phase_name: nameOf(pos === 'needs_planning' || pos === 'phase_complete' || pos === 'just_started' ? next : n) }))
   return s.length ? ['', ...s] : []
+}
+
+// Light process (option lightPlans, isLight): plan counts are the ROADMAP's,
+// the estimate until plan_write records the real count.
+export async function processLine(io: Io, lightPlans: number): Promise<string> {
+  const p = await loadProject(io)
+  const rows = p.roadmap?.rows ?? []
+  if (!rows.length) return ''
+  if (!(lightPlans > 0)) return 'Process: full for every phase (lightPlans 0).'
+  const count = (n: number) => rows.find(r => r.phase === n)?.plans ?? p.roadmap?.phases.find(x => x.phase === n)?.plans
+  const light = rows.filter(r => isLight(count(r.phase), lightPlans)).map(r => r.phase)
+  const full = rows.filter(r => !light.includes(r.phase)).map(r => r.phase)
+  const list = (ns: number[]) => (ns.length === 1 ? `phase ${ns[0]}` : `phases ${ns.join(', ')}`)
+  return `Process: ${[light.length ? `light for ${list(light)}` : '', full.length ? `full for ${list(full)}` : ''].filter(Boolean).join('; ')} (light: at most ${lightPlans} plans).`
 }
 
 export async function validateText(io: Io, args: string): Promise<{ text: string; exitCode: number }> {

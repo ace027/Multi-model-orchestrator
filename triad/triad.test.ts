@@ -359,6 +359,40 @@ describe('haiku ceiling', () => {
     expect(state.steps).toBe(3) // a note, never a stop
   })
 
+  test('maxSpend: a notice at 80%, then running agents wrap up and new work is refused', { options: { maxSpend: 0.0012 } }, async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    const toasts: string[] = []
+    on('ui.toast', (_$: any, e: any) => { toasts.push(String(e.text ?? e)); return { value: undefined } })
+    await start($)
+    const c = await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'build it', description: 'c' })
+    await step($, c.agentId!, 0) // about $0.00104: 87%
+    expect(toasts.length).toBe(1)
+    expect(toasts[0]).toMatch(/of the \$0\.00 spending budget/)
+    expect(state.sent.length).toBe(0)
+    await step($, c.agentId!, 1) // over
+    expect(state.sent.filter(t => /spending budget .* is used up/.test(t)).length).toBe(1)
+    await step($, c.agentId!, 2)
+    expect(state.sent.length).toBe(1) // told once
+    expect(((await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'x', description: 'h' })) as any).deny).toMatch(/spending budget is reached/)
+    const r: any = await $.tool.call({ tool: 'mcp__triad__build_phase', tool_use_id: 'b' } as any)
+    expect(r.isError).toBe(true)
+    expect(r.result).toMatch(/raising maxSpend/)
+    expect((await $.command.run({ command: 'triad' } as any) as any).text).toMatch(/of \$0\.0012 \(maxSpend\)/)
+  })
+
+  test('maxSpend 0 is no limit', async ($, on) => {
+    world(on, { writes: {}, spawns: [] })
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    await start($)
+    const c = await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'build it', description: 'c' })
+    for (let i = 0; i < 3; i++) await step($, c.agentId!, i)
+    expect(state.sent.length).toBe(0)
+    expect((await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'y', description: 'd' })).agentId).toBeDefined()
+  })
+
   test('never stops a coder on token grounds', async ($, on) => {
     world(on, { writes: {}, spawns: [] })
     const state = { chars: 900_000, sent: [] as string[], steps: 0 }

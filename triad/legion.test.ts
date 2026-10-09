@@ -3,7 +3,7 @@ import type { Io, RunResult } from './hooks/legion/io.ts'
 import type { Agents } from './hooks/legion/build.ts'
 import { build } from './hooks/legion/build.ts'
 import { review } from './hooks/legion/reviewrun.ts'
-import { planCheck, planWrite, projectInit, statusText, validateText } from './hooks/legion/handlers.ts'
+import { planCheck, planWrite, processLine, projectInit, statusText, validateText } from './hooks/legion/handlers.ts'
 import { getField, parsePlan, parseRoadmap, parseState, planWaves, progressBar, setField, setRoadmapRow, summaryStatus, updateState } from './hooks/legion/planning.ts'
 import { critique } from './hooks/legion/critique.ts'
 import { dedup, parseReport, triage } from './hooks/legion/review.ts'
@@ -189,6 +189,37 @@ describe('build and review', () => {
     expect(doc).toContain('PASSED')
     expect(io.commits).toContain('chore(triad): phase 1 review passed — Core')
     expect(io.files.get('.planning/ROADMAP.md')).toContain('[x] Phase 1')
+  })
+  test('light process: a small phase gets two reviewers, no evaluators, at most two cycles; a review mode asked for wins', async () => {
+    const setup = async () => {
+      const io = await newProject()
+      await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })
+      await build(io, fakeAgents(io))
+      return io
+    }
+    const reviewers = (spawned: string[]) => spawned.filter(s => s.startsWith('review '))
+    const io = await setup()
+    const a = fakeAgents(io, () => '**Verdict**: PASS')
+    expect((await review(io, a, { lightPlans: 2 })).result).toBe('PASSED')
+    expect(reviewers(a.spawned).length).toBe(2)
+    expect(a.spawned.some(s => s.startsWith('evaluate '))).toBe(false)
+    const io2 = await setup()
+    const stuck = fakeAgents(io2, () => '### Finding 1\n- **Severity**: major\n- **File**: src/a.ts\n- **Lines**: 1\n- **Issue**: still wrong\n- **Confidence**: 90%\n\n**Verdict**: NEEDS WORK')
+    expect((await review(io2, stuck, { lightPlans: 2 })).cycles).toBeLessThanOrEqual(2)
+    const io3 = await setup()
+    const full = fakeAgents(io3, () => '**Verdict**: PASS')
+    await review(io3, full, { lightPlans: 2, mode: 'panel' })
+    const io4 = await setup()
+    const off = fakeAgents(io4, () => '**Verdict**: PASS')
+    await review(io4, off, { lightPlans: 0 })
+    expect(reviewers(off.spawned)).toEqual(reviewers(full.spawned))
+    expect(off.spawned.some(s => s.startsWith('evaluate '))).toBe(true)
+  })
+  test('planning_status names the light and full phases', async () => {
+    const io = memIo()
+    await projectInit(io, { name: 'Demo', description: 'A demo.', phases: [{ name: 'Core', goal: 'Build the core API', plans: 2 }, { name: 'Game', goal: 'The game', plans: 4 }] } as any)
+    expect(await processLine(io, 2)).toBe('Process: light for phase 1; full for phase 2 (light: at most 2 plans).')
+    expect(await processLine(io, 0)).toBe('Process: full for every phase (lightPlans 0).')
   })
   test('review: a reviewer that returns nothing is never a pass', async () => {
     const io = await newProject()
