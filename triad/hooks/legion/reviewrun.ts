@@ -4,7 +4,7 @@
 import { ghClosePhase } from './github.ts'
 import { OUTCOMES, storeKnowledge, storeOutcome } from './memory.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
-import { checkPhase, getSection, overlaps, pad2, setRoadmapRow, updateState, verificationCommands } from './planning.ts'
+import { checkPhase, getSection, isLight, overlaps, pad2, setRoadmapRow, updateState, verificationCommands } from './planning.ts'
 import { BY_ID, classicReviewers, composePanel, divisionsOf, fixAgentFor, personaBrief, rubricOf } from './registry.ts'
 import type { Persona } from './personas.ts'
 import { REVIEWER_RULES, parseReport, passed, reviewed, renderReview, signature, triage, MUST_FIX, type Finding, type ReviewerReport } from './review.ts'
@@ -18,7 +18,7 @@ import { coverageChecks, coverageFindings, readCoverage, renderCoverage } from '
 import { findingErrors, intentFilter } from './review.ts'
 import { loadIntentConfig, resolveTeam } from './intents.ts'
 
-export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void; intent?: string }
+export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void; intent?: string; lightPlans?: number }
 export type ReviewResult = { ok: boolean; result?: 'PASSED' | 'ESCALATED' | 'STALE LOOP ABORTED'; error?: string; cycles: number; text: string; open: Finding[] }
 
 function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; name: string; goal: string; criteria: string[]; files: string[]; open: Finding[]; cycle: number; checks: string[] }): string {
@@ -73,7 +73,10 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   const settings = p.settings
   const mode = settings.control_mode as Mode
   const prefix = settings.execution.commit_prefix
-  const maxCycles = opts.maxCycles ?? settings.review?.max_cycles ?? 3
+  // Light process (a small phase, no review mode asked for): two reviewers, no
+  // multi-pass evaluators, at most two cycles.
+  const light = !opts.mode && !opts.intent && isLight(ph.plans.length, opts.lightPlans ?? 0)
+  const maxCycles = Math.min(opts.maxCycles ?? settings.review?.max_cycles ?? 3, light ? 2 : Infinity)
   const date = today(io)
   const files = [...new Set([
     ...ph.plans.flatMap(x => x.fm.files_modified),
@@ -83,7 +86,8 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   const text = `${info?.goal ?? ''} ${name} ${ph.context ?? ''} ${files.join(' ')}`
   const agentIds = ph.plans.flatMap(x => x.fm.agents)
   const panelMode = (opts.mode ?? settings.review?.default_mode ?? 'panel') === 'panel'
-  let reviewers = panelMode ? composePanel(text, divisionsOf(files, agentIds)) : classicReviewers(text)
+  let reviewers = light ? classicReviewers(text).slice(0, 2) : panelMode ? composePanel(text, divisionsOf(files, agentIds)) : classicReviewers(text)
+  if (light) log(`light process: ${ph.plans.length} plans (lightPlans ${opts.lightPlans})`)
 
   // Intent review (--just-security and the other filter_review intents): the
   // intent's team replaces the panel and its domains filter the findings.
@@ -98,7 +102,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   log(`reviewers: ${reviewers.map(r => r.id).join(', ')}`)
 
   // Multi-pass evaluators (review.evaluator_depth) and coverage thresholds.
-  const evaluators = !opts.intent && (settings.review?.evaluator_depth ?? 'multi-pass') === 'multi-pass' ? evaluatorsFor(files) : []
+  const evaluators = !opts.intent && !light && (settings.review?.evaluator_depth ?? 'multi-pass') === 'multi-pass' ? evaluatorsFor(files) : []
   if (evaluators.length) log(`evaluators: ${evaluators.map(e => e.type).join(', ')}`)
   const coverage = opts.intent ? undefined : await readCoverage(io)
   const covChecks = coverage ? coverageChecks(coverage, settings.review?.coverage_thresholds) : []
@@ -121,7 +125,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   let cycle = 0
   for (cycle = 1; cycle <= maxCycles; cycle++) {
     const reports: ReviewerReport[] = await Promise.all(reviewers.map(async persona => {
-      const brief = reviewerBrief({ persona, panel: panelMode, phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles, open, cycle, checks })
+      const brief = reviewerBrief({ persona, panel: panelMode && !light, phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles, open, cycle, checks })
       const r = await agents.run({ persona, brief, scope: { planId: `review-${pad2(n)}`, mode: 'surgical', files_modified: [], files_forbidden: [], active: reviewers.map(x => x.id) }, label: `review ${persona.id}` })
       const report = parseReport(persona.id, r.answer ?? '', cycle)
       // Reviewers sometimes give absolute paths; findings are keyed by the project-relative one.

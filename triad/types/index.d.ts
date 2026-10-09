@@ -20,6 +20,8 @@ export type PaneView = {
   helpers: [number, number]
   maxDepth: number
   refusals: number
+  // The session's spending budget (option maxSpend), when one is set.
+  maxSpend?: number
 }
 
 declare module 'claude-code' {

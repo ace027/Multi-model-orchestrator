@@ -416,3 +416,9 @@ export function findPhaseDir(dirs: string[], n: number): string | undefined {
 
 export const isPlanFile = (f: string) => /^\d+-\d+-PLAN\.md$/.test(f)
 export const summaryFileOf = (planId: string) => `${planId}-SUMMARY.md`
+
+// Light process (option lightPlans): a phase of at most that many plans skips the
+// optional planning steps and gets a two-reviewer review.
+export function isLight(plans: number | undefined, lightPlans: number): boolean {
+  return lightPlans > 0 && !!plans && plans <= lightPlans
+}
