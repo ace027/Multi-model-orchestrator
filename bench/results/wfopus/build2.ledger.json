@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 32,
+      "input": 64,
+      "output": 31562,
+      "cacheRead": 613141,
+      "cacheWrite": 101565,
+      "cost": 1.3578801999999999
+    },
+    "haiku": {
+      "requests": 1,
+      "input": 8350,
+      "output": 820,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "cost": 0.001245
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 5,
+      "input": 10,
+      "output": 974,
+      "cacheRead": 67778,
+      "cacheWrite": 31977,
+      "cost": 0.2888916,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 21463
+    },
+    "aff4b1f1edb648988": {
+      "requests": 5,
+      "input": 10,
+      "output": 5419,
+      "cacheRead": 66775,
+      "cacheWrite": 16197,
+      "cost": 0.20276,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 21738,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    },
+    "aadbdb224290b9681": {
+      "requests": 12,
+      "input": 24,
+      "output": 14019,
+      "cacheRead": 273082,
+      "cacheWrite": 27150,
+      "cost": 0.4708424,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 32691,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    },
+    "a2b197a8aa5ab83d6": {
+      "requests": 10,
+      "input": 20,
+      "output": 11150,
+      "cacheRead": 205506,
+      "cacheWrite": 26241,
+      "cost": 0.3953862000000001,
+      "role": "coder",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 31782,
+      "type": "triad:triad-coder",
+      "parent": "main",
+      "status": "done"
+    },
+    "compressor": {
+      "requests": 1,
+      "input": 8350,
+      "output": 820,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "cost": 0.001245,
+      "role": "compressor",
+      "depth": 0,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "maxPrompt": 8350
+    }
+  },
+  "haiku": {
+    "requests": 1,
+    "maxPrompt": 8350,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 1,
+    "rawTokens": 5122,
+    "outTokens": 1020
+  },
+  "ceiling": {
+    "wrapNotes": 0,
+    "stops": 0,
+    "trimmed": 0,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 0,
+    "haikuWrapAt": 80000,
+    "openPane": false,
+    "coderMinutes": 0,
+    "allOpus": true
+  },
+  "contextInjections": 1
+}

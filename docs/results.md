@@ -14,6 +14,7 @@ What each build phase measured in live runs, with the scripts that reproduce the
 | 7 | Browser games, Opus only vs Triad | $5.54 |
 | 8 | Triad 0.8.0 (twice) and Opus (again) on the games and harder tasks | about $8.6 |
 | 9 | Structured workflow (Triad 0.9.0) on Tron, twice, plus phase 3 rebuilt on the Opus coder | about $19.2 |
+| 9 | The same workflow with every agent on Opus (`allOpus`) | about $12.1 (plus about $2.0 for a run stopped at the API usage limit) |
 
 ## Phase 2 acceptance
 
@@ -330,4 +331,33 @@ Findings:
 - The structured workflow matches Opus on the graded checks and leaves a full project record, at about three times the cost on a task this size.
 - The Sonnet-built AIs were the weak point (47 and 8). On the Opus coder both rebuilt AIs reached 51, level with Opus-only run 1 and below run 2; both were cut off mid-tuning.
 - A budget written in the brief did not hold. Triad now enforces one in code: `coderMinutes` (default 20) sends a coder one wrap-up note once it has worked that long.
+
+### The same workflow with every agent on Opus (`bench/results/wfopus`)
+
+Comparing the workflow with Opus alone in one session is not like for like, since the workflow adds planning and review. So the same run went through `bench/run_workflow.sh` with `OPTS='{"allOpus":true}'`: the same commands, with every agent on Opus.
+
+| Run | Score | Cost | Time |
+|---|---|---|---|
+| Triad tiers, b | 51/52 | $6.71 | 59 min |
+| Triad tiers, a | 52/52 | about $6.0 | 65 min |
+| All Opus | 52/52 | about $12.1 (phase 3 build timed out at 40 min; its ~$3.36 is from the transcript) | 72 min |
+
+All Opus by step: start $0.26, plans $3.09, builds about $5.84, reviews $2.94. Most of the saving from the tiers is in the builds, where Sonnet does the coding (about $1.96 against $5.84).
+
+Crossplay with the all-Opus AI added (`bench/results/wfopus/crossplay.txt`, points of 112):
+
+| AI | Points |
+|---|---|
+| Opus only, run 1 | 74 |
+| All-Opus workflow | 73.5 |
+| Reference | 72.5 |
+| Opus only, run 2 | 65 |
+| Workflow a, AI on Sonnet | 54 |
+| Workflow a, AI on Opus coder | 51.5 |
+| Workflow b, AI on Opus coder | 49.5 |
+| Workflow b, AI on Sonnet | 8 |
+
+Findings:
+- Triad's tiers run the same process at about half the cost of all Opus, and match it on the graded checks.
+- On the open-ended piece (AI strength), all Opus is ahead: level with Opus alone and the reference. The rebuilt Opus-coder AIs sat with the Sonnet ones here. Both were cut off by the command timeout before the time note existed, so they show the cost of an unbounded tuning loop more than the coder's ceiling.
 

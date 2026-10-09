@@ -1,0 +1,20 @@
+6b84a50 chore(triad): update state after wave 1 of phase 3
+b0e6bfc feat(triad): execute plan 03-01 — Bot harness: four bots, seeded obstacle arenas, round runner and CLI
+6c19d97 refactor: polish phase 2
+64a318f chore(triad): phase 2 review passed — Playable page: rendering, input, loop and UI
+6869b52 chore(triad): complete phase 2 execution — Playable page: rendering, input, loop and UI
+605e8b1 chore(triad): update state after wave 2 of phase 2
+e33740d feat(triad): execute plan 02-03 — Page wiring and Playwright play-through
+57440cf chore(triad): update state after wave 1 of phase 2
+812735e feat(triad): execute plan 02-02 — Real-time session state machine
+46adcca feat(triad): execute plan 02-01 — Canvas renderer with spec colours and layout
+ba68f73 refactor: polish phase 1
+5e3a4ab chore(triad): phase 1 review passed — Game engine and test hook
+4aec5e8 chore(triad): complete phase 1 execution — Game engine and test hook
+98b7385 chore(triad): update state after wave 3 of phase 1
+648cd87 feat(triad): execute plan 01-03 — Playwright check of window.tron on a served index.html
+13ddb25 chore(triad): update state after wave 2 of phase 1
+a76e1fb feat(triad): execute plan 01-02 — Controller, window.tron hook, chooseMove stub and page shell
+7444884 chore(triad): update state after wave 1 of phase 1
+3bcd738 feat(triad): execute plan 01-01 — Pure game engine with rule-by-rule tests
+b5fc6fd fixture

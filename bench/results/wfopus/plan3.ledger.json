@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "tiers": {
+    "opus": {
+      "requests": 15,
+      "input": 30,
+      "output": 23500,
+      "cacheRead": 414451,
+      "cacheWrite": 64326,
+      "cost": 1.0177372000000002
+    }
+  },
+  "agents": {
+    "main": {
+      "requests": 11,
+      "input": 22,
+      "output": 21292,
+      "cacheRead": 381205,
+      "cacheWrite": 47699,
+      "cost": 0.8837610000000002,
+      "role": "orchestrator",
+      "depth": 0,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 57338
+    },
+    "a5c0833c71ae5a654": {
+      "requests": 4,
+      "input": 8,
+      "output": 2208,
+      "cacheRead": 33246,
+      "cacheWrite": 16627,
+      "cost": 0.13397620000000002,
+      "role": "helper",
+      "depth": 1,
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "maxPrompt": 16629,
+      "type": "triad:triad-helper",
+      "parent": "main",
+      "status": "done"
+    }
+  },
+  "haiku": {
+    "requests": 0,
+    "maxPrompt": 0,
+    "overLine": 0
+  },
+  "refusals": [],
+  "rejectedReplies": 0,
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "ceiling": {
+    "wrapNotes": 0,
+    "stops": 0,
+    "trimmed": 0,
+    "refusedBriefs": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "options": {
+    "maxDepth": 2,
+    "maxCoders": 4,
+    "maxHelpers": 6,
+    "maxRetries": 1,
+    "strictMenu": true,
+    "compress": true,
+    "compressThreshold": 4000,
+    "deferTools": true,
+    "haikuCeiling": 0,
+    "haikuWrapAt": 80000,
+    "openPane": false,
+    "coderMinutes": 0,
+    "allOpus": true
+  },
+  "contextInjections": 1
+}
