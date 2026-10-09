@@ -382,6 +382,27 @@ describe('haiku ceiling', () => {
     expect((await $.command.run({ command: 'triad' } as any) as any).text).toMatch(/of \$0\.0012 \(maxSpend\)/)
   })
 
+  test('maxProjectSpend counts earlier sessions from .planning/SPEND.json', { options: { maxProjectSpend: 0.0015 } }, async ($, on) => {
+    const log = { writes: {} as Record<string, string>, spawns: [] as any[] }
+    world(on, log)
+    const files: Record<string, string> = {
+      '/repo/.planning/ROADMAP.md': '# Roadmap',
+      '/repo/.planning/SPEND.json': JSON.stringify({ sessions: { old: { usd: 0.001, at: '2026-10-01T00:00:00Z' } } }),
+    }
+    on('fs.read', (_$: any, e: any) => { if (e.path in files) return { value: files[e.path] }; throw new Error('ENOENT') })
+    const state = { chars: 1_000, sent: [] as string[], steps: 0 }
+    helperWorld(on, state)
+    await start($)
+    const c = await $.agent.spawn({ subagentType: 'triad:triad-coder', prompt: 'build it', description: 'c' })
+    await step($, c.agentId!, 0) // $0.001 earlier + about $0.00104 now: over $0.0015
+    const saved = JSON.parse(log.writes['/repo/.planning/SPEND.json']!)
+    expect(Object.keys(saved.sessions).sort()).toEqual(['old', 'sess-1'])
+    expect(((await $.agent.spawn({ subagentType: 'triad:triad-helper', prompt: 'x', description: 'h' })) as any).deny).toMatch(/project spending budget is reached .* across sessions/)
+    const r: any = await $.tool.call({ tool: 'mcp__triad__build_phase', tool_use_id: 'b' } as any)
+    expect(r.result).toMatch(/raising maxProjectSpend/)
+    expect((await $.command.run({ command: 'triad' } as any) as any).text).toMatch(/project spend \$0\.0020 of \$0\.0015 across sessions/)
+  })
+
   test('maxSpend 0 is no limit', async ($, on) => {
     world(on, { writes: {}, spawns: [] })
     const state = { chars: 1_000, sent: [] as string[], steps: 0 }

@@ -112,7 +112,7 @@ export function recordCompletion(l: Ledger, u: Usage) {
   l.agents.compressor!.parent = undefined
 }
 
-export type Budgets = { coders: [number, number]; helpers: [number, number]; maxDepth: number; maxSpend?: number }
+export type Budgets = { coders: [number, number]; helpers: [number, number]; maxDepth: number; maxSpend?: number; project?: { spent: number; max: number } }
 
 const usd = (n: number) => '$' + n.toFixed(n < 1 ? 4 : 2)
 const k = (n: number) => (n >= 10_000 ? Math.round(n / 1000) + 'k' : String(n))
@@ -141,6 +141,7 @@ export function render(l: Ledger, budgets: Budgets): string {
   out.push(`  total  ${usd(total)} (agent requests only; the engine's own side calls, such as titles, are not counted)`)
   out.push('', 'Budgets:')
   if (budgets.maxSpend) out.push(`  spend ${usd(Math.max(total, l.measuredUsd ?? 0))} of ${usd(budgets.maxSpend)} (maxSpend); at the limit new agents and workflow steps are refused`)
+  if (budgets.project) out.push(`  project spend ${usd(budgets.project.spent)} of ${usd(budgets.project.max)} across sessions (maxProjectSpend)`)
   out.push(`  coders running ${budgets.coders[0]}/${budgets.coders[1]}, helpers running ${budgets.helpers[0]}/${budgets.helpers[1]}, max depth ${budgets.maxDepth}`)
   out.push(`  Haiku: ${l.haiku.requests} requests, largest prompt ${k(l.haiku.maxPrompt)} of ${k(HAIKU_LINE)}, ${l.haiku.overLine} over the line`)
   const g = l.ceiling ?? { wrapNotes: 0, stops: 0, trimmed: 0, refusedBriefs: 0 }
@@ -180,5 +181,6 @@ export function paneView(l: Ledger, budgets: Budgets): PaneView {
     rows, tiers, total: tiers.reduce((n, t) => n + t.cost, 0), ...(l.measuredUsd !== undefined ? { measuredUsd: l.measuredUsd } : {}),
     coders: budgets.coders, helpers: budgets.helpers, maxDepth: budgets.maxDepth, refusals: l.refusals.length,
     ...(budgets.maxSpend ? { maxSpend: budgets.maxSpend } : {}),
+    ...(budgets.project ? { project: budgets.project } : {}),
   }
 }

@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'claude-code/testing'
 import type { Io, RunResult } from './hooks/legion/io.ts'
 import type { Agents } from './hooks/legion/build.ts'
-import { build } from './hooks/legion/build.ts'
+import { build, gitignoreLines } from './hooks/legion/build.ts'
+import { estimate } from './hooks/legion/estimate.ts'
 import { review } from './hooks/legion/reviewrun.ts'
 import { planCheck, planWrite, processLine, projectInit, statusText, validateText } from './hooks/legion/handlers.ts'
 import { getField, parsePlan, parseRoadmap, parseState, planWaves, progressBar, setField, setRoadmapRow, summaryStatus, updateState } from './hooks/legion/planning.ts'
@@ -214,6 +215,52 @@ describe('build and review', () => {
     await review(io4, off, { lightPlans: 0 })
     expect(reviewers(off.spawned)).toEqual(reviewers(full.spawned))
     expect(off.spawned.some(s => s.startsWith('evaluate '))).toBe(true)
+  })
+  test('fixMinor: after a pass, one round fixes the minor findings and commits once the checks pass', async () => {
+    const minorReply = () => '### Finding 1\n- **Severity**: minor\n- **File**: src/a.ts\n- **Lines**: 1\n- **Issue**: name is unclear\n- **Confidence**: 90%\n\n**Verdict**: PASS'
+    const setup = async () => {
+      const io = await newProject()
+      await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })
+      await build(io, fakeAgents(io))
+      return io
+    }
+    const io = await setup()
+    const a = fakeAgents(io, minorReply)
+    const r = await review(io, a, { lightPlans: 2, fixMinor: true })
+    expect(r.result).toBe('PASSED')
+    expect(a.spawned.filter(s => s.startsWith('minor fixes ')).length).toBe(1)
+    expect(r.text).toMatch(/minor findings: .*checks 1\/1 passed, 1 file\(s\) changed/)
+    expect(io.commits).toContain('refactor(triad): minor review fixes for phase 1\n\nPhase 1: Core\nFindings addressed: F-001')
+    const io2 = await setup()
+    const off = fakeAgents(io2, minorReply)
+    await review(io2, off, { lightPlans: 2, fixMinor: false })
+    expect(off.spawned.some(s => s.startsWith('minor fixes '))).toBe(false)
+  })
+  test('the plan commit adds .gitignore lines for the languages the phase writes', async () => {
+    const io = await newProject()
+    io.files.set('.gitignore', 'node_modules\n')
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'conv.py'), plan(2, 1, 'web/app.ts')] })
+    await build(io, fakeAgents(io))
+    expect(io.files.get('.gitignore')).toBe('node_modules\n__pycache__/\n*.pyc\n.pytest_cache/\n.venv/\ndist/\ncoverage/\n')
+    expect(gitignoreLines(['a.py'], io.files.get('.gitignore')!)).toEqual([])
+  })
+  test('estimate: per phase from the plan counts, the process and Opus plans; finished steps cost nothing', async () => {
+    const io = memIo()
+    await projectInit(io, { name: 'Demo', description: 'A demo.', phases: [{ name: 'Core', goal: 'Build the core API', plans: 2 }, { name: 'Game', goal: 'The game', plans: 4 }] } as any)
+    await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts'), plan(2, 1, 'src/b.ts', { model: 'opus' } as any)] })
+    const e = await estimate(io, { lightPlans: 2 })
+    const [p1, p2] = e.phases
+    expect(p1).toMatchObject({ plans: 2, planned: true, opusPlans: 1, light: true, plan: 0 })
+    expect(Math.abs(p1!.build - (0.2 + 1.2))).toBeLessThan(1e-9)
+    expect(Math.abs(p1!.review - (0.1 + 0.05 * 2))).toBeLessThan(1e-9)
+    expect(p2).toMatchObject({ plans: 4, planned: false, light: false })
+    expect(Math.abs(p2!.plan - (0.45 + 0.4))).toBeLessThan(1e-9)
+    expect(Math.abs(p2!.review - (0.35 + 0.6 + 0.1))).toBeLessThan(1e-9)
+    expect(e.text).toMatch(/\| 1\. Core \| 2, 1 on Opus \| light \| done \|/)
+    expect(e.text).toMatch(/maxProjectSpend/)
+    await build(io, fakeAgents(io))
+    expect((await estimate(io, { lightPlans: 2 })).phases[0]!.build).toBe(0)
+    expect((await estimate(memIo(), { lightPlans: 2 })).text).toMatch(/No Legion project/)
   })
   test('planning_status names the light and full phases', async () => {
     const io = memIo()

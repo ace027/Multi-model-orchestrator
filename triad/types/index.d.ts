@@ -22,6 +22,8 @@ export type PaneView = {
   refusals: number
   // The session's spending budget (option maxSpend), when one is set.
   maxSpend?: number
+  // Spend across the project's sessions and its budget (option maxProjectSpend), when one is set.
+  project?: { spent: number; max: number }
 }
 
 declare module 'claude-code' {

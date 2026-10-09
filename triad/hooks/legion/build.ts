@@ -3,6 +3,7 @@
 // per plan at its persona's tier, verification commands run here, a SUMMARY.md
 // per plan (failures too), STATE/ROADMAP updated as it goes, one commit per
 // successful plan. Resumable: a plan with a successful SUMMARY is not run again.
+import { SPEND_FILE } from '../budget.ts'
 import { preBuildCheck } from './gates.ts'
 import { ghTickPlan } from './github.ts'
 import { loadPhase, loadProject, today, type Io, type Project } from './io.ts'
@@ -73,12 +74,29 @@ export async function dirtyFiles(io: Io): Promise<Set<string>> {
 
 export async function commit(io: Io, files: string[], message: string): Promise<string | undefined> {
   if (!files.length) return undefined
+  // The project's spend record travels with the plans (maxProjectSpend).
+  if (!files.includes(SPEND_FILE) && (await io.read(SPEND_FILE)) !== undefined) files = [...files, SPEND_FILE]
   const add = await io.run(['git', 'add', '-A', '--', ...files])
   if (add.exitCode !== 0) return `git add failed: ${add.stderr.trim()}`
   const staged = await io.run(['git', 'diff', '--cached', '--quiet'])
   if (staged.exitCode === 0) return undefined // nothing to commit
   const c = await io.run(['git', 'commit', '-q', '-m', message])
   return c.exitCode === 0 ? undefined : `git commit failed: ${(c.stderr || c.stdout).trim()}`
+}
+
+// Caches and build output for the languages a phase writes, so they never sit
+// untracked after a build. Lines already in .gitignore are kept as they are.
+const IGNORES: [RegExp, string[]][] = [
+  [/\.py$/, ['__pycache__/', '*.pyc', '.pytest_cache/', '.venv/']],
+  [/\.(m?[jt]sx?|cjs)$|(^|\/)package\.json$/, ['node_modules/', 'dist/', 'coverage/']],
+  [/\.rs$|(^|\/)Cargo\.toml$/, ['target/']],
+  [/\.go$/, ['/bin/']],
+  [/\.(java|kt)$/, ['build/', '*.class']],
+]
+export function gitignoreLines(files: string[], current: string): string[] {
+  const have = new Set(current.split('\n').map(l => l.trim()))
+  const want = IGNORES.filter(([re]) => files.some(f => re.test(f))).flatMap(([, lines]) => lines)
+  return [...new Set(want)].filter(l => !have.has(l) && !have.has(l.replace(/\/$/, '')))
 }
 
 // Escalation blocks an agent emitted (agent-communication format), checked against Legion's escalation_format.
@@ -238,7 +256,13 @@ export async function build(io: Io, agents: Agents, opts: BuildOptions = {}): Pr
   // The plans go into history before any code: /triad:start and /triad:plan only write them.
   if (autoCommit) {
     const docs = []
-    for (const f of ['.planning/PROJECT.md', '.planning/ROADMAP.md', '.planning/STATE.md']) if ((await io.read(f)) !== undefined) docs.push(f)
+    for (const f of ['.planning/PROJECT.md', '.planning/ROADMAP.md', '.planning/STATE.md', '.planning/phases/.gitkeep']) if ((await io.read(f)) !== undefined) docs.push(f)
+    const ignore = await io.read('.gitignore')
+    const add = gitignoreLines(ph.plans.flatMap(x => x.fm.files_modified), ignore ?? '')
+    if (add.length) {
+      await io.write('.gitignore', `${ignore ? ignore.replace(/\n*$/, '\n') : ''}${add.join('\n')}\n`)
+      docs.push('.gitignore')
+    }
     const err = await commit(io, [...docs, ph.rel], `docs(${prefix}): plan phase ${n} — ${phaseName}\n\n${planned} plans across ${waves.waves.length} waves.`)
     if (err) warnings.push(err)
   }

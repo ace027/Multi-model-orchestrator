@@ -1,6 +1,6 @@
 {
   "name": "triad",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "author": { "name": "ace027" },
   "homepage": "https://github.com/ace027/Multi-model-orchestrator",
   "description": "Tiered-model orchestration: Opus orchestrates and takes open-ended coding, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
@@ -84,11 +84,23 @@
       "description": "At 80% Triad warns; at the limit running agents are told to wrap up and new agents and workflow steps are refused. 0 means no limit.",
       "default": 0
     },
+    "maxProjectSpend": {
+      "type": "number",
+      "title": "Spending budget per project (USD)",
+      "description": "Like maxSpend, but counts every session on the project: each session's spend is kept in .planning/SPEND.json, which is committed with the plans. 0 means no limit.",
+      "default": 0
+    },
     "lightPlans": {
       "type": "number",
       "title": "Light process up to this many plans",
       "description": "A phase with at most this many plans skips the optional planning steps (board, spec, proposals, persona table, security and design passes) and gets a two-reviewer review of at most two cycles. 0 means always the full process.",
       "default": 2
+    },
+    "fixMinor": {
+      "type": "boolean",
+      "title": "Fix minor review findings",
+      "description": "After a review passes, one coder pass fixes the minor and medium-confidence findings that name a file, then the tests run again; the pass is reverted if they fail.",
+      "default": true
     },
     "openPane": {
       "type": "boolean",

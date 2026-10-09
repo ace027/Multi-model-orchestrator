@@ -11,7 +11,7 @@
       "name": "triad",
       "source": "./triad",
       "description": "Tiered-model orchestration with the Legion workflow: Opus orchestrates and takes open-ended coding, Sonnet codes, Haiku does menial work.",
-      "version": "0.10.0"
+      "version": "0.11.0"
     }
   ]
 }

@@ -5,9 +5,10 @@ import { emptyLedger, ensureAgent, paneView, promptTokens, recordCompletion, rec
 import { PANE, registerPane } from './pane.tsx'
 import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, TIME_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
 import { LEGION_TOOLS } from './legion/tools.ts'
-import { BUDGET_AGENT_NOTE, BUDGET_OVER, BUDGET_WARN, levelOf, spentOf } from './budget.ts'
+import { BUDGET_AGENT_NOTE, BUDGET_OVER, BUDGET_WARN, SPEND_FILE, bindingBudget, earlierSpend, parseSpend, spentOf } from './budget.ts'
 import { personaRank, planCheck, planWrite, processLine, projectInit, statusText, validateText } from './legion/handlers.ts'
 import { buildRun } from './legion/buildrun.ts'
+import { estimate } from './legion/estimate.ts'
 import { review } from './legion/reviewrun.ts'
 import { checkWrite, controlMode, controlModeLine, type Scope } from './legion/settings.ts'
 import { checkMapping, loadKnowledgeIndex, logDecision, prepareRun } from './legion/authority.ts'
@@ -117,7 +118,7 @@ async function save($: any) {
 
 // The pane's view (pane.tsx draws it); the state scan wants the atom in each file that uses it.
 const paneState = atom({ plugin: 'triad', key: 'view' } as const, null)
-const budgets = () => ({ coders: [running.coder.size, opts.maxCoders] as [number, number], helpers: [running.helper.size, opts.maxHelpers] as [number, number], maxDepth: opts.maxDepth, maxSpend: opts.maxSpend })
+const budgets = () => ({ coders: [running.coder.size, opts.maxCoders] as [number, number], helpers: [running.helper.size, opts.maxHelpers] as [number, number], maxDepth: opts.maxDepth, maxSpend: opts.maxSpend, ...(opts.maxProjectSpend > 0 ? { project: { spent: projectSpent(), max: opts.maxProjectSpend } } : {}) })
 
 // The pane's view; a failed write never costs the ledger or the hook.
 async function publish($: any) {
@@ -129,8 +130,26 @@ async function publish($: any) {
 
 // Spending budget: one notice at 80%, and at the limit a note to every agent
 // still running (new spawns and workflow steps are refused from then on).
-const budgetLevel = () => levelOf(spentOf(ledger), opts.maxSpend)
+// What earlier sessions spent on this project (.planning/SPEND.json), read at start.
+let earlier = 0
+let spendWritten = -1
+const projectSpent = () => earlier + spentOf(ledger)
+const budget = () => bindingBudget(spentOf(ledger), opts.maxSpend, projectSpent(), opts.maxProjectSpend)
+const budgetLevel = () => budget().level
+// Keeps this session's line in SPEND.json current (once a project exists; to the cent).
+async function recordSpend($: any) {
+  const spent = Math.round(spentOf(ledger) * 100) / 100
+  if (!sessionId || spent === spendWritten) return
+  const io = ioOf($)
+  const text = await io.read(SPEND_FILE)
+  if (text === undefined && (await io.read('.planning/ROADMAP.md')) === undefined) return
+  const f = parseSpend(text)
+  earlier = earlierSpend(f, sessionId)
+  f.sessions[sessionId] = { usd: spent, at: new Date().toISOString() }
+  try { await io.write(SPEND_FILE, JSON.stringify(f, null, 2) + '\n'); spendWritten = spent } catch { /* next step tries again */ }
+}
 async function checkBudget($: any) {
+  await recordSpend($)
   const level = budgetLevel()
   const b = (ledger.budget ??= {})
   // A raised limit (options reload) re-arms the notices.
@@ -138,19 +157,19 @@ async function checkBudget($: any) {
   if (level === 'ok' || level === 'off') b.warned = false
   if (level === 'warn' && !b.warned) {
     b.warned = true
-    try { $.ui.toast(BUDGET_WARN(spentOf(ledger), opts.maxSpend)) } catch { /* the pane shows it too */ }
+    try { $.ui.toast(BUDGET_WARN(budget())) } catch { /* the pane shows it too */ }
   }
   if (level === 'over' && !b.over) {
     b.over = true
     b.warned = true
-    try { $.ui.toast(BUDGET_OVER(spentOf(ledger), opts.maxSpend)) } catch { /* the refusals say it */ }
+    try { $.ui.toast(BUDGET_OVER(budget())) } catch { /* the refusals say it */ }
     for (const id of [...running.coder, ...running.helper]) {
-      try { await $.session.send({ to: { agentId: id }, text: BUDGET_AGENT_NOTE(opts.maxSpend) }) } catch { /* best effort */ }
+      try { await $.session.send({ to: { agentId: id }, text: BUDGET_AGENT_NOTE(budget()) }) } catch { /* best effort */ }
     }
   }
 }
 // The line a workflow tool's result ends with once 80% is spent.
-const budgetNote = () => (budgetLevel() === 'warn' ? `\n\n${BUDGET_WARN(spentOf(ledger), opts.maxSpend)}` : '')
+const budgetNote = () => (budgetLevel() === 'warn' ? `\n\n${BUDGET_WARN(budget())}` : '')
 
 // Waits for an agent's turn.complete without spending the hook's own budget:
 // the wait runs in a child process that polls for the marker the turn.complete
@@ -332,16 +351,22 @@ async function legionTool($: any, name: string, input: any): Promise<string> {
   switch (name) {
     case 'planning_status': {
       const v = await validateText(io, '--ci')
-      const spend = opts.maxSpend > 0 ? `\nBudget: $${spentOf(ledger).toFixed(2)} of $${opts.maxSpend.toFixed(2)} spent this session (maxSpend)${budgetLevel() === 'over' ? ': reached, stop' : ''}.` : ''
+      const b = budget()
+      const lines = [
+        opts.maxSpend > 0 ? `$${spentOf(ledger).toFixed(2)} of $${opts.maxSpend.toFixed(2)} spent this session (maxSpend)` : '',
+        opts.maxProjectSpend > 0 ? `$${projectSpent().toFixed(2)} of $${opts.maxProjectSpend.toFixed(2)} spent on the project (maxProjectSpend)` : '',
+      ].filter(Boolean)
+      const spend = lines.length ? `\nBudget: ${lines.join('; ')}${b.level === 'over' ? `: ${b.option} reached, stop` : ''}.` : ''
       return `${await statusText(io)}\n\nValidate: ${v.text}\n${controlModeLine(await controlMode(io))}\n${await processLine(io, opts.lightPlans)}${spend}`
     }
+    case 'estimate': return (await estimate(io, { lightPlans: opts.lightPlans, allOpus: opts.allOpus })).text
     case 'project_init': return projectInit(io, input)
     case 'plan_write': return planWrite(io, input)
     case 'plan_check': return planCheck(io, Number(input.phase))
     case 'persona_brief': return personaRank(io, input)
     case 'build_phase': return buildRun(io, agentsOf($, log), input, log)
     case 'persona_run': return renderPersonaRuns(await runPersonas(io, agentsOf($, log), input, log))
-    case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, intent: input.intent, lightPlans: opts.lightPlans, log })).text
+    case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, intent: input.intent, lightPlans: opts.lightPlans, fixMinor: opts.fixMinor, log })).text
   }
   return `unknown tool ${name}`
 }
@@ -359,6 +384,7 @@ export const register: Register = (on, options) => {
     sessionId = await $.session.id()
     ledger = { ...emptyLedger(), ...((await $.store.get(`ledger:${sessionId}`)) as Partial<Ledger> | undefined) }
     ledger.options = { ...opts }
+    earlier = earlierSpend(parseSpend(await ioOf($).read(SPEND_FILE)), sessionId)
     await $.fs.write(`${cwd}/.triad/.gitignore`, '*\n')
     await $.tool.register({
       name: 'delegate_menial',
@@ -426,7 +452,7 @@ export const register: Register = (on, options) => {
     // A delegate_menial spawn runs in the main loop, so the caller rides in the description.
     const parent = e.description.startsWith(DELEGATE_MARK) ? e.description.slice(DELEGATE_MARK.length).split(/\s/)[0] : e.parentAgentId
     const depth = depthOf(parent) + 1
-    if (budgetLevel() === 'over') return refuse(BUDGET_OVER(spentOf(ledger), opts.maxSpend).replace(/^triad: /, ''))
+    if (budgetLevel() === 'over') return refuse(BUDGET_OVER(budget()).replace(/^triad: /, ''))
     if (depth > opts.maxDepth) return refuse(`depth ${depth} is over the limit of ${opts.maxDepth}; do this step yourself or return blocked.`)
     if (role === 'helper' && approxTokens(e.prompt) > PREFLIGHT_TOKENS) {
       ledger.ceiling.refusedBriefs++
@@ -659,10 +685,12 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Read-only tools that spend nothing stay open once a budget is reached.
+  const FREE_TOOLS = new Set(['planning_status', 'estimate'])
   for (const t of LEGION_TOOLS) {
     on('tool.call', { tool: `mcp__triad__${t.name}` }, async ($, e, next) => {
       if (e.agentId) return { deny: 'triad: the Legion workflow tools run in the main loop only.' }
-      if (budgetLevel() === 'over' && t.name !== 'planning_status') return { result: BUDGET_OVER(spentOf(ledger), opts.maxSpend), isError: true }
+      if (budgetLevel() === 'over' && !FREE_TOOLS.has(t.name)) return { result: BUDGET_OVER(budget()), isError: true }
       try {
         return { result: (await legionTool($, t.name, e)) + budgetNote() }
       } catch (err) {

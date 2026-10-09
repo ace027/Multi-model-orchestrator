@@ -18,7 +18,10 @@ import { coverageChecks, coverageFindings, readCoverage, renderCoverage } from '
 import { findingErrors, intentFilter } from './review.ts'
 import { loadIntentConfig, resolveTeam } from './intents.ts'
 
-export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void; intent?: string; lightPlans?: number }
+export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void; intent?: string; lightPlans?: number; fixMinor?: boolean }
+// The most minor findings one fixMinor round takes on.
+const MINOR_CAP = 8
+
 export type ReviewResult = { ok: boolean; result?: 'PASSED' | 'ESCALATED' | 'STALE LOOP ABORTED'; error?: string; cycles: number; text: string; open: Finding[] }
 
 function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; name: string; goal: string; criteria: string[]; files: string[]; open: Finding[]; cycle: number; checks: string[] }): string {
@@ -41,12 +44,14 @@ function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; nam
   ].join('\n')
 }
 
-function fixBrief(persona: Persona, findings: Finding[], files: string[], phase: number, cycle: number): string {
+function fixBrief(persona: Persona, findings: Finding[], files: string[], phase: number, cycle: number | 'minor'): string {
   return [
     personaBrief(persona),
     '',
-    `# Review fixes: phase ${phase}, cycle ${cycle}`,
-    `Fix these findings, and nothing else. Files you may write: ${files.join(', ')}. Do not commit.`,
+    cycle === 'minor' ? `# Minor review findings: phase ${phase}` : `# Review fixes: phase ${phase}, cycle ${cycle}`,
+    cycle === 'minor'
+      ? `The review passed; these are its minor and medium-confidence findings. Fix the ones that are clear and small, and nothing else. Skip any that needs a design decision or a large change. Files you may write: ${files.join(', ')}. Do not commit.`
+      : `Fix these findings, and nothing else. Files you may write: ${files.join(', ')}. Do not commit.`,
     ...findings.map(f => `\n## ${f.id} [${f.severity}] ${f.file}${f.line_range ? `:${f.line_range[0]}-${f.line_range[1]}` : ''}\nIssue: ${f.description}\n${f.why ? `Why: ${f.why}\n` : ''}${f.suggested_fix ? `Suggested fix: ${f.suggested_fix}` : ''}`),
     '',
     'If a finding is wrong for this codebase, do not change the code: say so under issues with your evidence.',
@@ -232,6 +237,43 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     }
   }
 
+  // Minor findings (fixMinor): after a pass, one fix round for the suggestions
+  // and medium-confidence findings that name a file. The checks run again and
+  // the round is undone if any fails, so a pass never turns into a break.
+  let minorNote: string | undefined
+  const minor = [...new Map([...suggestions, ...deferred].filter(f => f.file && files.some(x => overlaps(f.file, x))).map(f => [`${f.file}\n${f.description}`, f])).values()].slice(0, MINOR_CAP)
+  if (result === 'PASSED' && opts.fixMinor && minor.length) {
+    if (!checks.length) minorNote = `minor findings: ${minor.length} left (no verification commands to check a fix against)`
+    else {
+      const byAgent = new Map<string, Finding[]>()
+      for (const f of minor) byAgent.set(fixAgentFor(f.file), [...(byAgent.get(fixAgentFor(f.file)) ?? []), f])
+      const before = await dirtyFiles(io)
+      const runs = await Promise.all([...byAgent.entries()].map(async ([id, fs]) => {
+        const persona = BY_ID.get(id) ?? BY_ID.get('engineering-senior-developer')!
+        const own = [...new Set(fs.map(f => f.file))]
+        const may = [...own, ...files.filter(f => /(^|\/)tests?\/|test_|\.test\.|\.spec\./.test(f) && !own.includes(f))]
+        const r = await agents.run({ persona, brief: fixBrief(persona, fs, may, n, 'minor'), scope: { planId: `review-${pad2(n)}-minor`, mode: mode === 'autonomous' ? 'autonomous' : 'guarded', files_modified: may, files_forbidden: [] }, label: `minor fixes ${id}` })
+        return { id, fs, r }
+      }))
+      const changed = [...await dirtyFiles(io)].filter(f => !before.has(f) && !f.startsWith('.triad/') && !f.startsWith('.planning/'))
+      const verify = changed.length ? await runVerification(io, checks) : []
+      const okNow = verify.every(v => v.passed)
+      if (changed.length && !okNow) {
+        await io.run(['git', 'checkout', '--', ...changed])
+        await io.run(['git', 'clean', '-fdq', '--', ...changed])
+      }
+      const applied = changed.length && okNow
+      minorNote = `minor findings: ${runs.map(r => `${r.id} on ${r.fs.map(f => f.id).join(', ')} (${parseReply(r.r.answer ?? '').status ?? 'no answer'})`).join('; ')}; ` +
+        (!changed.length ? 'no changes' : applied ? `checks ${verify.length}/${verify.length} passed, ${changed.length} file(s) changed` : `checks failed (${verify.filter(v => !v.passed).length}/${verify.length}), changes undone`)
+      fixes.push(minorNote)
+      if (applied && settings.execution.auto_commit !== false) {
+        await io.run(['git', 'add', '-A', '--', ...changed])
+        await io.run(['git', 'commit', '-q', '-m', `refactor(${prefix}): minor review fixes for phase ${n}\n\nPhase ${n}: ${name}\nFindings addressed: ${minor.map(f => f.id).join(', ')}`])
+      }
+    }
+    log(minorNote)
+  }
+
   const findings = [...all]
   // Schema check of every recorded finding; invalid ones are flagged in the report, never dropped.
   const invalid = [...all, ...deferred].map(f => ({ id: f.id, errors: findingErrors(f) })).filter(x => x.errors.length)
@@ -290,6 +332,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     `Phase ${n}: ${name} — review ${result}`,
     `Reviewers: ${reviewers.map(r => r.id).join(', ')}`,
     ...delta,
+    ...(minorNote ? [minorNote] : []),
     ...(open.length ? ['Unresolved:', ...open.map(f => `- ${f.id} [${f.severity}] ${f.file}: ${f.description}`)] : []),
     ...(evaluators.length ? [`Evaluators: ${evaluators.map(e => e.type).join(', ')}`] : []),
     ...(invalid.length ? [`Invalid findings (schema): ${invalid.map(i => i.id).join(', ')} — see ## Invalid Findings`] : []),
