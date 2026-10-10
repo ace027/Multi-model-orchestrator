@@ -104,7 +104,7 @@ Scope (cap 50 files), test and type-check baseline, four passes, per-file revert
 
 Ship a reviewed phase: 6 pre-ship gates in code, ship report, PR or push, post-ship verification, optional canary.
 
-Six pre-ship gates and the ship report in code; PR, push or mark via `git`/`gh`; canary checks at 1, 5 and 15 minutes inside the call (never auto-rollback).
+Six pre-ship gates and the ship report in code; PR, push or mark via `git`/`gh`, or, when the `gh` CLI is not installed or logged in, the PR through the session's GitHub MCP server (the one with `create_pull_request`; no labels or assignee that way); canary checks at 1, 5 and 15 minutes inside the call (never auto-rollback).
 
 The verification commands and the test suite run as a detached job under `.triad/run/`, and a Haiku runner agent calls the job's wait script with Bash until it finishes; `check` then reads each command's exit code and output back. A suite of several minutes inside one silent tool call left a remote session with nothing in its transcript, and the session was stopped and restarted mid-ship; the runner's Bash calls keep the transcript moving. Passing results hold for the commit they ran on: `publish` and post-ship verification reuse them, and `publish` finds a PR it already opened instead of creating a second. Canary checks (1, 5 and 15 minutes after deploy) run the same way, inside the `canary` call.
 
