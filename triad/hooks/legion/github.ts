@@ -3,7 +3,7 @@
 // milestones, and the `## GitHub` table that mirrors every write in STATE.md.
 // GitHub failures never block a workflow; they are reported.
 import { loadPhase, loadProject, type Io } from './io.ts'
-import { pad2 } from './planning.ts'
+import { pad2, phaseDone } from './planning.ts'
 import { parseMilestones } from './milestone.ts'
 
 export const LABEL = 'triad'
@@ -168,7 +168,7 @@ export async function ghClosePhase(io: Io, n: number, info: { plans: number; req
   const p = await loadProject(io)
   const m = parseMilestones(p.roadmapText ?? '').find(x => n >= x.start && n <= x.end)
   if (gh.ok && m && p.roadmap) {
-    const done = p.roadmap.rows.filter(r => r.phase >= m.start && r.phase <= m.end).every(r => /^complete|shipped/i.test(r.status))
+    const done = p.roadmap.rows.filter(r => r.phase >= m.start && r.phase <= m.end).every(r => phaseDone(r.status))
     const { milestones } = parseGithubSection(p.stateText ?? '')
     const row = milestones.find(x => x.name === m.name)
     if (done && row) {

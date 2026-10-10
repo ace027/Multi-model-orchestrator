@@ -1,12 +1,11 @@
 // /retro in code: scope resolution, evidence gathering and metrics; the model
 // writes the five sections from this evidence, and retro_save appends RETRO.md.
 import { loadPhase, loadProject, today, type Io } from './io.ts'
-import { getSection } from './planning.ts'
+import { getSection, phaseDone } from './planning.ts'
 import { parseMilestones } from './milestone.ts'
 import { parseOutcomes, OUTCOMES, RETRO } from './memory.ts'
 import { escalationsIn } from './build.ts'
 
-const isComplete = (s: string) => /^complete/i.test(s.trim())
 
 export async function retroGather(io: Io, opts: { phase?: number; milestone?: number }): Promise<string> {
   const p = await loadProject(io)
@@ -19,10 +18,10 @@ export async function retroGather(io: Io, opts: { phase?: number; milestone?: nu
     phases = Array.from({ length: m.end - m.start + 1 }, (_, i) => m.start + i)
     scope = `Milestone ${m.n} (${m.name}) — Phases ${m.start}-${m.end}`
   } else {
-    const n = opts.phase ?? [...p.roadmap.rows].reverse().find(r => isComplete(r.status))?.phase
+    const n = opts.phase ?? [...p.roadmap.rows].reverse().find(r => phaseDone(r.status))?.phase
     if (n === undefined) return 'No completed phase yet. Retrospectives run on completed work; run `/triad:review` first.'
     const row = p.roadmap.rows.find(r => r.phase === n)
-    if (row && !isComplete(row.status)) return `Phase ${n} is not yet complete (status: ${row.status}). Retrospectives run on completed work. Run \`/triad:review\` first.`
+    if (row && !phaseDone(row.status)) return `Phase ${n} is not yet complete (status: ${row.status}). Retrospectives run on completed work. Run \`/triad:review\` first.`
     phases = [n]
     scope = `Phase ${n}${row ? `: ${row.name}` : ''}`
   }

@@ -3,6 +3,7 @@ import { fakeAgents, memIo } from './testkit.ts'
 import { build } from './hooks/legion/build.ts'
 import { review } from './hooks/legion/reviewrun.ts'
 import { planWrite, projectInit } from './hooks/legion/handlers.ts'
+import { setRoadmapRow } from './hooks/legion/planning.ts'
 import { loadSettings } from './hooks/legion/settings.ts'
 import { OUTCOMES, agentScores, decayScore, importanceOf, learnList, learnRecall, learnRecord, parseOutcomes, prune, recallOutcomes, storeKnowledge, storeOutcome } from './hooks/legion/memory.ts'
 import { milestoneArchive, milestoneComplete, milestoneDefine, milestoneStatus, parseMilestones, validateMilestones } from './hooks/legion/milestone.ts'
@@ -174,6 +175,18 @@ describe('build and review write memory; retro reads it', () => {
     expect(g).toContain('- Review pass rate: 1/1 (100%)')
     expect(await retroSave(io, { scope: 'Phase 1: P1', findings: 'went well', action_items: '| 1 | keep | High | 01-01 |', metrics: '- Plans completed: 2' })).toContain('RETRO.md')
     expect(io.files.get('.planning/memory/RETRO.md')).toContain('## Phase 1: P1 — 2026-10-08')
+  })
+
+  test('a shipped phase counts as complete for retro and milestones', async () => {
+    const io = await project(2)
+    await planWrite(io, { phase: 1, context: { goal: 'g' }, plans: [plan(1, 1, 'src/a.ts')] })
+    await build(io, fakeAgents(io), {})
+    await review(io, fakeAgents(io), {})
+    await milestoneDefine(io, [{ name: 'MVP', start: 1, end: 1, goal: 'Core' }, { name: 'Launch', start: 2, end: 2, goal: 'Ship' }])
+    io.files.set('.planning/ROADMAP.md', setRoadmapRow(io.files.get('.planning/ROADMAP.md')!, 1, { status: 'Shipped' }))
+    expect(await retroGather(io, {})).toContain('Scope: Phase 1')
+    expect(await retroGather(io, { phase: 1 })).not.toContain('not yet complete')
+    expect(await milestoneStatus(io)).toMatch(/\| 1 \| MVP \| 1-1 \| \[##########\] 100% \| Complete/)
   })
 })
 

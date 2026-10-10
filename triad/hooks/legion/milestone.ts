@@ -3,7 +3,7 @@
 // complete and archive steps. Grouping phases into milestones, the one-line
 // deliverables and the decisions are the model's; it passes them in.
 import { loadPhase, loadProject, today, type Io, type Project } from './io.ts'
-import { appendToSection, getSection, pad2, setRoadmapRow, type Roadmap } from './planning.ts'
+import { appendToSection, getSection, pad2, phaseDone, setRoadmapRow, type Roadmap } from './planning.ts'
 import { commit } from './build.ts'
 
 export type Milestone = { n: number; name: string; start: number; end: number; goal: string; status: string; completed?: string }
@@ -41,20 +41,19 @@ export function validateMilestones(ms: Milestone[], maxPhase: number): string[] 
   return errs
 }
 
-const isComplete = (s: string) => /^complete/i.test(s.trim())
 const nameOf = (r: Roadmap, n: number) => r.rows.find(x => x.phase === n)?.name || r.phases.find(x => x.phase === n)?.name || ''
 
 export function deriveStatus(m: Milestone, r: Roadmap): string {
   if (/archived/i.test(m.status)) return 'Archived'
   const rows = r.rows.filter(x => x.phase >= m.start && x.phase <= m.end)
-  if (rows.length && rows.length === m.end - m.start + 1 && rows.every(x => isComplete(x.status))) return 'Complete'
+  if (rows.length && rows.length === m.end - m.start + 1 && rows.every(x => phaseDone(x.status))) return 'Complete'
   if (rows.some(x => x.status.trim() && !/^(pending|not started|-)$/i.test(x.status.trim()))) return 'In Progress'
   return 'Pending'
 }
 
 export function metrics(m: Milestone, r: Roadmap, requirements?: string): { phasePct: number; planPct: number; bar: string; plans: [number, number]; reqs?: [number, number] } {
   const rows = r.rows.filter(x => x.phase >= m.start && x.phase <= m.end)
-  const complete = rows.filter(x => isComplete(x.status)).length
+  const complete = rows.filter(x => phaseDone(x.status)).length
   const done = rows.reduce((s, x) => s + (x.completed ?? 0), 0)
   const all = rows.reduce((s, x) => s + (x.plans ?? 0), 0)
   const planPct = all ? Math.floor(done / all * 100) : 0
@@ -163,7 +162,7 @@ export async function milestoneComplete(io: Io, n: number, input: { deliverables
   const m = ms.find(x => x.n === n)
   if (!m) return `No Milestone ${n} in ROADMAP.md.`
   const rows = p.roadmap.rows.filter(r => r.phase >= m.start && r.phase <= m.end)
-  const open = rows.filter(r => !isComplete(r.status))
+  const open = rows.filter(r => !phaseDone(r.status))
   if (open.length || rows.length < m.end - m.start + 1) return `Cannot complete Milestone ${n} — the following phases are not yet complete: ${open.map(r => `Phase ${r.phase} (${r.status})`).join(', ') || 'phases missing from the progress table'}`
   const path = `.planning/milestones/MILESTONE-${n}.md`
   if ((await io.read(path)) !== undefined && !input.overwrite) return `Milestone summary already exists at ${path}. Ask the user: overwrite with fresh metrics (call again with overwrite: true), or skip summary generation.`

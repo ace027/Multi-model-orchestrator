@@ -3,7 +3,7 @@
 // dependencies and agent allocation in code. The Studio Producer analysis is
 // the model's (persona_run).
 import { PERSONAS } from './personas.ts'
-import { parseRoadmap, parseState } from './planning.ts'
+import { parseRoadmap, parseState, phaseDone } from './planning.ts'
 import { today, type Io } from './io.ts'
 
 export const REGISTRY = 'portfolio.md' // relative to the registry Io (~/.claude/legion)
@@ -92,7 +92,7 @@ async function snapshot(p: Project, at: (path: string) => Io, now: Date): Promis
     const plans = rm.rows.reduce((a, r) => a + (r.plans ?? 0), 0)
     const done = rm.rows.reduce((a, r) => a + (r.completed ?? 0), 0)
     s.pct = plans ? Math.floor(done / plans * 100) : 0
-    for (const r of rm.rows) if (/^complete/i.test(r.status)) s.done.add(r.phase)
+    for (const r of rm.rows) if (phaseDone(r.status)) s.done.add(r.phase)
     for (const ph of rm.phases) if (ph.checked) s.done.add(ph.phase)
   } catch { s.unreadable = true; return s }
   const known = new Set(PERSONAS.map(x => x.id))

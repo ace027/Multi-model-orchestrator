@@ -6,7 +6,7 @@
 // what those runs spread over. Once the user's own runs have recorded what their
 // steps cost (StepRecord, kept in the plugin store), the rates scale to match.
 import { loadPhase, loadProject, type Io } from './io.ts'
-import { isLight } from './planning.ts'
+import { isLight, phaseDone } from './planning.ts'
 
 export const RATES = {
   plan: { full: [0.45, 0.1], light: [0.15, 0.05] },
@@ -80,7 +80,7 @@ export async function estimate(io: Io, o: { lightPlans: number; allOpus?: boolea
     const plans = planned ? ph.plans.length : (row.plans ?? p.roadmap.phases.find(x => x.phase === row.phase)?.plans ?? 2)
     const opusPlans = ph.plans.filter(x => x.fm.model === 'opus').length
     const light = isLight(plans, o.lightPlans)
-    const complete = /complete/i.test(row.status)
+    const complete = phaseDone(row.status)
     const built = complete || (planned && ph.plans.every(x => ph.summaries[x.id] !== undefined))
     const done = [...(planned ? ['plan'] : []), ...(built ? ['build'] : []), ...(complete ? ['review'] : [])]
     const shape = { plans, opusPlans, light, allOpus: o.allOpus }
