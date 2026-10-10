@@ -314,7 +314,22 @@ function ioOf($: any, root = cwd): Io {
       return { exitCode: r.exitCode ?? 1, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') }
     },
     long: (commands, label) => longRun($, root, commands, label),
+    github: (tool, args) => githubCall($, tool, args),
     now: () => new Date(),
+  }
+}
+
+// The session's GitHub MCP server: the one with both create_pull_request and
+// list_pull_requests (named by its tool prefix, which $.mcp.call accepts).
+async function githubCall($: any, tool: string, args: Record<string, unknown>): Promise<{ ok: boolean; text: string }> {
+  try {
+    const names = new Set(((await $.tool.list()) as { name: string; mcp: boolean }[]).filter(t => t.mcp).map(t => t.name))
+    const server = [...names].map(n => n.match(/^mcp__(.+)__create_pull_request$/)?.[1]).find(s => s && names.has(`mcp__${s}__list_pull_requests`))
+    if (!server) return { ok: false, text: 'no GitHub MCP server is connected' }
+    const r: any = await $.mcp.call(server, tool, args)
+    return { ok: !r.isError, text: ((r.content ?? []) as any[]).filter(b => b.type === 'text').map(b => String(b.text)).join('\n') }
+  } catch (e) {
+    return { ok: false, text: String(e) }
   }
 }
 

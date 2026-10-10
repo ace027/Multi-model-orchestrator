@@ -5,7 +5,7 @@
 import { loadPhase, loadProject, today, type Io, type PhaseFiles, type Project } from './io.ts'
 import { pad2, setRoadmapRow, updateState } from './planning.ts'
 import { commit, dirtyFiles, runVerification } from './build.ts'
-import { ensureLabel, ghInfo, ghRecordPr, issueOf, phaseBranch, FOOTER } from './github.ts'
+import { ensureLabel, ghInfo, ghRecordPr, issueOf, phaseBranch, prUrlIn, FOOTER } from './github.ts'
 import type { VerifyRun } from './render.ts'
 import { preShipAudit } from './gates.ts'
 
@@ -181,10 +181,10 @@ export async function shipCheck(io: Io, opts: { phase?: number; dry_run?: boolea
   if (g.checks.some(c => !c.pass)) return head.join('\n')
   const report = renderShipReport(g, io.now())
   if (!opts.dry_run) await io.write(reportPath(g), report)
-  const gh = await ghInfo(io)
+  const gh = await ghInfo(io, { mcp: true })
   const issue = await issueOf(io, g.n)
   return [...head, '', opts.dry_run ? report : `Wrote ${reportPath(g)}.`, '', '## PR preview', `Title: Phase ${pad2(g.n)}: ${g.name}`, renderPrBody(g, issue), '',
-    gh.ok ? `GitHub available (${gh.slug}, base ${gh.defaultBranch}). Publish options: pr / push / mark / abort.` : `GitHub not available (${gh.reason}). Publish options: push / mark / abort.`,
+    gh.ok ? `GitHub available (${gh.slug}, base ${gh.defaultBranch}, via ${gh.via === 'mcp' ? 'the GitHub MCP server' : 'gh'}). Publish options: pr / push / mark / abort.` : `GitHub not available (${gh.reason}). Publish options: push / mark / abort.`,
     ...(opts.dry_run ? ['', 'DRY RUN — skipping ship actions'] : [])].join('\n')
 }
 
@@ -199,7 +199,7 @@ export async function shipPublish(io: Io, opts: { phase?: number; method: 'pr' |
   let prUrl: string | undefined
   let prNumber: number | undefined
   if (opts.method !== 'mark') {
-    const gh = opts.method === 'pr' ? await ghInfo(io) : undefined
+    const gh = opts.method === 'pr' ? await ghInfo(io, { mcp: true }) : undefined
     if (opts.method === 'pr' && !gh!.ok) return `Cannot create a PR: ${gh!.reason}`
     let branch = (await io.run(['git', 'branch', '--show-current'])).stdout.trim()
     const base = gh?.defaultBranch ?? 'main'
@@ -213,7 +213,24 @@ export async function shipPublish(io: Io, opts: { phase?: number; method: 'pr' |
     const push = await io.run(['git', 'push', '-u', 'origin', branch])
     if (push.exitCode !== 0) return [...out, `Push failed; no PR created: ${(push.stderr || push.stdout).trim()}`].join('\n')
     out.push(`Pushed ${branch}.`)
-    if (opts.method === 'pr') {
+    if (opts.method === 'pr' && gh!.via === 'mcp') {
+      // No gh CLI: the session's GitHub MCP server opens the PR (no labels or assignee).
+      const [owner, repo] = gh!.slug!.split('/') as [string, string]
+      const find = async () => { const r = await io.github!('list_pull_requests', { owner, repo, head: `${owner}:${branch}`, base, state: 'open' }); return r.ok ? prUrlIn(r.text) : undefined }
+      prUrl = await find()
+      if (prUrl) out.push(`PR already open: ${prUrl}`)
+      else {
+        const audit = await preShipAudit(io, 'gh pr create (GitHub MCP)')
+        if (audit) return [...out, audit].join('\n')
+        const pr = await io.github!('create_pull_request', { owner, repo, title: `Phase ${pad2(g.n)}: ${g.name}`, head: branch, base, body: renderPrBody(g, await issueOf(io, g.n)) })
+        // A failed call can still have opened the PR: look before reporting failure.
+        prUrl = (pr.ok ? prUrlIn(pr.text) : undefined) ?? await find()
+        if (!prUrl) return [...out, `PR creation failed (GitHub MCP): ${pr.text.trim().slice(0, 500)}`].join('\n')
+        out.push(`PR: ${prUrl}`)
+      }
+      prNumber = Number(prUrl.split('/').pop()) || undefined
+      if (prNumber) { const w = await ghRecordPr(io, g.n, g.name, prNumber); if (w) out.push(w) }
+    } else if (opts.method === 'pr') {
       // A ship stopped after its PR was opened (a session restart) finds that PR again.
       const open = await io.run(['gh', 'pr', 'list', '--head', branch, '--base', base, '--state', 'open', '--json', 'url', '--jq', '.[0].url'])
       prUrl = open.exitCode === 0 ? open.stdout.trim().split('\n').find(l => /^https?:\/\//.test(l)) : undefined

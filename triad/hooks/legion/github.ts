@@ -11,7 +11,7 @@ export const LABEL_COLOR = '7B68EE'
 export const BRANCH_PREFIX = 'triad/phase-'
 export const FOOTER = '---\n*Created by Triad*'
 
-export type GhInfo = { ok: boolean; slug?: string; defaultBranch?: string; reason?: string }
+export type GhInfo = { ok: boolean; slug?: string; defaultBranch?: string; reason?: string; via?: 'cli' | 'mcp' }
 
 export async function ghMode(io: Io): Promise<'enabled' | 'disabled' | 'prompt'> {
   const v = (await loadProject(io)).settings.integrations?.github
@@ -26,16 +26,44 @@ export async function setGhMode(io: Io, value: 'enabled' | 'disabled'): Promise<
   return `integrations.github = ${value} (settings.json).`
 }
 
-export async function ghInfo(io: Io): Promise<GhInfo> {
+// opts.mcp: with no gh CLI, fall back to the session's GitHub MCP server
+// (only ship's PR uses it; the sync below needs gh).
+export async function ghInfo(io: Io, opts: { mcp?: boolean } = {}): Promise<GhInfo> {
   const auth = await io.run(['gh', 'auth', 'status']).catch(() => ({ exitCode: 127, stdout: '', stderr: 'gh not found' }))
-  if (auth.exitCode !== 0) return { ok: false, reason: /not found|ENOENT/i.test(auth.stderr) ? 'gh is not installed' : 'Run `gh auth login` to enable GitHub integration.' }
+  if (auth.exitCode !== 0) {
+    const reason = /not found|ENOENT/i.test(auth.stderr) ? 'gh is not installed' : 'Run `gh auth login` to enable GitHub integration.'
+    return opts.mcp ? ghMcpInfo(io, reason) : { ok: false, reason }
+  }
   const remote = await io.run(['git', 'remote', 'get-url', 'origin'])
   if (remote.exitCode !== 0) return { ok: false, reason: 'no origin remote' }
   const v = await io.run(['gh', 'repo', 'view', '--json', 'nameWithOwner,defaultBranch', '-q', '.nameWithOwner + " " + .defaultBranch'])
   if (v.exitCode !== 0) return { ok: false, reason: /rate limit|403|429/i.test(v.stderr) ? 'GitHub API rate limit reached. Some data may be incomplete.' : 'GitHub unreachable. Continuing without GitHub integration.' }
   const [slug, defaultBranch] = v.stdout.trim().split(/\s+/)
-  return { ok: true, slug, defaultBranch }
+  return { ok: true, slug, defaultBranch, via: 'cli' }
 }
+
+// owner/repo from an origin URL (https, ssh, or a proxy path ending in owner/repo).
+export function slugOf(url: string): string | undefined {
+  const m = url.trim().replace(/\.git$/, '').replace(/\/$/, '').match(/[/:]([^/:\s]+)\/([^/:\s]+)$/)
+  return m ? `${m[1]}/${m[2]}` : undefined
+}
+
+async function ghMcpInfo(io: Io, cliReason: string): Promise<GhInfo> {
+  if (!io.github) return { ok: false, reason: `${cliReason}, and no GitHub MCP server is connected` }
+  const remote = await io.run(['git', 'remote', 'get-url', 'origin'])
+  if (remote.exitCode !== 0) return { ok: false, reason: 'no origin remote' }
+  const slug = slugOf(remote.stdout)
+  if (!slug) return { ok: false, reason: `cannot tell the GitHub repository from origin (${remote.stdout.trim()})` }
+  const [owner, repo] = slug.split('/') as [string, string]
+  const probe = await io.github('list_pull_requests', { owner, repo, state: 'open', perPage: 1 })
+  if (!probe.ok) return { ok: false, reason: `${cliReason}; the GitHub MCP server cannot reach ${slug}: ${probe.text.trim().slice(0, 200)}` }
+  const head = await io.run(['git', 'ls-remote', '--symref', 'origin', 'HEAD'])
+  const defaultBranch = head.stdout.match(/^ref: refs\/heads\/(\S+)\s+HEAD/m)?.[1] ?? 'main'
+  return { ok: true, slug, defaultBranch, via: 'mcp' }
+}
+
+// The first pull request URL in a GitHub MCP result.
+export const prUrlIn = (text: string) => text.match(/https:\/\/github\.com\/[^\s"']+\/pull\/\d+/)?.[0]
 
 export async function ensureLabel(io: Io, name = LABEL, color = LABEL_COLOR, description = 'Created by Triad'): Promise<void> {
   await io.run(['gh', 'label', 'create', name, '--description', description, '--color', color]).catch(() => undefined)

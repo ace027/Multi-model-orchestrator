@@ -455,6 +455,55 @@ describe('ship', () => {
     expect(calls.filter(a => a[0] === 'gh' && a[1] === 'pr' && a[2] === 'create').length).toBe(1)
   })
 
+  test('without the gh CLI, the PR is opened through the GitHub MCP server', async () => {
+    const io = await shippable()
+    await review(io, fakeAgents(io), {})
+    const calls = withRun(io, a => {
+      if (a[0] === 'gh') return { exitCode: 127, stdout: '', stderr: 'gh not found' }
+      if (a[0] === 'git' && a[1] === 'remote') return { exitCode: 0, stdout: 'http://proxy@127.0.0.1:9/git/o/r\n' }
+      if (a[0] === 'git' && a[1] === 'ls-remote') return { exitCode: 0, stdout: 'ref: refs/heads/trunk\tHEAD\nabc\tHEAD\n' }
+      if (a[0] === 'git' && a[1] === 'branch') return { exitCode: 0, stdout: 'trunk\n' }
+      return a[0] === 'git' && ['push', 'checkout'].includes(a[1]!) ? { exitCode: 0, stdout: '' } : undefined
+    })
+    const mcp: [string, Record<string, unknown>][] = []
+    let open = '[]'
+    let createFails = false
+    io.github = async (tool, args) => {
+      mcp.push([tool, args])
+      if (tool === 'list_pull_requests') return { ok: true, text: open }
+      if (tool === 'create_pull_request') {
+        open = '[{"html_url":"https://github.com/o/r/pull/9","user":{"html_url":"https://github.com/me"}}]'
+        return createFails ? { ok: false, text: 'connection reset' } : { ok: true, text: '{"id":"1","url":"https://github.com/o/r/pull/9"}' }
+      }
+      return { ok: false, text: 'unknown tool' }
+    }
+    expect(await shipCheck(io, {})).toContain('GitHub available (o/r, base trunk, via the GitHub MCP server). Publish options: pr / push / mark / abort.')
+    const out = await shipPublish(io, { method: 'pr' })
+    expect(out).toContain('Created branch triad/phase-01-p1.')
+    expect(out).toContain('PR: https://github.com/o/r/pull/9')
+    const create = mcp.find(([t]) => t === 'create_pull_request')![1]
+    expect(create).toMatchObject({ owner: 'o', repo: 'r', title: 'Phase 01: P1', head: 'triad/phase-01-p1', base: 'trunk' })
+    expect(String(create.body)).toContain('*Created by Triad*')
+    expect(calls.some(a => a[0] === 'gh' && a[1] === 'pr')).toBe(false)
+    expect(io.files.get('.planning/STATE.md')).toContain('| Phase 1: P1 | — | #9 | Open |')
+    // Again after a restart: the open PR is found, not created twice.
+    expect(await shipPublish(io, { method: 'pr' })).toContain('PR already open: https://github.com/o/r/pull/9')
+    expect(mcp.filter(([t]) => t === 'create_pull_request').length).toBe(1)
+    // A create call that errors but opened the PR anyway is found, not reported as failed.
+    const io2 = await shippable()
+    await review(io2, fakeAgents(io2), {})
+    withRun(io2, a => a[0] === 'gh' ? { exitCode: 127, stdout: '', stderr: 'gh not found' } : a[0] === 'git' && a[1] === 'remote' ? { exitCode: 0, stdout: 'git@github.com:o/r.git' } : a[0] === 'git' && ['push', 'checkout'].includes(a[1]!) ? { exitCode: 0, stdout: '' } : undefined)
+    open = '[]'
+    createFails = true
+    io2.github = io.github
+    expect(await shipPublish(io2, { method: 'pr' })).toContain('PR: https://github.com/o/r/pull/9')
+    // No gh and no GitHub MCP server: no PR offered, with the reason.
+    const io3 = await shippable()
+    await review(io3, fakeAgents(io3), {})
+    withRun(io3, a => (a[0] === 'gh' ? { exitCode: 127, stdout: '', stderr: 'gh not found' } : undefined))
+    expect(await shipCheck(io3, {})).toContain('GitHub not available (gh is not installed, and no GitHub MCP server is connected). Publish options: push / mark / abort.')
+  })
+
   test('a canary check waits inside its job, and the wait is not a result', async () => {
     const io = await shippable()
     const jobs: string[][] = []
