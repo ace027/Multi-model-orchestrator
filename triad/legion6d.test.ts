@@ -145,6 +145,40 @@ describe('two-wave', () => {
     expect(detectTwoWave(ph.plans.slice(0, 3), undefined, {}).twoWave).toBe(false)
   })
 
+  test('architect-agent plans that write code are build plans; a build plan waiting on an analysis plan keeps single-wave', async () => {
+    const io = await project()
+    // The common shape: engineering-backend-architect builds, later plans depend on the first ones.
+    await planWrite(io, { phase: 1, context: { goal: 'g' }, plans: [
+      plan(1, 1, 'src/game.ts', { title: 'Review and set up the game loop' }),
+      plan(2, 1, 'src/board.ts'),
+      plan(3, 1, 'src/input.ts'),
+      plan(4, 2, 'src/main.ts', { depends_on: ['01-01', '01-02', '01-03'] }),
+    ] })
+    const ph = await loadPhase(io, await loadProject(io), 1)
+    expect(ph.plans.every(p => p.fm.agents[0] === 'engineering-backend-architect')).toBe(true)
+    const d = detectTwoWave(ph.plans, undefined, {})
+    expect([d.twoWave, d.analysis]).toEqual([false, []])
+    // A read-only review that writes only a report is still an analysis plan, but
+    // a build plan that depends on it keeps the phase in single-wave.
+    const notes = (await loadPhase(io, await loadProject(io), 1)).plans
+    notes[0]!.fm.files_modified = ['docs/review.md']
+    const w = detectTwoWave(notes, undefined, {})
+    expect([w.twoWave, w.analysis]).toEqual([false, ['01-01']])
+    expect(w.reason).toBe('01-04 depends on analysis plan(s), so the plans run in their own wave order')
+  })
+
+  test('a forced two-wave build that cannot start its plans says which dependency stopped it', async () => {
+    const io = await project()
+    await planWrite(io, { phase: 1, context: { goal: 'g' }, plans: [
+      plan(1, 1, 'docs/review.md', { wave_role: 'analysis', title: 'Review the design' }),
+      plan(2, 2, 'src/a.ts', { depends_on: ['01-01'] }),
+    ] })
+    const a = await twoWaveBuild(io, fakeAgents(io), { phase: 1 })
+    expect(a.ok).toBe(false)
+    expect(a.text).toContain('Wave A: build failed (wave 2 not run: 01-02 needs 01-01)')
+    expect(a.text).not.toContain('undefined')
+  })
+
   test('Wave A stops at the architecture gate; Wave B gives the verdict and finalizes the phase', async () => {
     const io = await twoWaveProject()
     const agents = fakeAgents(io)

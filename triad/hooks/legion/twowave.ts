@@ -38,7 +38,12 @@ export function serviceGroup(p: Plan): string {
   return groups.size === 1 ? [...groups][0]! : groups.size ? 'mixed' : 'shared'
 }
 
-const isAnalysis = (p: Plan) => roleOf(p) === 'analysis' || (!(p.fm as any).wave_role && (ANALYSIS_AGENT.test(p.fm.agents[0] ?? '') || ANALYSIS_TITLE.test(p.title)))
+// Without a wave_role, a plan counts as analysis only when it writes no code
+// (no files, or only notes and reports): an architect or security agent, or a
+// plan titled "review", that writes source files is a build plan
+// (engineering-backend-architect is the usual build agent).
+const writesCode = (p: Plan) => p.fm.files_modified.some(f => !/\.(md|txt)$/i.test(f))
+const isAnalysis = (p: Plan) => roleOf(p) === 'analysis' || (!(p.fm as any).wave_role && !writesCode(p) && (ANALYSIS_AGENT.test(p.fm.agents[0] ?? '') || ANALYSIS_TITLE.test(p.title)))
 
 export type Detection = { twoWave: boolean; reason: string; groups: string[]; analysis: string[] }
 
@@ -53,6 +58,10 @@ export function detectTwoWave(plans: Plan[], context: string | undefined, flags:
   if (flags.twoWave) return d(true, '--two-wave')
   if (ctx) return d(ctx === 'true', `CONTEXT.md two_wave: ${ctx}`)
   if (plans.length < 4) return d(false, `${plans.length} plans (two-wave needs at least 4)`)
+  // Wave A builds before it analyzes, so a build plan cannot wait on an analysis plan.
+  const ids = new Set(analysis)
+  const waits = plans.filter(p => !ids.has(p.id) && p.fm.depends_on.some(x => ids.has(x)))
+  if (waits.length) return d(false, `${waits.map(p => p.id).join(', ')} depend${waits.length === 1 ? 's' : ''} on analysis plan(s), so the plans run in their own wave order`)
   if (groups.length >= 2) return d(true, `${plans.length} plans across service groups ${groups.join(', ')}`)
   if (analysis.length) return d(true, `${plans.length} plans with analysis plan(s) ${analysis.join(', ')}`)
   return d(false, 'one service group and no analysis plans')
@@ -126,7 +135,7 @@ export async function twoWaveBuild(io: Io, agents: Agents, opts: TwoWaveOptions 
     })
     if (!b.ok || failed.length) {
       await io.write(manifestA, [`wave: A`, `phase: ${n}`, `status: failed`, `timestamp: "${stamp}"`, 'service_groups:', ...groupYaml, ''].join('\n'))
-      return { ok: false, text: `${b.text}\n\nWave A: build failed (${failed.map(o => o.id).join(', ') || b.error}). Fix before proceeding; Wave B was not started.` }
+      return { ok: false, text: `${b.text}\n\nWave A: build failed (${failed.map(o => o.id).join(', ') || b.error || b.warnings.filter(w => /not run/.test(w)).join('; ') || 'no plan finished'}). Fix before proceeding; Wave B was not started.` }
     }
     // Analysis: plans with the role, else the architecture and security defaults.
     const runs = analysisA.length
