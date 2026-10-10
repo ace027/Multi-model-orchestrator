@@ -191,6 +191,9 @@ export function parseRoadmap(text: string): Roadmap {
 }
 
 // Edits one progress-table row in place, by column name; other columns are kept.
+// A roadmap phase is done once its review passed (Complete) or it shipped since.
+export const phaseDone = (status: string) => /^(complete|shipped)/i.test(status.trim())
+
 export function setRoadmapRow(text: string, phase: number, values: { plans?: number; completed?: number; status?: string }): string {
   const lines = text.split('\n')
   const t = progressTable(lines)
