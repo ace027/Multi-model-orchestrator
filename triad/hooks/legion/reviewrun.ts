@@ -31,11 +31,27 @@ function issuesOf(answer: string): string[] {
 
 // The most minor findings one fixMinor round takes on.
 const MINOR_CAP = 8
+// The most late findings a closing round takes on (see the cycle cap below).
+const CLOSING_CAP = 3
 
 export type ReviewResult = { ok: boolean; result?: 'PASSED' | 'ESCALATED' | 'STALE LOOP ABORTED'; error?: string; cycles: number; text: string; open: Finding[] }
 
-function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; name: string; goal: string; criteria: string[]; files: string[]; open: Finding[]; cycle: number; checks: string[] }): string {
+function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; name: string; goal: string; criteria: string[]; files: string[]; open: Finding[]; cycle: number; checks: string[]; closing?: boolean }): string {
   const r = rubricOf(o.persona)
+  const list = o.open.map(f => `- ${f.id} [${f.severity}] ${f.file}${f.line_range ? `:${f.line_range[0]}` : ''}: ${f.description}`)
+  if (o.closing) return [
+    personaBrief(o.persona),
+    '',
+    `# Closing check: Phase ${o.phase}: ${o.name} (cycle ${o.cycle})`,
+    `Files: ${o.files.join(', ') || '(none)'}`,
+    ...(o.checks.length ? [`Verification commands (you may run them): ${o.checks.join(' ; ')}`] : []),
+    '',
+    'Every earlier finding is resolved. These last findings were just fixed; check only these. Report one again if it is not fixed, and raise nothing new.',
+    ...list,
+    '',
+    'You are a reviewer. Do not modify any file.',
+    REVIEWER_RULES,
+  ].join('\n')
   return [
     personaBrief(o.persona),
     '',
@@ -45,7 +61,7 @@ function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; nam
     '',
     `Files to review: ${o.files.join(', ') || '(none)'}`,
     ...(o.checks.length ? [`Verification commands (you may run them): ${o.checks.join(' ; ')}`] : []),
-    ...(o.open.length ? ['', 'Findings from the last cycle, said to be fixed; check each one:', ...o.open.map(f => `- ${f.id} [${f.severity}] ${f.file}${f.line_range ? `:${f.line_range[0]}` : ''}: ${f.description}`)] : []),
+    ...(o.open.length ? ['', 'Findings from the last cycle, said to be fixed; check each one:', ...list] : []),
     '',
     o.panel ? `## Your Domain Rubric — ${r.name}\nEvaluate only against these criteria; fellow reviewers cover the rest.\n${r.criteria.map((c, i) => `${i + 1}. ${c.name}: ${c.check}`).join('\n')}` : `## Rubric — ${r.name}\n${r.criteria.map((c, i) => `${i + 1}. ${c.name}: ${c.check}`).join('\n')}`,
     '',
@@ -138,9 +154,15 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   let open: Finding[] = []
   let result: ReviewResult['result']
   let cycle = 0
-  for (cycle = 1; cycle <= maxCycles; cycle++) {
-    const reports: ReviewerReport[] = await Promise.all(reviewers.map(async persona => {
-      const brief = reviewerBrief({ persona, panel: panelMode && !light, phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles, open, cycle, checks })
+  // The cycle cap, and one closing round past it: when the last cycle finds
+  // only a few new non-critical findings and every earlier one is resolved,
+  // they get one fix round and a re-check of just those findings.
+  let limit = maxCycles
+  let closing = false
+  for (cycle = 1; cycle <= limit; cycle++) {
+    const asked = closing ? reviewers.filter(r => open.some(f => f.agent === r.id)) : reviewers
+    const reports: ReviewerReport[] = await Promise.all(asked.map(async persona => {
+      const brief = reviewerBrief({ persona, panel: panelMode && !light, phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles, open, cycle, checks, closing })
       const r = await agents.run({ persona, brief, scope: { planId: `review-${pad2(n)}`, mode: 'surgical', files_modified: [], files_forbidden: [], active: reviewers.map(x => x.id) }, label: `review ${persona.id}` })
       const report = parseReport(persona.id, r.answer ?? '', cycle)
       // Reviewers sometimes give absolute paths; findings are keyed by the project-relative one.
@@ -184,6 +206,13 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
       t.actioned.splice(t.actioned.indexOf(m), 1)
       t.mustFix[again] = Object.assign(f, { severity: m.severity, description: m.description, suggested_fix: m.suggested_fix ?? f.suggested_fix, cycle })
     }
+    // A closing round re-checks the findings it fixed; anything new is recorded as deferred.
+    if (closing) {
+      const late = t.mustFix.filter(m => !open.includes(m))
+      t.mustFix = t.mustFix.filter(m => open.includes(m))
+      t.actioned = t.actioned.filter(m => !late.includes(m))
+      t.deferred.push(...late.map(f => ({ ...f, status: 'deferred' as const })))
+    }
     for (const f of t.niceToHave) f.status = 'deferred' // suggestions are not required
     let next = all.length + 1
     for (const f of t.actioned) f.id = `F-${String(next++).padStart(3, '0')}`
@@ -195,14 +224,21 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     const breakdown = cycle > 1 ? ` (resolved ${resolvedNow}, new ${t.mustFix.length - unchanged}, unchanged ${unchanged})` : ''
     delta.push(`cycle ${cycle}: ${t.mustFix.length} must-fix${breakdown}, ${t.niceToHave.length} suggestions, ${t.deferred.length} deferred, ${t.dropped} dropped (low confidence)`)
     log(delta[delta.length - 1]!)
-    if (passed(reports, t)) { result = 'PASSED'; open = []; break }
+    if (closing ? !t.mustFix.length && reports.length > 0 && reports.every(reviewed) : passed(reports, t)) { result = 'PASSED'; open = []; break }
     open = t.mustFix
     const sig = signature(open)
     if (cycle > 1 && sig === lastSig) staleCount++
     else staleCount = 0
     lastSig = sig
-    if (staleCount >= 1 && cycle > 2) { result = 'STALE LOOP ABORTED'; break }
-    if (cycle === maxCycles) { result = 'ESCALATED'; break }
+    if (staleCount >= 1 && cycle > 2 && !closing) { result = 'STALE LOOP ABORTED'; break }
+    if (cycle === limit) {
+      const severe = open.some(f => f.severity === 'blocker' || f.severity === 'critical')
+      if (closing || cycle === 1 || unchanged > 0 || severe || open.length > CLOSING_CAP) { result = 'ESCALATED'; break }
+      closing = true
+      limit++
+      delta.push(`cycle ${cycle}: every earlier finding resolved; closing round for ${open.length} new finding(s): one fix round, then a check of those only`)
+      log(delta[delta.length - 1]!)
+    }
     const silent = reports.filter(r => !reviewed(r))
     if (silent.length) {
       // No report from a reviewer: ask again next cycle; out of cycles, escalate.
@@ -239,7 +275,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
       }), '')
     await io.write(`${ph.rel}/FIXES.md`, [`# Phase ${n}: ${name} — Review Fixes`, '', 'Fixes applied by the review loop, one section per cycle. Re-review decides whether each one holds.', '', ...fixesLog].join('\n'))
     reviewFiles = [...new Set([...changed, ...open.map(f => f.file)])].filter(f => files.some(x => overlaps(f, x)) || changed.includes(f))
-    state = updateState(state, { status: `Phase ${n} under review — cycle ${cycle}/${maxCycles}, ${open.filter(f => f.severity === 'blocker').length} blocker(s) remaining`, lastActivity: `Phase ${n} review cycle ${cycle} (${date})` })
+    state = updateState(state, { status: `Phase ${n} under review — cycle ${cycle}/${limit}, ${open.filter(f => f.severity === 'blocker').length} blocker(s) remaining`, lastActivity: `Phase ${n} review cycle ${cycle} (${date})` })
     await io.write('.planning/STATE.md', state)
     if (changed.length && settings.execution.auto_commit !== false) {
       await io.run(['git', 'add', '-A', '--', ...changed, '.planning/STATE.md'])
@@ -291,7 +327,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   // Schema check of every recorded finding; invalid ones are flagged in the report, never dropped.
   const invalid = [...all, ...deferred].map(f => ({ id: f.id, errors: findingErrors(f) })).filter(x => x.errors.length)
   if (invalid.length) log(`invalid findings: ${invalid.map(i => i.id).join(', ')}`)
-  const doc = renderReview({ phase: n, name, result: result!, cycles: Math.min(cycle, maxCycles), reviewers: reviewers.map(r => r.id), date, findings, deferred, suggestions, verdicts, hotSpots: [...hot], cycleDelta: delta, fixes,
+  const doc = renderReview({ phase: n, name, result: result!, cycles: Math.min(cycle, limit), reviewers: reviewers.map(r => r.id), date, findings, deferred, suggestions, verdicts, hotSpots: [...hot], cycleDelta: delta, fixes,
     coverage: opts.intent ? undefined : renderCoverage(coverage, covChecks), invalid, evaluators: evaluators.map(e => e.type), intent: opts.intent })
   await io.write(`${ph.rel}/${pad2(n)}-REVIEW.md`, doc)
   const total = p.state.total ?? p.roadmap.rows.length
@@ -300,7 +336,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   if (result === 'PASSED') {
     state = updateState(state, {
       phase: `${n} of ${total} (complete)`,
-      status: `Phase ${n} complete — review passed (${Math.min(cycle, maxCycles)} cycle(s))`,
+      status: `Phase ${n} complete — review passed (${Math.min(cycle, limit)} cycle(s))`,
       lastActivity: `Phase ${n} review (${date})`,
       nextAction: after !== undefined ? `Run \`/triad:plan ${after}\` to plan Phase ${after}: ${p.roadmap.phases.find(x => x.phase === after)?.name ?? ''}` : 'All phases complete — project review finished!',
     })
@@ -308,7 +344,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   } else {
     const blockers = open.filter(f => f.severity === 'blocker' || f.severity === 'critical').length
     state = updateState(state, {
-      status: result === 'STALE LOOP ABORTED' ? `Phase ${n} review stale — the same ${open.length} finding(s) after ${cycle} cycles` : `Phase ${n} review escalated — ${open.length} unresolved finding(s) (${blockers} blocker/critical) after ${maxCycles} cycles`,
+      status: result === 'STALE LOOP ABORTED' ? `Phase ${n} review stale — the same ${open.length} finding(s) after ${cycle} cycles` : `Phase ${n} review escalated — ${open.length} unresolved finding(s) (${blockers} blocker/critical) after ${Math.min(cycle, limit)} cycles`,
       lastActivity: `Phase ${n} review (${date})`,
       nextAction: `Fix the unresolved findings in ${pad2(n)}-REVIEW.md, accept the phase as is, or re-plan; then run \`/triad:review --phase ${n}\``,
     })
@@ -318,7 +354,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   // Memory: an outcome per reviewer; a pattern on a first-cycle pass; the verdict as a preference signal.
   const memo: string[] = []
   try {
-    const cycles = Math.min(cycle, maxCycles)
+    const cycles = Math.min(cycle, limit)
     const blockerCount = findings.filter(f => f.severity === 'blocker' || f.severity === 'critical').length
     for (const r of reviewers) {
       const rec = await storeOutcome(io, settings, {
@@ -352,7 +388,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
     `Report: ${ph.rel}/${pad2(n)}-REVIEW.md`,
     ...(ghNote ? [`GitHub: ${ghNote}`] : []),
   ].join('\n')
-  return { ok: result === 'PASSED', result, cycles: Math.min(cycle, maxCycles), text: summary, open }
+  return { ok: result === 'PASSED', result, cycles: Math.min(cycle, limit), text: summary, open }
 }
 
 export { MUST_FIX }
