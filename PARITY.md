@@ -223,7 +223,7 @@ All personas are ported as compact files with a `tier:` field that `agent.spawn`
 | `execution.agent_personality_verbosity` (`full\|condensed`) | Full or condensed persona injection | Improved | Distilled core by default; with `full` in settings.json, build plan and `persona_run` briefs get the whole Legion persona body (`personasfull.ts`); reviewer and evaluator briefs keep the core plus their rubric |
 | `execution.use_worktrees` (experimental) | Per-plan git worktrees | Ported | Opt-in: each plan runs in its own worktree under `.triad/worktrees/`, is verified there and merged back; a merge conflict fails the plan and keeps the worktree |
 | `review.default_mode` (`classic\|panel`) | Review mode | Ported | Same |
-| `review.max_cycles` (1-5, default 3) | Review cycle cap | Improved | Enforced in code |
+| `review.max_cycles` (1-5, default 3) | Review cycle cap | Improved | Enforced in code; one closing round past the cap when the last cycle only raised a few new major findings |
 | `review.evaluator_depth` (`single\|multi-pass`) | Evaluator depth | Ported | `multi-pass` (the default) adds the evaluator passes to the review; `single` keeps the panel only; it also gates `/triad:design audit` |
 | `review.polish` (schema only, default true) | Post-review polish step | Ported | Same |
 | `review.polish_scope` (schema only) | Scope of review-integrated polish | Ported | Same |

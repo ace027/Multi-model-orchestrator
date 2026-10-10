@@ -216,6 +216,44 @@ describe('build and review', () => {
     expect(reviewers(off.spawned)).toEqual(reviewers(full.spawned))
     expect(off.spawned.some(s => s.startsWith('evaluate '))).toBe(true)
   })
+  test('closing round: a new finding in the last cycle, with every earlier one resolved, gets one fix round and a check of it alone', async () => {
+    const at = (lines: string, severity = 'major') => `### Finding 1\n- **Severity**: ${severity}\n- **File**: src/a.ts\n- **Lines**: ${lines}\n- **Issue**: issue at ${lines}\n- **Confidence**: 90%\n\n**Verdict**: NEEDS WORK`
+    const setup = async () => {
+      const io = await newProject()
+      await planWrite(io, { phase: 1, context: { goal: 'core' }, plans: [plan(1, 1, 'src/a.ts')] })
+      await build(io, fakeAgents(io))
+      return io
+    }
+    const reviews = (spawned: string[]) => spawned.filter(s => s.startsWith('review ')).length
+    // Light process: two cycles. Cycle 1 finds one issue, cycle 2 a new one, the closing check passes.
+    const io = await setup()
+    const a = fakeAgents(io, c => c === 1 ? at('1-2') : c === 2 ? at('40-42') : '**Verdict**: PASS')
+    const r = await review(io, a, { lightPlans: 2 })
+    expect(r.result).toBe('PASSED')
+    expect(r.cycles).toBe(3)
+    expect(r.text).toContain('closing round for 1 new finding(s)')
+    expect(a.spawned.filter(s => s.startsWith('fix ')).length).toBe(2)
+    expect(reviews(a.spawned)).toBe(5) // two reviewers twice, then only the one whose finding was fixed
+    // A finding raised for the first time in the closing check is recorded as deferred, not blocking.
+    const io2 = await setup()
+    const b = fakeAgents(io2, c => c === 1 ? at('1-2') : c === 2 ? at('40-42') : at('80-81'))
+    const r2 = await review(io2, b, { lightPlans: 2 })
+    expect(r2.result).toBe('PASSED')
+    expect(io2.files.get('.planning/phases/01-core/01-REVIEW.md')).toContain('issue at 80-81')
+    // The closing check finds the fix did not hold: escalated after three cycles.
+    const io3 = await setup()
+    const c3 = fakeAgents(io3, c => c === 1 ? at('1-2') : at('40-42'))
+    const r3 = await review(io3, c3, { lightPlans: 2 })
+    expect(r3.result).toBe('ESCALATED')
+    expect(r3.cycles).toBe(3)
+    expect(r3.open.map(f => f.description)).toEqual(['issue at 40-42'])
+    // No closing round for a critical finding.
+    const io4 = await setup()
+    const d = fakeAgents(io4, c => c === 1 ? at('1-2') : at('40-42', 'critical'))
+    const r4 = await review(io4, d, { lightPlans: 2 })
+    expect(r4.result).toBe('ESCALATED')
+    expect(r4.cycles).toBe(2)
+  })
   test('fixMinor: after a pass, one round fixes the minor findings and commits once the checks pass', async () => {
     const minorReply = () => '### Finding 1\n- **Severity**: minor\n- **File**: src/a.ts\n- **Lines**: 1\n- **Issue**: name is unclear\n- **Confidence**: 90%\n\n**Verdict**: PASS'
     const setup = async () => {
