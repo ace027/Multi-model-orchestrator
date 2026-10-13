@@ -1,6 +1,6 @@
 ---
 description: Execute a planned phase with the wave executor (one agent per plan, verification in code, a commit per plan); intent flags, two-wave mode and dry runs
-argument-hint: "[phase number] [--wave N] [--rerun] [--dry-run] [--just-harden | --just-document | --skip-frontend | --skip-backend] [--two-wave | --single-wave] [--skip-gates] [--auto]"
+argument-hint: "[phase number] [--wave N] [--rerun] [--dry-run] [--just-harden | --just-document | --skip-frontend | --skip-backend] [--two-wave | --single-wave] [--skip-gates] [--skip-architecture] [--skip-security] [--auto]"
 ---
 Execute a planned phase of the Triad project in `.planning/`. Arguments: $ARGUMENTS
 

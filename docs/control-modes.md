@@ -55,11 +55,11 @@ Each authority decision (an allowed, warned or denied write, a filtered finding,
 
 ## Directory mappings
 
-`.planning/config/directory-mappings.yaml` (written by `/triad:map`) says where each kind of file belongs. Its enforcement follows its own strictness setting, independent of the control mode:
+`.planning/config/directory-mappings.yaml` (written by `/triad:map`) says where each kind of file belongs. Its enforcement follows its own strictness setting:
 
 | strictness | A deliverable path outside its category's directories |
 |---|---|
-| `strict` | is a violation and the spec check asks for rework |
+| `strict` | is a violation: a plan agent's or coder's write there is denied (only warned in autonomous mode), and the spec check asks for rework |
 | `warn` (default) | is reported with a suggested path |
 | `off` | is not checked |
 

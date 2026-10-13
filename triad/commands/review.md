@@ -4,7 +4,7 @@ argument-hint: "[phase number] [--panel | --classic] [--security | --just-securi
 ---
 Review a built phase of the Triad project in `.planning/`. Arguments: $ARGUMENTS
 
-1. Load the tools: ToolSearch with query `select:mcp__triad__review_phase,mcp__triad__planning_status,mcp__triad__intent,mcp__triad__dry_run`. If any flags were given, call intent action `check` with command `review` and the flags; if it fails validation, show the result and stop.
+1. Load the tools: ToolSearch with query `select:mcp__triad__review_phase,mcp__triad__planning_status,mcp__triad__intent,mcp__triad__dry_run,mcp__triad__domain`. If any flags were given, call intent action `check` with command `review` and the flags; if it fails validation, show the result and stop.
    With `--dry-run`, call `dry_run` with command `review` (and the phase) and show the report; nothing else runs.
    Gates: every "ask the user" below is a confirmation gate, asked with AskUserQuestion. It is skipped, taking the default it names, when `planning_status` reports confirmation gates off (control mode autonomous) or with `--auto` (handled here: leave it out of the flags you pass to the tools).
 2. Call `planning_status`; with no phase number, use the phase it names. If the phase has not been built, tell the user to run `/triad:build` and stop.

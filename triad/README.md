@@ -81,7 +81,7 @@ To keep it in check:
 
 ## Options
 
-Set them in `/plugin` settings, or for a headless run with `--settings '{"pluginConfigs":{"triad@inline":{"options":{...}}}}'`.
+Set them in `/plugin` settings, or for a headless run with `--settings '{"pluginConfigs":{"triad@inline":{"options":{...}}}}'` (the key is `triad@inline` with `--plugin-dir`, `triad@multi-model-orchestrator` when installed from the marketplace).
 
 | Option | Default | Does |
 |---|---|---|
@@ -114,7 +114,7 @@ A helper brief over 40k tokens is refused at spawn: give the job to a coder, or 
 | `prompt.section` `communication` | Adds the orchestrator guidance (byte-stable, for caching) to the main loop only; a `prompt.context` block would also reach every subagent. |
 | `tool.describe` | With `deferTools`, defers engine tools the tiers do not use every turn (in a clean environment: ListAgents, ReportFindings, ScheduleWakeup, Workflow); they stay reachable through ToolSearch. |
 | `agent.offer` | Offers only `triad:triad-coder`, `triad:triad-opus-coder` and `triad:triad-helper` (with `strictMenu`). |
-| `agent.spawn` | Forces the tier's model (coder Sonnet, helper Haiku) and `background: false`; refuses other agent types, spawns deeper than `maxDepth`, and spawns over the concurrency caps. Records the tree. |
+| `agent.spawn` | Forces the tier's model (coder Sonnet, Opus coder Opus, helper Haiku; every agent Opus with `allOpus`) and `background: false`; refuses other agent types, spawns deeper than `maxDepth`, and spawns over the concurrency caps. Records the tree. |
 | `tool.call` `Agent` | Checks the reply against the return schema and sends a non-conforming reply back once (`maxRetries`), naming the agent id for SendMessage. |
 | `tool.call` `delegate_menial` | Coders only. Pre-flight size check (40k tokens), spawns a Haiku helper with the files it may write, waits for its answer in a child process (the hook budget does not count that wait), checks the schema, asks once for a resend. |
 | `tool.call` `Bash`/`Grep`/`Read` | With `compress`, output over `compressThreshold` tokens (Read: log-like files only) is saved to `.triad/out/` and replaced by its error lines, verbatim, plus a Haiku summary (chunked at 60k tokens, merged). A failed Bash call keeps its failure. A helper whose next request would pass its ceiling gets a pointer to the saved output instead of the output. |
@@ -133,4 +133,4 @@ The ledger prices every request per tier, including Haiku's rate above 100k prom
 
 `claude plugin test triad` runs the test suites; [`../CONTRIBUTING.md`](../CONTRIBUTING.md) has the other checks and the conventions. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the `delegate_menial` round trip is covered by the live run in `bench/run_accept.sh` instead.
 
-Version 0.13.4.
+Version 1.0.0.
