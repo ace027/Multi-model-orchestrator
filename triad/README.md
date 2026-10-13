@@ -56,9 +56,32 @@ For a structured project, use the Legion workflow:
 
 Triad reads and writes Legion's `.planning/` layout without migration: `PROJECT.md`, `ROADMAP.md`, `STATE.md`, `phases/NN-slug/` with its `CONTEXT`, `PLAN`, `SUMMARY` and `REVIEW` files, and Legion's root `settings.json`. Older forms (both STATE field styles, legacy plan frontmatter, `<verify><automated>` task checks) are read as they are. Existing projects keep their `commit_prefix`; new ones get `triad`. `PARITY.md` at the repository root maps every Legion feature to its Triad equivalent. The Legion material Triad derives from, and its MIT notice, are in `LEGION-NOTICE.md`.
 
+## Cost
+
+What a run costs depends mostly on how much code it writes and how many phases the project has. These were measured with `bench/` (details and scripts in [`../docs/results.md`](../docs/results.md)):
+
+| Work | Triad | Opus alone |
+|---|---|---|
+| A small task in a normal session (CSV import, refund logic) | $0.21–0.37 | $0.21–0.42 |
+| A browser game in a normal session (Pac-Man) | $0.82–1.10 | $1.14–1.15 |
+| `/triad:auto` on a one-phase CLI tool (light process) | $0.66 | n/a |
+| The full workflow (start, plan, build, review) on a three-phase game (Tron) | $6.0–6.7 | $12.1 with every agent on Opus |
+
+- **Normal sessions** cost about the same as Opus alone, or less, for the same graded result. On small tasks the orchestrator does the work itself.
+- **The workflow** adds planning and review on top of the code. On the Tron game the planning and review steps cost more than the builds. The tiers save most in the builds, where Sonnet writes the code: about half the cost of the same workflow on Opus.
+- **Open-ended quality** (a game AI's strength, visual polish) is where Sonnet falls short. `/triad:plan` marks such plans `model: opus`, so the build runs them on the Opus coder.
+
+To keep it in check:
+
+- `/triad:auto --estimate` plans every phase and prints the expected cost per phase before anything is built. Its rates scale to what your own past steps cost.
+- `maxSpend` (per session) and `maxProjectSpend` (across sessions) stop new agents and workflow steps at a dollar limit, with a notice at 80%.
+- `lightPlans` sends small phases through the light process (two reviewers, no board, two review cycles plus a closing round).
+- `coderMinutes` tells a coder to wrap up after that many minutes, so a tuning loop can't run on.
+- `/triad` and the pane show the spend per agent and per tier as it happens.
+
 ## Options
 
-Set them in `/plugin` settings, or for a headless run with `--settings '{"pluginConfigs":{"triad@inline":{"options":{...}}}}'`.
+Set them in `/plugin` settings, or for a headless run with `--settings '{"pluginConfigs":{"triad@inline":{"options":{...}}}}'` (the key is `triad@inline` with `--plugin-dir`, `triad@multi-model-orchestrator` when installed from the marketplace).
 
 | Option | Default | Does |
 |---|---|---|
@@ -76,7 +99,7 @@ Set them in `/plugin` settings, or for a headless run with `--settings '{"plugin
 | `allOpus` | false | Comparison baseline: every agent runs on Opus (and the Haiku ceiling is off). |
 | `maxSpend` | 0 | Spending budget per session, in USD (0: none). At 80% a notice; at the limit running agents are told to wrap up, and new agents and workflow steps are refused until it is raised. |
 | `maxProjectSpend` | 0 | The same budget across every session on the project, in USD (0: none). Each session's spend is kept in `.planning/SPEND.json`, written as each workflow step starts and committed with it, so a resumed `/triad:auto` or a fresh clone still counts it (all but the last few turns of each session). |
-| `lightPlans` | 2 | A phase with at most this many plans runs the light process: planning skips the board, spec, proposals, persona table and security and design passes, and review uses two reviewers for at most two cycles. 0: always the full process. |
+| `lightPlans` | 2 | A phase with at most this many plans runs the light process: planning skips the board, spec, proposals, persona table and security and design passes, and review uses two reviewers for two cycles (plus a closing round when the last cycle only raised a few new findings). 0: always the full process. |
 | `fixMinor` | true | After a review passes, one coder round fixes its minor and medium-confidence findings; the checks run again and the round is undone if one fails. |
 | `notify` | true | When `/triad:auto` finishes or stops, send one push notification line: how far it got, why it stopped, the spend. Needs push notifications on in Claude Code. |
 | `openPane` | false | Open the Triad pane at session start. A pane opened this way seats from 144 terminal columns; `/triad pane` opens it at any width. |
@@ -91,7 +114,7 @@ A helper brief over 40k tokens is refused at spawn: give the job to a coder, or 
 | `prompt.section` `communication` | Adds the orchestrator guidance (byte-stable, for caching) to the main loop only; a `prompt.context` block would also reach every subagent. |
 | `tool.describe` | With `deferTools`, defers engine tools the tiers do not use every turn (in a clean environment: ListAgents, ReportFindings, ScheduleWakeup, Workflow); they stay reachable through ToolSearch. |
 | `agent.offer` | Offers only `triad:triad-coder`, `triad:triad-opus-coder` and `triad:triad-helper` (with `strictMenu`). |
-| `agent.spawn` | Forces the tier's model (coder Sonnet, helper Haiku) and `background: false`; refuses other agent types, spawns deeper than `maxDepth`, and spawns over the concurrency caps. Records the tree. |
+| `agent.spawn` | Forces the tier's model (coder Sonnet, Opus coder Opus, helper Haiku; every agent Opus with `allOpus`) and `background: false`; refuses other agent types, spawns deeper than `maxDepth`, and spawns over the concurrency caps. Records the tree. |
 | `tool.call` `Agent` | Checks the reply against the return schema and sends a non-conforming reply back once (`maxRetries`), naming the agent id for SendMessage. |
 | `tool.call` `delegate_menial` | Coders only. Pre-flight size check (40k tokens), spawns a Haiku helper with the files it may write, waits for its answer in a child process (the hook budget does not count that wait), checks the schema, asks once for a resend. |
 | `tool.call` `Bash`/`Grep`/`Read` | With `compress`, output over `compressThreshold` tokens (Read: log-like files only) is saved to `.triad/out/` and replaced by its error lines, verbatim, plus a Haiku summary (chunked at 60k tokens, merged). A failed Bash call keeps its failure. A helper whose next request would pass its ceiling gets a pointer to the saved output instead of the output. |
@@ -110,4 +133,4 @@ The ledger prices every request per tier, including Haiku's rate above 100k prom
 
 `claude plugin test triad` runs the test suites; [`../CONTRIBUTING.md`](../CONTRIBUTING.md) has the other checks and the conventions. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the `delegate_menial` round trip is covered by the live run in `bench/run_accept.sh` instead.
 
-Version 0.13.4.
+Version 1.0.0.

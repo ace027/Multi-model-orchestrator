@@ -28,7 +28,7 @@ Questioning flow, then `project_init` writes PROJECT/ROADMAP/STATE from Legion's
 
 Map the codebase into .planning/CODEBASE.md and a retrieval index, or search an existing map.
 
-Codebase map and `rg` index in code (`.planning/CODEBASE.md`, `.planning/codebase/`); Haiku writes the narrative sections; freshness check and query in code.
+Codebase map and retrieval index (`index.jsonl`, `symbols.json`) in code (`.planning/CODEBASE.md`, `.planning/codebase/`); Haiku writes the narrative sections; freshness check and query in code.
 
 ### /triad:spec
 
@@ -62,15 +62,15 @@ The first run needs a goal or a spec path; `/triad:start` then takes its answers
 
 ### /triad:build
 
-`/triad:build [phase number] [--wave N] [--rerun] [--dry-run] [--just-harden | --just-document | --skip-frontend | --skip-backend] [--two-wave | --single-wave] [--skip-gates] [--auto]`
+`/triad:build [phase number] [--wave N] [--rerun] [--dry-run] [--just-harden | --just-document | --skip-frontend | --skip-backend] [--two-wave | --single-wave] [--skip-gates] [--skip-architecture] [--skip-security] [--auto]`
 
 Execute a planned phase with the wave executor (one agent per plan, verification in code, a commit per plan); intent flags, two-wave mode and dry runs. Before the first plan it commits the project files and the phase's plans, with `.gitignore` lines added for the caches and build output of the languages the plans write (Python, Node, Rust, Go, Java).
 
-Wave executor in mod code: one agent per plan at its persona's tier (haiku personas on triad-helper, opus personas with the opus model), plans of a wave in parallel unless they share files, verification commands run by the mod, one follow-up fix on a failed check, a SUMMARY.md per plan (failures too), STATE/ROADMAP after every plan and wave, Legion's commit messages. Resumes from the first plan without a successful summary.
+Wave executor in mod code: one agent per plan at its persona's tier (haiku personas on triad-helper, opus personas with the opus model), plans of a wave in parallel unless they share files, verification commands run by the mod, a failed check caused by the environment gets one automatic remediation and retry (any other failure is recorded as a blocker), a SUMMARY.md per plan (failures too), STATE/ROADMAP after every plan and wave, Legion's commit messages. Resumes from the first plan without a successful summary.
 
 Interrupted builds: each agent's answer is saved in `.triad/legion/answers/` before its plan is verified, and removed once the plan's SUMMARY is written. If the session restarts in between (a remote session stopped while it looked idle), the next `/triad:build` verifies and commits the saved answer without running the agent again, and `/triad status` names the plan under Interrupted build until then. While `build_phase` or `review_phase` runs, each progress line also goes into the transcript (and the status line), with a "still running" line every 5 minutes. Verification commands (each plan's, the review checks, polish's test and type checks, the two-wave test suite) run as a detached job under `.triad/run/` that a Haiku runner agent waits on with Bash, a few cheap turns per job, so a long suite never sits inside one silent tool call; if no runner can start, the call waits on the job itself.
 
-Flags: intent flags validated in code (`--just-harden` ad-hoc team, `--just-document`, `--skip-frontend`, `--skip-backend` plan filters), natural-language routing, `--dry-run`, two-wave mode (Wave A build + analysis, architecture gate, Wave B execution + remediation, production verdict, manifests). Two-wave mode switches on by itself for 4+ plans across service groups or with an analysis plan: one marked `wave_role: analysis`, or an architect, security or review plan that writes no code (only notes or reports). A phase where a build plan depends on an analysis plan stays single-wave.
+Flags: intent flags validated in code (`--just-harden` ad-hoc team, `--just-document`, `--skip-frontend`, `--skip-backend` plan filters), natural-language routing, `--dry-run`, two-wave mode (Wave A build + analysis, architecture gate, Wave B execution + remediation, production verdict, manifests; `--skip-architecture` and `--skip-security` skip the architecture gate or the security pass). Two-wave mode switches on by itself for 4+ plans across service groups or with an analysis plan: one marked `wave_role: analysis`, or an architect, security or review plan that writes no code (only notes or reports). A phase where a build plan depends on an analysis plan stays single-wave.
 
 ### /triad:review
 
@@ -104,7 +104,7 @@ Scope (cap 50 files), test and type-check baseline, four passes, per-file revert
 
 Ship a reviewed phase: 6 pre-ship gates in code, ship report, PR or push, post-ship verification, optional canary.
 
-Six pre-ship gates and the ship report in code; PR, push or mark via `git`/`gh`, or, when the `gh` CLI is not installed or logged in, the PR through the session's GitHub MCP server (the one with `create_pull_request`; no labels or assignee that way); canary checks at 1, 5 and 15 minutes inside the call (never auto-rollback).
+Six pre-ship gates and the ship report in code (an open blocker escalation fails a gate: list it with the `escalation` tool, action `list`, and once the user decides, record it with action `resolve`); PR, push or mark via `git`/`gh`, or, when the `gh` CLI is not installed or logged in, the PR through the session's GitHub MCP server (the one with `create_pull_request` and `list_pull_requests`; no labels or assignee that way); canary checks at 1, 5 and 15 minutes inside the call (never auto-rollback).
 
 The verification commands and the test suite run as a detached job under `.triad/run/`, and a Haiku runner agent calls the job's wait script with Bash until it finishes; `check` then reads each command's exit code and output back. A suite of several minutes inside one silent tool call left a remote session with nothing in its transcript, and the session was stopped and restarted mid-ship; the runner's Bash calls keep the transcript moving. Passing results hold for the commit they ran on: `publish` and post-ship verification reuse them, and `publish` finds a PR it already opened instead of creating a second. Canary checks (1, 5 and 15 minutes after deploy) run the same way, inside the `canary` call.
 
