@@ -434,7 +434,7 @@ Findings:
 | Triad, coders forced | 55/55 | $0.86 | $0.31 / $0.55 | 154 s | 15 | 1,354 | 5 coders |
 
 Findings:
-- **Triad delegated on its own here.** With nothing in the prompt about coders, the orchestrator briefed five Sonnet coders, one per module, in parallel. On the single-feature tasks above it did the work itself; the guide's rule (small known work yourself, independent pieces to coders in parallel) chose correctly both ways.
+- **Triad delegated on its own here.** With nothing in the prompt about coders, the orchestrator briefed five Sonnet coders, one per module, in one message. The `maxCoders` cap (4) refused the fifth, and the orchestrator started it once one of the first four had finished; both Triad runs did the same. On the single-feature tasks above it did the work itself; the guide's rule (small known work yourself, independent pieces to coders in parallel) chose correctly both ways.
 - **Cheaper and faster than Opus alone:** 32% less money ($0.72 against $1.05) and 2.5 times faster (118 s against 298 s), with the same full marks. Opus spent $0.23 instead of $1.05; two thirds of the bill moved to Sonnet.
 - Forcing coders through the prompt cost a little more than letting Triad decide ($0.86), for the same split.
 - One run each, total spend $2.63.
