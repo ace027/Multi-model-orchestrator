@@ -9,8 +9,9 @@ a fresh HOME (a copy of --legion-home for legion), so no config sees the user's 
 
 Each run copies tasks/<task>/repo to a scratch dir (plus setup.py if present), commits it,
 runs `claude -p` headless through bench/hermetic.sh, then runs tasks/<task>/check.py.
-Task sets: core (the Phase 3 tasks, the default), hard (csvimport, refunds) and games (tron,
-snake: browser games checked through Playwright; pacman still runs by name). hard and games have graded checks
+Task sets: core (the Phase 3 tasks, the default), hard (csvimport, refunds), games (tron,
+snake: browser games checked through Playwright; pacman still runs by name) and big
+(toolkit: five independent modules, room for coders in parallel). hard, games and big have graded checks
 that print `score P/N`, recorded as the run's score; bench/selftest.py checks them).
 Writes <out>/<config>/<task>.json and <out>/summary.md (this run's table). Needs ORCHESTRATOR_API_KEY.
 """
@@ -28,7 +29,7 @@ import uuid
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASKS = os.path.join(ROOT, "bench", "tasks")
-SETS = {"core": ["discounts", "logfix", "noisy", "rename", "testwrite"], "hard": ["csvimport", "refunds"], "games": ["tron", "snake"]}
+SETS = {"core": ["discounts", "logfix", "noisy", "rename", "testwrite"], "hard": ["csvimport", "refunds"], "games": ["tron", "snake"], "big": ["toolkit"]}
 PROMPT = "Do the task described in TASK.md."
 TOOLS = "Agent,SendMessage,Read,Edit,Write,Bash,Glob,Grep,mcp__triad__delegate_menial"
 
@@ -140,7 +141,7 @@ def table(recs: list) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--configs", default="p2,p3")
-    ap.add_argument("--tasks", default="core", help="task names or set names (core, hard, games), comma-separated")
+    ap.add_argument("--tasks", default="core", help="task names or set names (core, hard, games, big), comma-separated")
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--out", default=os.path.join(ROOT, "bench", "results", "phase3"))
     ap.add_argument("--legion-home", help="a HOME with Legion installed (node bin/install.js --claude --global)")
