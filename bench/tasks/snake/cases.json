@@ -1,0 +1,2513 @@
+{
+ "rules": [
+  {
+   "name": "initial_state",
+   "opts": {},
+   "script": [
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food",
+    "width",
+    "height"
+   ],
+   "expect": [
+    {
+     "tick": 0,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ],
+      [
+       8,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ],
+     "width": 20,
+     "height": 20
+    }
+   ]
+  },
+  {
+   "name": "moves_one_cell_per_tick",
+   "opts": {},
+   "script": [
+    1,
+    "?",
+    4,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       11,
+       10
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    },
+    {
+     "tick": 5,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       15,
+       10
+      ],
+      [
+       14,
+       10
+      ],
+      [
+       13,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "turns",
+   "opts": {},
+   "script": [
+    "up",
+    1,
+    "?",
+    "left",
+    1,
+    "?",
+    "down",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "up",
+     "length": 3,
+     "snake": [
+      [
+       10,
+       9
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    },
+    {
+     "tick": 2,
+     "score": 0,
+     "status": "playing",
+     "dir": "left",
+     "length": 3,
+     "snake": [
+      [
+       9,
+       9
+      ],
+      [
+       10,
+       9
+      ],
+      [
+       10,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    },
+    {
+     "tick": 3,
+     "score": 0,
+     "status": "playing",
+     "dir": "down",
+     "length": 3,
+     "snake": [
+      [
+       9,
+       10
+      ],
+      [
+       9,
+       9
+      ],
+      [
+       10,
+       9
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "reverse_is_ignored",
+   "opts": {},
+   "script": [
+    "left",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       11,
+       10
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "last_request_wins",
+   "opts": {},
+   "script": [
+    "up",
+    "down",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "down",
+     "length": 3,
+     "snake": [
+      [
+       10,
+       11
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "last_request_reverse_is_ignored",
+   "opts": {},
+   "script": [
+    "up",
+    "left",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       11,
+       10
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "request_lasts_one_tick",
+   "opts": {},
+   "script": [
+    "up",
+    1,
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 2,
+     "score": 0,
+     "status": "playing",
+     "dir": "up",
+     "length": 3,
+     "snake": [
+      [
+       10,
+       8
+      ],
+      [
+       10,
+       9
+      ],
+      [
+       10,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "wall_right_ends_game",
+   "opts": {
+    "snake": [
+     [
+      19,
+      5
+     ],
+     [
+      18,
+      5
+     ],
+     [
+      17,
+      5
+     ]
+    ]
+   },
+   "script": [
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "game_over",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       19,
+       5
+      ],
+      [
+       18,
+       5
+      ],
+      [
+       17,
+       5
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "wall_top_after_turn",
+   "opts": {},
+   "script": [
+    "up",
+    10,
+    "?",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 10,
+     "score": 0,
+     "status": "playing",
+     "dir": "up",
+     "length": 3,
+     "snake": [
+      [
+       10,
+       0
+      ],
+      [
+       10,
+       1
+      ],
+      [
+       10,
+       2
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    },
+    {
+     "tick": 11,
+     "score": 0,
+     "status": "game_over",
+     "dir": "up",
+     "length": 3,
+     "snake": [
+      [
+       10,
+       0
+      ],
+      [
+       10,
+       1
+      ],
+      [
+       10,
+       2
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "nothing_after_game_over",
+   "opts": {
+    "snake": [
+     [
+      19,
+      5
+     ],
+     [
+      18,
+      5
+     ],
+     [
+      17,
+      5
+     ]
+    ]
+   },
+   "script": [
+    1,
+    "up",
+    3,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "game_over",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       19,
+       5
+      ],
+      [
+       18,
+       5
+      ],
+      [
+       17,
+       5
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "eat_grows_and_scores",
+   "opts": {
+    "food": [
+     11,
+     10
+    ]
+   },
+   "script": [
+    1,
+    "?",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 10,
+     "status": "playing",
+     "dir": "right",
+     "length": 4,
+     "snake": [
+      [
+       11,
+       10
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ],
+      [
+       8,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    },
+    {
+     "tick": 2,
+     "score": 10,
+     "status": "playing",
+     "dir": "right",
+     "length": 4,
+     "snake": [
+      [
+       12,
+       10
+      ],
+      [
+       11,
+       10
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "given_food_does_not_advance_generator",
+   "opts": {
+    "food": [
+     12,
+     10
+    ]
+   },
+   "script": [
+    2,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 2,
+     "score": 10,
+     "status": "playing",
+     "dir": "right",
+     "length": 4,
+     "snake": [
+      [
+       12,
+       10
+      ],
+      [
+       11,
+       10
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "second_food_by_generator",
+   "opts": {},
+   "script": [
+    1,
+    "down",
+    3,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 4,
+     "score": 10,
+     "status": "playing",
+     "dir": "down",
+     "length": 4,
+     "snake": [
+      [
+       11,
+       13
+      ],
+      [
+       11,
+       12
+      ],
+      [
+       11,
+       11
+      ],
+      [
+       11,
+       10
+      ]
+     ],
+     "food": [
+      14,
+      9
+     ]
+    }
+   ]
+  },
+  {
+   "name": "custom_seed",
+   "opts": {
+    "seed": 7
+   },
+   "script": [
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 0,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ],
+      [
+       8,
+       10
+      ]
+     ],
+     "food": [
+      17,
+      14
+     ]
+    }
+   ]
+  },
+  {
+   "name": "custom_seed_second_food",
+   "opts": {
+    "seed": 123456789,
+    "food": [
+     14,
+     10
+    ]
+   },
+   "script": [
+    4,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 4,
+     "score": 10,
+     "status": "playing",
+     "dir": "right",
+     "length": 4,
+     "snake": [
+      [
+       14,
+       10
+      ],
+      [
+       13,
+       10
+      ],
+      [
+       12,
+       10
+      ],
+      [
+       11,
+       10
+      ]
+     ],
+     "food": [
+      14,
+      9
+     ]
+    }
+   ]
+  },
+  {
+   "name": "food_skips_snake",
+   "opts": {
+    "snake": [
+     [
+      13,
+      13
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      11,
+      13
+     ]
+    ]
+   },
+   "script": [
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 0,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       13,
+       13
+      ],
+      [
+       12,
+       13
+      ],
+      [
+       11,
+       13
+      ]
+     ],
+     "food": [
+      14,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "food_skips_obstacle",
+   "opts": {
+    "obstacles": [
+     [
+      11,
+      13
+     ],
+     [
+      12,
+      13
+     ]
+    ]
+   },
+   "script": [
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 0,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ],
+      [
+       8,
+       10
+      ]
+     ],
+     "food": [
+      13,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "food_scan_wraps_to_index_0",
+   "opts": {
+    "width": 5,
+    "height": 5,
+    "snake": [
+     [
+      4,
+      4
+     ],
+     [
+      3,
+      4
+     ],
+     [
+      2,
+      4
+     ],
+     [
+      1,
+      4
+     ]
+    ]
+   },
+   "script": [
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 0,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 4,
+     "snake": [
+      [
+       4,
+       4
+      ],
+      [
+       3,
+       4
+      ],
+      [
+       2,
+       4
+      ],
+      [
+       1,
+       4
+      ]
+     ],
+     "food": [
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "name": "moving_into_tail_is_allowed",
+   "opts": {
+    "snake": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      2,
+      2
+     ],
+     [
+      1,
+      2
+     ]
+    ],
+    "dir": "left",
+    "food": [
+     10,
+     10
+    ]
+   },
+   "script": [
+    "down",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "down",
+     "length": 4,
+     "snake": [
+      [
+       1,
+       2
+      ],
+      [
+       1,
+       1
+      ],
+      [
+       2,
+       1
+      ],
+      [
+       2,
+       2
+      ]
+     ],
+     "food": [
+      10,
+      10
+     ]
+    }
+   ]
+  },
+  {
+   "name": "tail_counts_when_eating",
+   "opts": {
+    "snake": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      2,
+      2
+     ],
+     [
+      1,
+      2
+     ]
+    ],
+    "dir": "left",
+    "food": [
+     1,
+     2
+    ]
+   },
+   "script": [
+    "down",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "game_over",
+     "dir": "down",
+     "length": 4,
+     "snake": [
+      [
+       1,
+       1
+      ],
+      [
+       2,
+       1
+      ],
+      [
+       2,
+       2
+      ],
+      [
+       1,
+       2
+      ]
+     ],
+     "food": [
+      1,
+      2
+     ]
+    }
+   ]
+  },
+  {
+   "name": "self_collision",
+   "opts": {
+    "snake": [
+     [
+      2,
+      2
+     ],
+     [
+      3,
+      2
+     ],
+     [
+      3,
+      3
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      1,
+      3
+     ]
+    ],
+    "dir": "left",
+    "food": [
+     10,
+     10
+    ]
+   },
+   "script": [
+    "down",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "game_over",
+     "dir": "down",
+     "length": 5,
+     "snake": [
+      [
+       2,
+       2
+      ],
+      [
+       3,
+       2
+      ],
+      [
+       3,
+       3
+      ],
+      [
+       2,
+       3
+      ],
+      [
+       1,
+       3
+      ]
+     ],
+     "food": [
+      10,
+      10
+     ]
+    }
+   ]
+  },
+  {
+   "name": "obstacle_ends_game",
+   "opts": {
+    "obstacles": [
+     [
+      12,
+      10
+     ]
+    ]
+   },
+   "script": [
+    1,
+    "?",
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       11,
+       10
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    },
+    {
+     "tick": 2,
+     "score": 0,
+     "status": "game_over",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       11,
+       10
+      ],
+      [
+       10,
+       10
+      ],
+      [
+       9,
+       10
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "wrap_right_edge",
+   "opts": {
+    "wrap": true,
+    "snake": [
+     [
+      19,
+      5
+     ],
+     [
+      18,
+      5
+     ],
+     [
+      17,
+      5
+     ]
+    ]
+   },
+   "script": [
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       0,
+       5
+      ],
+      [
+       19,
+       5
+      ],
+      [
+       18,
+       5
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "wrap_top_edge",
+   "opts": {
+    "wrap": true,
+    "snake": [
+     [
+      5,
+      0
+     ],
+     [
+      5,
+      1
+     ],
+     [
+      5,
+      2
+     ]
+    ],
+    "dir": "up"
+   },
+   "script": [
+    1,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 0,
+     "status": "playing",
+     "dir": "up",
+     "length": 3,
+     "snake": [
+      [
+       5,
+       19
+      ],
+      [
+       5,
+       0
+      ],
+      [
+       5,
+       1
+      ]
+     ],
+     "food": [
+      11,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "name": "won_when_no_cell_free",
+   "opts": {
+    "width": 3,
+    "height": 1,
+    "snake": [
+     [
+      1,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "food": [
+     2,
+     0
+    ]
+   },
+   "script": [
+    1,
+    "?",
+    2,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 1,
+     "score": 10,
+     "status": "won",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       2,
+       0
+      ],
+      [
+       1,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ],
+     "food": null
+    },
+    {
+     "tick": 1,
+     "score": 10,
+     "status": "won",
+     "dir": "right",
+     "length": 3,
+     "snake": [
+      [
+       2,
+       0
+      ],
+      [
+       1,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ],
+     "food": null
+    }
+   ]
+  },
+  {
+   "name": "small_grid",
+   "opts": {
+    "width": 6,
+    "height": 4,
+    "snake": [
+     [
+      2,
+      1
+     ],
+     [
+      1,
+      1
+     ]
+    ],
+    "seed": 99
+   },
+   "script": [
+    "?",
+    "down",
+    2,
+    "?",
+    "right",
+    3,
+    "?"
+   ],
+   "fields": [
+    "tick",
+    "score",
+    "status",
+    "dir",
+    "length",
+    "snake",
+    "food"
+   ],
+   "expect": [
+    {
+     "tick": 0,
+     "score": 0,
+     "status": "playing",
+     "dir": "right",
+     "length": 2,
+     "snake": [
+      [
+       2,
+       1
+      ],
+      [
+       1,
+       1
+      ]
+     ],
+     "food": [
+      3,
+      3
+     ]
+    },
+    {
+     "tick": 2,
+     "score": 0,
+     "status": "playing",
+     "dir": "down",
+     "length": 2,
+     "snake": [
+      [
+       2,
+       3
+      ],
+      [
+       2,
+       2
+      ]
+     ],
+     "food": [
+      3,
+      3
+     ]
+    },
+    {
+     "tick": 5,
+     "score": 20,
+     "status": "playing",
+     "dir": "right",
+     "length": 4,
+     "snake": [
+      [
+       5,
+       3
+      ],
+      [
+       4,
+       3
+      ],
+      [
+       3,
+       3
+      ],
+      [
+       2,
+       3
+      ]
+     ],
+     "food": [
+      1,
+      2
+     ]
+    }
+   ]
+  }
+ ],
+ "replays": [
+  {
+   "name": "bot_default",
+   "opts": {},
+   "n": 3000,
+   "expect": {
+    "tick": 876,
+    "score": 670,
+    "status": "game_over",
+    "length": 70,
+    "snake": [
+     [
+      19,
+      6
+     ],
+     [
+      19,
+      5
+     ],
+     [
+      19,
+      4
+     ],
+     [
+      19,
+      3
+     ],
+     [
+      19,
+      2
+     ],
+     [
+      18,
+      2
+     ],
+     [
+      17,
+      2
+     ],
+     [
+      16,
+      2
+     ],
+     [
+      16,
+      1
+     ],
+     [
+      15,
+      1
+     ],
+     [
+      14,
+      1
+     ],
+     [
+      13,
+      1
+     ],
+     [
+      12,
+      1
+     ],
+     [
+      11,
+      1
+     ],
+     [
+      10,
+      1
+     ],
+     [
+      9,
+      1
+     ],
+     [
+      8,
+      1
+     ],
+     [
+      7,
+      1
+     ],
+     [
+      6,
+      1
+     ],
+     [
+      5,
+      1
+     ],
+     [
+      4,
+      1
+     ],
+     [
+      3,
+      1
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      1,
+      1
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      1,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      1,
+      6
+     ],
+     [
+      1,
+      7
+     ],
+     [
+      2,
+      7
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      4,
+      7
+     ],
+     [
+      5,
+      7
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      7,
+      7
+     ],
+     [
+      7,
+      8
+     ],
+     [
+      7,
+      9
+     ],
+     [
+      7,
+      10
+     ],
+     [
+      7,
+      11
+     ],
+     [
+      7,
+      12
+     ],
+     [
+      7,
+      13
+     ],
+     [
+      7,
+      14
+     ],
+     [
+      7,
+      15
+     ],
+     [
+      8,
+      15
+     ],
+     [
+      9,
+      15
+     ],
+     [
+      10,
+      15
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      10,
+      13
+     ],
+     [
+      10,
+      12
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      10,
+      10
+     ],
+     [
+      10,
+      9
+     ],
+     [
+      11,
+      9
+     ],
+     [
+      12,
+      9
+     ],
+     [
+      13,
+      9
+     ],
+     [
+      14,
+      9
+     ],
+     [
+      15,
+      9
+     ],
+     [
+      16,
+      9
+     ],
+     [
+      17,
+      9
+     ],
+     [
+      17,
+      8
+     ],
+     [
+      18,
+      8
+     ],
+     [
+      19,
+      8
+     ],
+     [
+      19,
+      7
+     ],
+     [
+      18,
+      7
+     ],
+     [
+      18,
+      6
+     ],
+     [
+      18,
+      5
+     ],
+     [
+      18,
+      4
+     ],
+     [
+      18,
+      3
+     ],
+     [
+      17,
+      3
+     ]
+    ],
+    "food": [
+     19,
+     17
+    ]
+   }
+  },
+  {
+   "name": "bot_obstacles_seed",
+   "opts": {
+    "seed": 2024,
+    "obstacles": [
+     [
+      5,
+      5
+     ],
+     [
+      5,
+      6
+     ],
+     [
+      5,
+      7
+     ],
+     [
+      14,
+      12
+     ],
+     [
+      15,
+      12
+     ],
+     [
+      16,
+      12
+     ],
+     [
+      10,
+      3
+     ]
+    ]
+   },
+   "n": 3000,
+   "expect": {
+    "tick": 888,
+    "score": 530,
+    "status": "game_over",
+    "length": 56,
+    "snake": [
+     [
+      19,
+      0
+     ],
+     [
+      19,
+      1
+     ],
+     [
+      19,
+      2
+     ],
+     [
+      19,
+      3
+     ],
+     [
+      19,
+      4
+     ],
+     [
+      19,
+      5
+     ],
+     [
+      19,
+      6
+     ],
+     [
+      19,
+      7
+     ],
+     [
+      19,
+      8
+     ],
+     [
+      19,
+      9
+     ],
+     [
+      19,
+      10
+     ],
+     [
+      19,
+      11
+     ],
+     [
+      19,
+      12
+     ],
+     [
+      18,
+      12
+     ],
+     [
+      18,
+      13
+     ],
+     [
+      18,
+      14
+     ],
+     [
+      17,
+      14
+     ],
+     [
+      16,
+      14
+     ],
+     [
+      16,
+      15
+     ],
+     [
+      16,
+      16
+     ],
+     [
+      15,
+      16
+     ],
+     [
+      15,
+      15
+     ],
+     [
+      15,
+      14
+     ],
+     [
+      15,
+      13
+     ],
+     [
+      16,
+      13
+     ],
+     [
+      17,
+      13
+     ],
+     [
+      17,
+      12
+     ],
+     [
+      17,
+      11
+     ],
+     [
+      18,
+      11
+     ],
+     [
+      18,
+      10
+     ],
+     [
+      18,
+      9
+     ],
+     [
+      18,
+      8
+     ],
+     [
+      18,
+      7
+     ],
+     [
+      18,
+      6
+     ],
+     [
+      18,
+      5
+     ],
+     [
+      18,
+      4
+     ],
+     [
+      18,
+      3
+     ],
+     [
+      18,
+      2
+     ],
+     [
+      18,
+      1
+     ],
+     [
+      18,
+      0
+     ],
+     [
+      17,
+      0
+     ],
+     [
+      16,
+      0
+     ],
+     [
+      15,
+      0
+     ],
+     [
+      14,
+      0
+     ],
+     [
+      13,
+      0
+     ],
+     [
+      12,
+      0
+     ],
+     [
+      11,
+      0
+     ],
+     [
+      10,
+      0
+     ],
+     [
+      9,
+      0
+     ],
+     [
+      8,
+      0
+     ],
+     [
+      7,
+      0
+     ],
+     [
+      6,
+      0
+     ],
+     [
+      5,
+      0
+     ],
+     [
+      4,
+      0
+     ],
+     [
+      4,
+      1
+     ],
+     [
+      4,
+      2
+     ]
+    ],
+    "food": [
+     12,
+     4
+    ]
+   }
+  },
+  {
+   "name": "bot_wrap_small",
+   "opts": {
+    "width": 12,
+    "height": 10,
+    "wrap": true,
+    "seed": 31337,
+    "snake": [
+     [
+      6,
+      5
+     ],
+     [
+      5,
+      5
+     ],
+     [
+      4,
+      5
+     ]
+    ]
+   },
+   "n": 3000,
+   "expect": {
+    "tick": 332,
+    "score": 530,
+    "status": "game_over",
+    "length": 56,
+    "snake": [
+     [
+      2,
+      4
+     ],
+     [
+      3,
+      4
+     ],
+     [
+      4,
+      4
+     ],
+     [
+      5,
+      4
+     ],
+     [
+      6,
+      4
+     ],
+     [
+      7,
+      4
+     ],
+     [
+      7,
+      3
+     ],
+     [
+      8,
+      3
+     ],
+     [
+      8,
+      2
+     ],
+     [
+      7,
+      2
+     ],
+     [
+      6,
+      2
+     ],
+     [
+      6,
+      3
+     ],
+     [
+      5,
+      3
+     ],
+     [
+      4,
+      3
+     ],
+     [
+      3,
+      3
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      2,
+      2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      2,
+      9
+     ],
+     [
+      3,
+      9
+     ],
+     [
+      3,
+      0
+     ],
+     [
+      4,
+      0
+     ],
+     [
+      5,
+      0
+     ],
+     [
+      6,
+      0
+     ],
+     [
+      6,
+      9
+     ],
+     [
+      6,
+      8
+     ],
+     [
+      7,
+      8
+     ],
+     [
+      8,
+      8
+     ],
+     [
+      8,
+      7
+     ],
+     [
+      7,
+      7
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      5,
+      7
+     ],
+     [
+      5,
+      8
+     ],
+     [
+      5,
+      9
+     ],
+     [
+      4,
+      9
+     ],
+     [
+      4,
+      8
+     ],
+     [
+      4,
+      7
+     ],
+     [
+      4,
+      6
+     ],
+     [
+      5,
+      6
+     ],
+     [
+      5,
+      5
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      3,
+      5
+     ],
+     [
+      2,
+      5
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      1,
+      4
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      3
+     ],
+     [
+      11,
+      3
+     ],
+     [
+      11,
+      4
+     ],
+     [
+      11,
+      5
+     ],
+     [
+      10,
+      5
+     ],
+     [
+      10,
+      4
+     ],
+     [
+      10,
+      3
+     ]
+    ],
+    "food": [
+     0,
+     4
+    ]
+   }
+  }
+ ]
+}

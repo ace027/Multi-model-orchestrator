@@ -229,6 +229,13 @@ The hidden checks (`bench/webgrade.cjs`) serve the work dir and drive it in head
 | The page in real time: load, wait for Space, tick rate, keys, pause, and colour counts from real screenshots (things drawn, trails growing, pellets vanishing) | 8 | 8 | 7/8 |
 | Open-ended | `chooseMove` tournament: 24 rounds against four bots on obstacle arenas, both sides | 4 long replays of the classic maze driven by a deterministic bot, compared field by field | tron 50%; pacman reported only |
 
+**Snake replaces Pac-Man in the games set** (from 1.1.0): the model now declines to build a faithful Pac-Man copy, so `--tasks games` runs Tron and Snake; `--tasks pacman` still runs the old task by name. The Snake spec fixes a 20×20 grid, the tick order (turn, move, collide, grow), a seeded generator for food (`s = s·48271 mod 2³¹−1`, then a scan for a free cell), obstacles, an optional wrap mode, the won state and a `window.snake` hook. Its checks: 26 scripted rule cases (80%), 7 page cases (6/7), and 3 replays of up to 3000 ticks driven by a BFS bot, reported only. The expectations come from the reference engine through `tasks/snake/make_cases.cjs`, spot-checked by hand against the spec:
+
+```
+ok  snake      fixture  exit 1: score 0/36 rules 0/26 ui 0/7 replay 0/3 own-tests FAIL
+ok  snake      solution exit 0: score 36/36 rules 26/26 ui 7/7 replay 3/3 own-tests pass
+```
+
 A Pac-Man replay matches only if every rule is exact for up to 3000 ticks, including deaths, eaten ghosts, level clears and the extra life. That makes it a strict fidelity signal on top of the rule cases.
 
 **Validating the specs:** two separate agents each wrote a reference game from the spec alone, without seeing the checks (`tasks/<game>/solution`). The Pac-Man expectations come from a third rules engine, written separately from the spec. Both references get full marks:
@@ -390,5 +397,5 @@ The option `lean` (rules adapted from Ponytail) off and at `full`, everything el
 Findings:
 - Every check passed with the rules on: the same results for 21-26% less on the small tasks and 30-44% fewer lines.
 - On Tron, lean cost 63% less and wrote 57% fewer lines, but the orchestrator built it alone instead of briefing two coders, so the coder rules themselves were not exercised in this run; part of the gap is that choice. The earlier normal-session Tron run (`games1`, two coders, no lean rules) cost $0.87, so the lean-off run here was on the expensive side; one run each is a small sample.
-- Pac-Man was dropped: the model now declines to build a faithful copy of it, in both configurations, before writing anything ($0.13 each).
+- Pac-Man was dropped: the model now declines to build a faithful copy of it, in both configurations, before writing anything ($0.13 each). Snake replaces it in the games set (see Browser games).
 - `lean: full` is the default from 1.1.0. Total spend for this bench: about $3.90.
