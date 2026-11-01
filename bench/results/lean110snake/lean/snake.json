@@ -1,0 +1,54 @@
+{
+  "task": "snake",
+  "config": "lean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 91,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 299,
+  "linesRemoved": 0,
+  "check": "score 36/36 rules 26/26 ui 7/7 replay 3/3 own-tests pass tests-added True failed=[]",
+  "score": [
+    36.0,
+    36.0
+  ],
+  "cost": 0.31004339999999997,
+  "turns": 7,
+  "tokens": {
+    "inputTokens": 14,
+    "outputTokens": 7747,
+    "cacheReadInputTokens": 120037,
+    "cacheCreationInputTokens": 26208
+  },
+  "totalTokens": 154006,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 7747,
+      "cacheReadInputTokens": 120037,
+      "cacheCreationInputTokens": 26208,
+      "costUSD": 0.31004339999999997
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 7
+    }
+  },
+  "work": "/tmp/bench-lean-snake-fn6wdp6v/repo"
+}
