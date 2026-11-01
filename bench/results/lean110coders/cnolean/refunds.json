@@ -1,0 +1,66 @@
+{
+  "task": "refunds",
+  "config": "cnolean",
+  "options": {
+    "lean": "off"
+  },
+  "seconds": 59,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 126,
+  "linesRemoved": 7,
+  "check": "score 18/18 own-tests pass tests-added True failed=[]",
+  "score": [
+    18.0,
+    18.0
+  ],
+  "cost": 0.25270929999999997,
+  "turns": 5,
+  "tokens": {
+    "inputTokens": 16,
+    "outputTokens": 6884,
+    "cacheReadInputTokens": 97758,
+    "cacheCreationInputTokens": 32476
+  },
+  "totalTokens": 137134,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 10,
+      "outputTokens": 2835,
+      "cacheReadInputTokens": 72615,
+      "cacheCreationInputTokens": 22896,
+      "costUSD": 0.185743
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 6,
+      "outputTokens": 4049,
+      "cacheReadInputTokens": 25143,
+      "cacheCreationInputTokens": 9580,
+      "costUSD": 0.0669663
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 5
+    },
+    "a0b0f674eb9e8d88b": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-cnolean-refunds-q4ea0pq6/repo"
+}

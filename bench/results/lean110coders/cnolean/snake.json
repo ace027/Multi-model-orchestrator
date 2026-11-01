@@ -1,0 +1,66 @@
+{
+  "task": "snake",
+  "config": "cnolean",
+  "options": {
+    "lean": "off"
+  },
+  "seconds": 154,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 394,
+  "linesRemoved": 0,
+  "check": "score 36/36 rules 26/26 ui 7/7 replay 3/3 own-tests pass tests-added True failed=[]",
+  "score": [
+    36.0,
+    36.0
+  ],
+  "cost": 0.3858531,
+  "turns": 3,
+  "tokens": {
+    "inputTokens": 44,
+    "outputTokens": 14258,
+    "cacheReadInputTokens": 339303,
+    "cacheCreationInputTokens": 36417
+  },
+  "totalTokens": 390022,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 26,
+      "outputTokens": 4640,
+      "cacheReadInputTokens": 226103,
+      "cacheCreationInputTokens": 19660,
+      "costUSD": 0.23642459999999993
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 18,
+      "outputTokens": 9618,
+      "cacheReadInputTokens": 113200,
+      "cacheCreationInputTokens": 16757,
+      "costUSD": 0.1494285
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 11
+    },
+    "a8509b4c7ba6beb20": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 8
+    }
+  },
+  "work": "/tmp/bench-cnolean-snake-oois36xq/repo"
+}
