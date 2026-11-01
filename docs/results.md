@@ -389,6 +389,6 @@ The option `lean` (rules adapted from Ponytail) off and at `full`, everything el
 
 Findings:
 - Every check passed with the rules on: the same results for 21-26% less on the small tasks and 30-44% fewer lines.
-- On Tron, lean cost 63% less and wrote 57% fewer lines, but the orchestrator built it alone instead of briefing two coders, so the coder rules themselves were not exercised in this run; part of the gap is that choice. Earlier Tron runs at 0.9-1.0 defaults cost $0.87-1.86, so one run each is a small sample.
+- On Tron, lean cost 63% less and wrote 57% fewer lines, but the orchestrator built it alone instead of briefing two coders, so the coder rules themselves were not exercised in this run; part of the gap is that choice. The earlier normal-session Tron run (`games1`, two coders, no lean rules) cost $0.87, so the lean-off run here was on the expensive side; one run each is a small sample.
 - Pac-Man was dropped: the model now declines to build a faithful copy of it, in both configurations, before writing anything ($0.13 each).
 - `lean: full` is the default from 1.1.0. Total spend for this bench: about $3.90.

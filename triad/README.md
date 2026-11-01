@@ -87,6 +87,7 @@ To keep it in check:
 - `/triad:auto --estimate` plans every phase and prints the expected cost per phase before anything is built. Its rates scale to what your own past steps cost.
 - `maxSpend` (per session) and `maxProjectSpend` (across sessions) stop new agents and workflow steps at a dollar limit, with a notice at 80%.
 - `lightPlans` sends small phases through the light process (two reviewers, no board, two review cycles plus a closing round).
+- `lean` (default `full`) keeps the code small: on the bench it cut cost by 21-26% on small tasks with every check still passing (`docs/results.md`).
 - `coderMinutes` tells a coder to wrap up after that many minutes, so a tuning loop can't run on.
 - `/triad` and the pane show the spend per agent and per tier as it happens.
 
