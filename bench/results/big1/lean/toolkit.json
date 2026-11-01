@@ -1,0 +1,86 @@
+{
+  "task": "toolkit",
+  "config": "lean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 118,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 1336,
+  "linesRemoved": 0,
+  "check": "score 55/55 own-tests pass tests-added True failed=[]",
+  "score": [
+    55.0,
+    55.0
+  ],
+  "cost": 0.7200119,
+  "turns": 14,
+  "tokens": {
+    "inputTokens": 54,
+    "outputTokens": 37757,
+    "cacheReadInputTokens": 303014,
+    "cacheCreationInputTokens": 79119
+  },
+  "totalTokens": 419944,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 16,
+      "outputTokens": 4029,
+      "cacheReadInputTokens": 137805,
+      "cacheCreationInputTokens": 24053,
+      "costUSD": 0.22847
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 38,
+      "outputTokens": 33728,
+      "cacheReadInputTokens": 165209,
+      "cacheCreationInputTokens": 55066,
+      "costUSD": 0.49154190000000003
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 8
+    },
+    "a64da2414b17d0a36": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 5
+    },
+    "ac81ce442ebc6e9a4": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 4
+    },
+    "accabed68efec0b30": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 4
+    },
+    "a8b3ea6fc6cd91d71": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    },
+    "ab746afd184bc0fc7": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-lean-toolkit-75h092i2/repo"
+}

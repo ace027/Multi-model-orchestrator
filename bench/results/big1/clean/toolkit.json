@@ -1,0 +1,91 @@
+{
+  "task": "toolkit",
+  "config": "clean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 154,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 1354,
+  "linesRemoved": 0,
+  "check": "score 55/55 own-tests pass tests-added True failed=[]",
+  "score": [
+    55.0,
+    55.0
+  ],
+  "cost": 0.8593188999999998,
+  "turns": 15,
+  "tokens": {
+    "inputTokens": 70,
+    "outputTokens": 44255,
+    "cacheReadInputTokens": 434426,
+    "cacheCreationInputTokens": 87131
+  },
+  "totalTokens": 565882,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 18,
+      "outputTokens": 5249,
+      "cacheReadInputTokens": 184753,
+      "cacheCreationInputTokens": 33743,
+      "costUSD": 0.31071760000000004
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 52,
+      "outputTokens": 39006,
+      "cacheReadInputTokens": 249673,
+      "cacheCreationInputTokens": 53388,
+      "costUSD": 0.5486013000000001
+    }
+  },
+  "compression": {
+    "calls": 1,
+    "rawTokens": 4802,
+    "outTokens": 2007
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 9
+    },
+    "a98888d0402e5f9f2": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 5
+    },
+    "a7b5a85bae72eb145": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 5
+    },
+    "a10fd2b3705862bf5": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 4
+    },
+    "a65ef1c023f4ae0e4": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 6
+    },
+    "a60a4044fe57976f9": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 4
+    },
+    "compressor": {
+      "role": "compressor",
+      "depth": 0,
+      "requests": 1
+    }
+  },
+  "work": "/tmp/bench-clean-toolkit-nhh09lxp/repo"
+}
