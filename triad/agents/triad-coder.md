@@ -22,4 +22,5 @@ changes:
 - <path> | <added|modified|deleted|moved> | <one-line note>
 verify: <command you ran> => <result, e.g. "12 passed">
 blocked_reason: <only when status is blocked>
+skipped: <optional: what you chose not to build or check, and any risk>
 ```

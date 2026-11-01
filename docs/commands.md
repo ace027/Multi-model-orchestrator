@@ -48,6 +48,8 @@ Opus decomposes the phase into wave-ordered plans (personas picked with `persona
 
 Light process for a small phase (at most `lightPlans` plans, default 2; `planning_status` names them): no board quick-assess, spec, proposals, persona table, security scan or design review unless their flags ask, and at most one refine round.
 
+With `lean` on, plans cover only what the requirements and success criteria ask, reuse what the codebase has, and add no dependency for a few lines; with `lean: ultra`, planning also cuts requirements the phase goal does not justify and records each cut as an assumed key decision.
+
 Flags: `--dry-run`, `--auto` (board quick-assess, spec, proposals, critique, design 7-pass review, security scan; BLOCKER halts), `--auto-refine`, `--skip-board`, `--skip-security`, `--security`, `--spec`, `--domain=`; GitHub phase issue sync.
 
 ## Build, review and ship
@@ -78,7 +80,7 @@ Flags: intent flags validated in code (`--just-harden` ad-hoc team, `--just-docu
 
 Review a built phase: reviewer panel or classic, findings triaged in code, fixes routed to agents, up to 3 cycles.
 
-Panel (2-4 reviewers by divisions touched, always one Testing) or classic; a small phase (at most `lightPlans` plans, default 2) with no mode asked for gets the light review (two reviewers, no multi-pass evaluators, at most two cycles); reports parsed and triaged in code (confidence ≥80 actioned, 50-79 deferred, <50 dropped; dedup by file and overlapping lines); must-fix findings (blocker/critical/major) routed to fix agents by file; re-review of changed files; stale-loop abort; up to `review.max_cycles`, then escalation, except that when the last cycle finds at most 3 new major findings and every earlier one is resolved, one closing round fixes them and re-checks only those (anything new it raises is deferred); after a pass, with `fixMinor` (default on), one fix round for the minor and medium-confidence findings, kept only if the verification commands still pass; NN-REVIEW.md, STATE, ROADMAP `[x]`.
+Panel (2-4 reviewers by divisions touched, always one Testing) or classic; a small phase (at most `lightPlans` plans, default 2) with no mode asked for gets the light review (two reviewers, no multi-pass evaluators, at most two cycles); reports parsed and triaged in code (confidence ≥80 actioned, 50-79 deferred, <50 dropped; dedup by file and overlapping lines); must-fix findings (blocker/critical/major) routed to fix agents by file; re-review of changed files; stale-loop abort; up to `review.max_cycles`, then escalation, except that when the last cycle finds at most 3 new major findings and every earlier one is resolved, one closing round fixes them and re-checks only those (anything new it raises is deferred); after a pass, with `fixMinor` (default on), one fix round for the minor and medium-confidence findings, kept only if the verification commands still pass; NN-REVIEW.md, STATE, ROADMAP `[x]`. With `lean` on (default `full`), every reviewer must give a concrete failing case for each finding, treats a `shortcut:` comment that names its limit as a decision rather than a finding, and reports code that should not exist as category `lean`, severity minor (so the minor-fix round handles it, not another cycle).
 
 Flags: `--security` / `--just-security` (scan in code, OWASP/STRIDE by the security persona, unresolved CRITICAL/HIGH block ship), `--dry-run`, domain reviews.
 
@@ -89,6 +91,14 @@ Flags: `--security` / `--just-security` (scan in code, OWASP/STRIDE by the secur
 Run one small ad-hoc task with a single coder, outside the phase plan, optionally committed and reviewed.
 
 One coder on a small ad-hoc task, optional commit and review. `--fix` is fix mode: a `#N` names a GitHub issue (read with `gh`); the fix is committed, reviewed once, and pushed on a `fix/` branch as a pull request; STATE.md and ROADMAP.md are not touched.
+
+### /triad:audit
+
+`/triad:audit [path] [--save]`
+
+Read-only quality audit of a repo or folder, ranked, in plain English; changes nothing.
+
+After Ponytail's `/ponytail-audit`. The orchestrator maps the scope (from `CODEBASE.md` when there is one) and splits it by area, never by topic, so no file is read twice: up to 40 source files is one area, larger scopes up to 3, riskiest first. One read-only Sonnet run per area (`engineering-senior-developer`, in parallel) looks for bugs, security and data-loss risks, what breaks at the expected load, risky code without a test, big slowdowns, and lean findings (delete, reuse, standard library, needless abstraction, merge, split). Every finding needs a concrete failing case. The orchestrator merges them into at most 20, numbered across Must fix, Should fix and Nice to have, each with What this is, Problem, Fix and If we skip it, then a verdict, the lines that could go, and what was not checked. `--save` writes `.planning/AUDIT.md` (or `AUDIT.md`).
 
 ### /triad:polish
 
@@ -205,6 +215,7 @@ These run in mod code with no model call, so they cost nothing.
 | `/triad` | Prints the agent tree, tokens and cost per tier, and the budgets. |
 | `/triad pane` | Opens the same as a live pane that redraws as agents run. |
 | `/triad status [--dry-run]` | Dashboard for a `.planning/` project: phase, progress, the next command to run, and the control mode. `--dry-run` prints the checks and planned actions as a dry-run report instead. |
+| `/triad debt` | Lists every `shortcut:` comment (and Ponytail's older `ponytail:`) in the repo, by file, and tags the ones that name no point to revisit them `[no-trigger]`. `/triad status` shows the count; retro and milestone facts list the no-trigger ones. |
 | `/triad validate [--ci] [--fix]` | Schema and consistency checks of `.planning/`: plan frontmatter, STATE and ROADMAP agreement, persona names, settings and the authority matrix. Exit code 0 (pass), 1 (warnings) or 2 (failures); `--ci` prints only the summary line; `--fix` repairs what it safely can and lists the fixes. |
 
 ## Build authority

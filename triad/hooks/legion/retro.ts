@@ -1,5 +1,6 @@
 // /retro in code: scope resolution, evidence gathering and metrics; the model
 // writes the five sections from this evidence, and retro_save appends RETRO.md.
+import { debtFacts, scanDebt } from './debt.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
 import { getSection, phaseDone } from './planning.ts'
 import { parseMilestones } from './milestone.ts'
@@ -72,7 +73,7 @@ export async function retroGather(io: Io, opts: { phase?: number; milestone?: nu
   return [
     `Scope: ${scope}`, `Project: ${name}`, `Date: ${today(io)}`, '', '## Metrics (computed; copy into the report as is)', ...metrics,
     ...(warnings.length ? ['', 'Warnings:', ...warnings.map(w => `- ${w}`)] : []),
-    '', '## Evidence', ...evidence,
+    '', '## Evidence', ...evidence, ...debtFacts(await scanDebt(io)),
     '', 'Write the report: # Retrospective: {scope}, **Project**, **Scope**, **Date**, then ## What Went Well, ## What Didn\'t Work, ## Patterns to Keep, ## Patterns to Drop, ## Action Items (| # | Action | Priority | Evidence |, priority High/Medium/Low), ## Metrics. Every finding cites a phase, plan or file from the evidence; patterns must recur. Then ask the user: save to memory, view only, or edit before saving.',
   ].join('\n')
 }

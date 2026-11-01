@@ -1,6 +1,6 @@
 {
   "name": "triad",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": { "name": "ace027" },
   "homepage": "https://github.com/ace027/Multi-model-orchestrator",
   "description": "Tiered-model orchestration: Opus orchestrates and takes open-ended coding, Sonnet codes, Haiku does menial work. The mod enforces the tiers and keeps a token ledger.",
@@ -107,6 +107,13 @@
       "title": "Fix minor review findings",
       "description": "After a review passes, one coder pass fixes the minor and medium-confidence findings that name a file, then the tests run again; the pass is reverted if they fail.",
       "default": true
+    },
+    "lean": {
+      "type": "string",
+      "title": "Lean level",
+      "description": "The smallest complete change (rules adapted from Ponytail). off: no rules. lite: build what was asked and name smaller options. full: coders reuse first, add nothing unasked and mark known limits with shortcut: comments; reviewers need a concrete failing case for every finding. ultra: full, and planning cuts scope the goal does not justify.",
+      "options": ["off", "lite", "full", "ultra"],
+      "default": "full"
     },
     "openPane": {
       "type": "boolean",

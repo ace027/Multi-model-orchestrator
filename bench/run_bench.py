@@ -39,6 +39,9 @@ CONFIGS = {
     "p3": {},
     "triad": {},
     "legion": "legion",
+    # Lean rules off and on (option lean), everything else at the defaults.
+    "nolean": {"lean": "off"},
+    "lean": {"lean": "full"},
 }
 LEGION_PROMPT = ("/legion:quick Do the task described in TASK.md. This is a non-interactive run: "
                  "wherever the workflow would ask the user, take the recommended option.")
@@ -81,6 +84,12 @@ def run(task: str, config: str, out_dir: str) -> dict:
     except json.JSONDecodeError:
         cli = {"error": p.stdout[-2000:], "stderr": p.stderr[-2000:]}
     chk = subprocess.run([sys.executable, os.path.join(TASKS, task, "check.py"), repo], capture_output=True, text=True)
+    # Lines the run added and removed against the fixture (its own .triad/ excluded).
+    subprocess.run(["git", "add", "-A", "--", ".", ":(exclude).triad"], cwd=repo, capture_output=True)
+    base = subprocess.run(["git", "rev-list", "--max-parents=0", "HEAD"], cwd=repo, capture_output=True, text=True).stdout.split()[:1] or ["HEAD"]
+    numstat = subprocess.run(["git", "diff", "--cached", "--numstat", base[0]], cwd=repo, capture_output=True, text=True).stdout
+    added = sum(int(a) for a, *_ in (l.split("\t") for l in numstat.splitlines()) if a.isdigit())
+    removed = sum(int(b) for _, b, *_ in (l.split("\t") for l in numstat.splitlines()) if b.isdigit())
     ledger_path = os.path.join(repo, ".triad", "ledger.json")
     ledger = json.load(open(ledger_path)) if os.path.exists(ledger_path) else None
 
@@ -89,7 +98,7 @@ def run(task: str, config: str, out_dir: str) -> dict:
               for k in ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")}
     rec = {
         "task": task, "config": config, "options": opts if opts != "legion" else None, "seconds": secs, "exit": p.returncode,
-        "success": chk.returncode == 0, "check": chk.stdout.strip()[-500:],
+        "success": chk.returncode == 0, "linesAdded": added, "linesRemoved": removed, "check": chk.stdout.strip()[-500:],
         "score": [float(x) for x in m.groups()] if (m := re.search(r"score ([\d.]+)/(\d+)", chk.stdout)) else None,
         "cost": cli.get("total_cost_usd"), "turns": cli.get("num_turns"),
         "tokens": tokens, "totalTokens": sum(tokens.values()),
@@ -108,7 +117,7 @@ def run(task: str, config: str, out_dir: str) -> dict:
 
 
 def table(recs: list) -> str:
-    rows = [f"{'task':<11}{'config':<7}{'ok':<11}{'cost':>8}{'tokens':>10}{'in+cw':>9}{'out':>7}{'secs':>6}  agents"]
+    rows = [f"{'task':<11}{'config':<7}{'ok':<11}{'cost':>8}{'tokens':>10}{'in+cw':>9}{'out':>7}{'secs':>6}{'+lines':>8}  agents"]
     for r in sorted(recs, key=lambda r: (r["task"], r["config"])):
         t = r["tokens"]
         roles = {}
@@ -116,7 +125,7 @@ def table(recs: list) -> str:
             roles[a["role"]] = roles.get(a["role"], 0) + 1
         cost = f"{r['cost']:.3f}" if r["cost"] is not None else "-"
         rows.append(f"{r['task']:<11}{r['config']:<7}{('Y' if r['success'] else 'N') + (' %g/%g' % tuple(r['score']) if r.get('score') else ''):<11}{cost:>8}{r['totalTokens']:>10}"
-                    f"{t['inputTokens'] + t['cacheCreationInputTokens']:>9}{t['outputTokens']:>7}{r['seconds']:>6}  "
+                    f"{t['inputTokens'] + t['cacheCreationInputTokens']:>9}{t['outputTokens']:>7}{r['seconds']:>6}{r.get('linesAdded', 0):>8}  "
                     + " ".join(f"{k}:{v}" for k, v in sorted(roles.items())))
     return "\n".join(rows)
 

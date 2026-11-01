@@ -2,6 +2,7 @@
 // section, validation, derived status and metrics, the dashboard, and the
 // complete and archive steps. Grouping phases into milestones, the one-line
 // deliverables and the decisions are the model's; it passes them in.
+import { debtFacts, scanDebt } from './debt.ts'
 import { loadPhase, loadProject, today, type Io, type Project } from './io.ts'
 import { appendToSection, getSection, pad2, phaseDone, setRoadmapRow, type Roadmap } from './planning.ts'
 import { commit } from './build.ts'
@@ -152,6 +153,7 @@ export async function milestoneFacts(io: Io, n: number): Promise<string> {
   }
   const decisions = getSection(p.stateText ?? '', /^##\s+(Recent )?Decisions/i)
   if (decisions) out.push('\n## STATE.md decisions', decisions)
+  out.push(...debtFacts(await scanDebt(io)))
   return out.join('\n')
 }
 

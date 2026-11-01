@@ -5,6 +5,8 @@ import { emptyLedger, ensureAgent, paneView, promptTokens, recordCompletion, rec
 import { PANE, registerPane } from './pane.tsx'
 import { PROGRESS_SYSTEM, TRIMMED_RESULT, WRAP_UP_NOTE, TIME_NOTE, apiChars, newMeter, parseProgress, partialReply, progressPrompt, project, resultOverflows, transcriptTail, type Meter } from './ceiling.ts'
 import { LEGION_TOOLS } from './legion/tools.ts'
+import { leanBrief, leanGuide, leanLevel } from './lean.ts'
+import { renderDebt, scanDebt } from './legion/debt.ts'
 import { BUDGET_AGENT_NOTE, BUDGET_OVER, BUDGET_WARN, SPEND_FILE, bindingBudget, earlierSpend, parseSpend, spentOf } from './budget.ts'
 import { personaRank, planCheck, planWrite, processLine, projectInit, statusText, validateText } from './legion/handlers.ts'
 import { buildRun } from './legion/buildrun.ts'
@@ -383,8 +385,11 @@ function agentsOf($: any, log: (line: string) => void = () => {}): Agents {
         log(`${label}: not started (${prep.deny})`)
         return { deny: prep.deny }
       }
-      const { brief, scope } = prep
+      const { scope } = prep
       const helper = persona.tier === 'haiku'
+      // Lean rules go to coders that may write (builds, fix rounds), not to read-only reviewers.
+      const writes = !helper && scope.files_modified.length > 0 && !scope.profile?.read_only
+      const brief = writes && opts.lean !== 'off' ? `${prep.brief}\n\n${leanBrief(opts.lean)}` : prep.brief
       const description = `${LEGION_MARK}${label} #${++seq}`
       if (persona.tier === 'opus') modelFor[description] = 'opus'
       const s: any = await $.agent.spawn({ subagentType: helper ? HELPER_TYPE : persona.tier === 'opus' ? 'triad:triad-opus-coder' : 'triad:triad-coder', prompt: brief, description, model: helper ? 'haiku' : persona.tier === 'opus' ? 'opus' : 'sonnet' })
@@ -475,7 +480,7 @@ async function legionStep($: any, io: Io, name: string, input: any, log: (line: 
         opts.maxProjectSpend > 0 ? `$${projectSpent().toFixed(2)} of $${opts.maxProjectSpend.toFixed(2)} spent on the project (maxProjectSpend)` : '',
       ].filter(Boolean)
       const spend = lines.length ? `\nBudget: ${lines.join('; ')}${b.level === 'over' ? `: ${b.option} reached, stop` : ''}.` : ''
-      return `${await statusText(io)}\n\nValidate: ${v.text}\n${controlModeLine(await controlMode(io))}\n${await processLine(io, opts.lightPlans)}${spend}${opts.notify ? '' : '\nNotify: off (option notify).'}`
+      return `${await statusText(io)}\n\nValidate: ${v.text}\n${controlModeLine(await controlMode(io))}\n${await processLine(io, opts.lightPlans)}${spend}${opts.notify ? '' : '\nNotify: off (option notify).'}\nLean: ${opts.lean} (option lean)${opts.lean === 'ultra' ? ': planning cuts scope the goal does not justify' : ''}.`
     }
     case 'estimate': return (await estimate(io, { lightPlans: opts.lightPlans, allOpus: opts.allOpus, history: (await $.store.get(STEPS_KEY)) as StepRecord[] | undefined })).text
     case 'project_init': return projectInit(io, input)
@@ -484,7 +489,7 @@ async function legionStep($: any, io: Io, name: string, input: any, log: (line: 
     case 'persona_brief': return personaRank(io, input)
     case 'build_phase': return buildRun(io, agentsOf($, log), input, log)
     case 'persona_run': return renderPersonaRuns(await runPersonas(io, agentsOf($, log), input, log))
-    case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, intent: input.intent, lightPlans: opts.lightPlans, fixMinor: opts.fixMinor, log })).text
+    case 'review_phase': return (await review(io, agentsOf($, log), { phase: input.phase, mode: input.mode, intent: input.intent, lightPlans: opts.lightPlans, fixMinor: opts.fixMinor, lean: opts.lean, log })).text
   }
   return `unknown tool ${name}`
 }
@@ -494,6 +499,7 @@ export const register: Register = (on, options) => {
   // Comparison baseline: the same workflow with every agent on Opus. The Haiku
   // ceiling exists for Haiku's pricing line, so it is off too.
   if (opts.allOpus) opts.haikuCeiling = 0
+  opts.lean = leanLevel(opts.lean)
   registerPane(on)
 
   on('session.start', async ($, e, next) => {
@@ -523,7 +529,7 @@ export const register: Register = (on, options) => {
     try {
       legionGuide = `${LEGION_GUIDE}\n\n${await loadKnowledgeIndex(ioOf($, $.plugin.root))}`
     } catch { legionGuide = LEGION_GUIDE }
-    await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `pane` opens it as a live pane; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project', argumentHint: '[pane | status | validate [--ci] [--fix]]' })
+    await $.command.register({ name: 'triad', description: 'Triad agent tree, tokens and cost per tier; `pane` opens it as a live pane; `status` and `validate [--ci] [--fix]` for a Legion .planning/ project; `debt` lists shortcut: comments', argumentHint: '[pane | status | validate [--ci] [--fix] | debt]' })
     await publish($)
     if (opts.openPane) void $.ui.open({ id: PANE, title: 'Triad' })
     return r
@@ -534,7 +540,7 @@ export const register: Register = (on, options) => {
   on('prompt.section', { name: 'communication' }, async ($, e, next) => {
     const r = await next(e)
     ledger.contextInjections = (ledger.contextInjections ?? 0) + 1
-    return { text: (r.text ? r.text + '\n\n' : '') + ORCHESTRATOR_GUIDE }
+    return { text: (r.text ? r.text + '\n\n' : '') + ORCHESTRATOR_GUIDE + (opts.lean !== 'off' ? `\n\n${leanGuide(opts.lean)}` : '') }
   })
 
   // The Legion coordination rules and the command and persona index ride with
@@ -581,7 +587,9 @@ export const register: Register = (on, options) => {
     reserved[role]++
     let r
     try {
-      r = await next({ ...e, model: opts.allOpus ? 'opus' : modelFor[e.description] ?? modelOfType(type) ?? MODEL_FOR[role], background: false })
+      // The orchestrator's own coder briefs get the lean rules here; workflow briefs got them in agentsOf.
+      const lean = role === 'coder' && opts.lean !== 'off' && !e.description.startsWith(LEGION_MARK)
+      r = await next({ ...e, ...(lean ? { prompt: `${e.prompt}\n\n${leanBrief(opts.lean)}` } : {}), model: opts.allOpus ? 'opus' : modelFor[e.description] ?? modelOfType(type) ?? MODEL_FOR[role], background: false })
     } finally {
       reserved[role]--
     }
@@ -842,6 +850,7 @@ export const register: Register = (on, options) => {
     const args = String(e.args ?? '').trim()
     if (/^status\b/.test(args)) return { text: `${await statusText(ioOf($), { dryRun: /--dry-run\b/.test(args) })}\n${controlModeLine(await controlMode(ioOf($)))}` }
     if (/^validate\b/.test(args)) return validateText(ioOf($), args)
+    if (/^debt\b/.test(args)) return { text: renderDebt(await scanDebt(ioOf($))) }
     await save($)
     if (/^pane\b/.test(args)) {
       await $.ui.open({ id: PANE, title: 'Triad' })

@@ -1,4 +1,5 @@
 // Tool and command handlers over an Io (the mod passes one built on `$`).
+import { debtLine, scanDebt } from './debt.ts'
 import { gapSummary } from './gaps.ts'
 import { parseGithubSection } from './github.ts'
 import { loadPhase, loadProject, today, type Io } from './io.ts'
@@ -49,6 +50,8 @@ export async function statusText(io: Io, opts: { dryRun?: boolean } = {}): Promi
     extra.push('', '## GitHub', ...gh.rows.map(r => `- ${r.phase}: issue ${r.issue}, PR ${r.pr || '—'}, ${r.status}`))
     for (const m of gh.milestones) extra.push(`- Milestone ${m.name} (${m.number}): ${m.status}`)
   }
+  const debt = debtLine(await scanDebt(io))
+  if (debt) extra.push('', debt)
   extra.push(...await suggestionsFor(io, p, n => plans.get(n)?.[0] ?? false))
   return renderStatus(p, nextAction(p, n => plans.get(n)?.[0] ?? false, n => plans.get(n)?.[1] ?? false)) + (extra.length ? '\n' + extra.join('\n') : '')
 }
