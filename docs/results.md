@@ -422,3 +422,19 @@ Findings:
 - **Lines:** lean cut what the coders wrote on every task: 52% fewer on CSV import, 17% on Refunds, 13% on Snake, 39% on Tron. The coder rules do reach the coders.
 - **Cost:** mixed. Lean was 10% cheaper on CSV import and 25% on Snake, about even on Refunds, and 16% dearer on Tron. On Tron the Opus coder tuning the AI made 45 requests against 30 and ran 38 minutes against 26; tuning within a budget varies from run to run, and fewer lines did not make it shorter. Total $6.22 against $3.04 for the same four tasks with no coders.
 - Against the orchestrator working alone (lean full, the table above), delegating cost more on CSV import ($0.45 against $0.30), Refunds ($0.27 against $0.16) and Tron ($2.18 against $0.70), and about the same on Snake ($0.29 against $0.31). So the default, letting the orchestrator decide, stays. One run each; the Tron cost gap is within the spread seen before ($0.87 to $1.86 for the same task).
+
+## A bigger task: five independent modules (`bench/results/big1`)
+
+`python3 bench/run_bench.py --tasks big` runs `toolkit`: a Python package of five unrelated modules (semver ranges, cron next-run times, JSON Pointer and Patch, an INI dialect with interpolation, durations), each with its own spec under `docs/` and 11 hidden cases, 55 in all (pass at 80%). It is built so the work splits cleanly. The fixture scores 0/55 and the reference solution 55/55; a second implementation written from the specs alone, without the tests, also scored 55/55, and the one contradiction it found (indented INI headers) was fixed before the runs.
+
+| Config | Checks | Cost | Opus / Sonnet | Time | Turns | +lines | Agents |
+|---|---|---|---|---|---|---|---|
+| Opus alone | 55/55 | $1.05 | $1.05 / - | 298 s | 20 | 1,546 | - |
+| Triad, default (lean full) | 55/55 | $0.72 | $0.23 / $0.49 | 118 s | 14 | 1,336 | 5 coders |
+| Triad, coders forced | 55/55 | $0.86 | $0.31 / $0.55 | 154 s | 15 | 1,354 | 5 coders |
+
+Findings:
+- **Triad delegated on its own here.** With nothing in the prompt about coders, the orchestrator briefed five Sonnet coders, one per module, in one message. The `maxCoders` cap (4) refused the fifth, and the orchestrator started it once one of the first four had finished; both Triad runs did the same. On the single-feature tasks above it did the work itself; the guide's rule (small known work yourself, independent pieces to coders in parallel) chose correctly both ways.
+- **Cheaper and faster than Opus alone:** 32% less money ($0.72 against $1.05) and 2.5 times faster (118 s against 298 s), with the same full marks. Opus spent $0.23 instead of $1.05; two thirds of the bill moved to Sonnet.
+- Forcing coders through the prompt cost a little more than letting Triad decide ($0.86), for the same split.
+- One run each, total spend $2.63.

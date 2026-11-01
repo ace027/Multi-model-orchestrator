@@ -1,0 +1,37 @@
+{
+  "task": "toolkit",
+  "config": "opus",
+  "options": null,
+  "seconds": 298,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 1546,
+  "linesRemoved": 0,
+  "check": "score 55/55 own-tests pass tests-added True failed=[]",
+  "score": [
+    55.0,
+    55.0
+  ],
+  "cost": 1.0522238000000002,
+  "turns": 20,
+  "tokens": {
+    "inputTokens": 24,
+    "outputTokens": 35737,
+    "cacheReadInputTokens": 443589,
+    "cacheCreationInputTokens": 49734
+  },
+  "totalTokens": 529084,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 24,
+      "outputTokens": 35737,
+      "cacheReadInputTokens": 443589,
+      "cacheCreationInputTokens": 49734,
+      "costUSD": 1.0522238000000002
+    }
+  },
+  "compression": null,
+  "deferredTools": null,
+  "agents": null,
+  "work": "/tmp/bench-opus-toolkit-pnpjvczt/repo"
+}
