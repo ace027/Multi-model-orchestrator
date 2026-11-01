@@ -373,3 +373,22 @@ The same goal both times, run headless from an empty git repository with a clean
 
 In 0.11.0 the orchestrator loads its tools in one search, calls `build_phase` and `review_phase` directly, and skips polish on a light phase. That took a quarter off the Opus cost. The minor-fix round cost about $0.03 of Sonnet: it fixed three of the four findings and left the fourth with a reason. The plan commit added the Python `.gitignore` lines.
 
+
+## Triad 1.1.0: lean rules on and off (`bench/results/lean110`, `lean110tron`)
+
+The option `lean` (rules adapted from Ponytail) off and at `full`, everything else at the defaults, one run of each task in a normal session (`bench/run_bench.py --configs nolean,lean`). `+lines` is the lines the run added against the fixture.
+
+| Task | lean | Checks | Cost | Tokens | Output | +lines | Agents |
+|---|---|---|---|---|---|---|---|
+| CSV import | off | 30/30 | $0.40 | 179k | 10.8k | 334 | orchestrator alone |
+| CSV import | full | 30/30 | $0.30 | 144k | 8.6k | 235 | orchestrator alone |
+| Refunds | off | 18/18 | $0.21 | 103k | 5.6k | 149 | orchestrator alone |
+| Refunds | full | 18/18 | $0.16 | 79k | 3.8k | 84 | orchestrator alone |
+| Tron | off | 52/52 | $1.86 | 1.54M | 62k | 1,582 | 2 coders |
+| Tron | full | 52/52 | $0.70 | 562k | 21k | 674 | orchestrator alone |
+
+Findings:
+- Every check passed with the rules on: the same results for 21-26% less on the small tasks and 30-44% fewer lines.
+- On Tron, lean cost 63% less and wrote 57% fewer lines, but the orchestrator built it alone instead of briefing two coders, so the coder rules themselves were not exercised in this run; part of the gap is that choice. Earlier Tron runs at 0.9-1.0 defaults cost $0.87-1.86, so one run each is a small sample.
+- Pac-Man was dropped: the model now declines to build a faithful copy of it, in both configurations, before writing anything ($0.13 each).
+- `lean: full` is the default from 1.1.0. Total spend for this bench: about $3.90.

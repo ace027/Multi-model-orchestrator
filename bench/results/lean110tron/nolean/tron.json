@@ -1,0 +1,71 @@
+{
+  "task": "tron",
+  "config": "nolean",
+  "options": {
+    "lean": "off"
+  },
+  "seconds": 1098,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 1582,
+  "linesRemoved": 0,
+  "check": "score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']",
+  "score": [
+    52.0,
+    52.0
+  ],
+  "cost": 1.8617801999999999,
+  "turns": 11,
+  "tokens": {
+    "inputTokens": 96,
+    "outputTokens": 62016,
+    "cacheReadInputTokens": 1360537,
+    "cacheCreationInputTokens": 122328
+  },
+  "totalTokens": 1544977,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 76,
+      "outputTokens": 45018,
+      "cacheReadInputTokens": 1183350,
+      "cacheCreationInputTokens": 92355,
+      "costUSD": 1.599109
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 20,
+      "outputTokens": 16998,
+      "cacheReadInputTokens": 177187,
+      "cacheCreationInputTokens": 29973,
+      "costUSD": 0.26267120000000005
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 10
+    },
+    "a60ec2e4b93938494": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 10
+    },
+    "ae676c890ae2ce760": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 28
+    }
+  },
+  "work": "/tmp/bench-nolean-tron-gj2tm_nc/repo"
+}
