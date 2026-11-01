@@ -1,0 +1,54 @@
+{
+  "task": "csvimport",
+  "config": "nolean",
+  "options": {
+    "lean": "off"
+  },
+  "seconds": 97,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 334,
+  "linesRemoved": 1,
+  "check": "score 30/30 own-tests pass tests-added True failed=[]",
+  "score": [
+    30.0,
+    30.0
+  ],
+  "cost": 0.40300280000000005,
+  "turns": 7,
+  "tokens": {
+    "inputTokens": 14,
+    "outputTokens": 10810,
+    "cacheReadInputTokens": 136659,
+    "cacheCreationInputTokens": 31883
+  },
+  "totalTokens": 179366,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 10810,
+      "cacheReadInputTokens": 136659,
+      "cacheCreationInputTokens": 31883,
+      "costUSD": 0.40300280000000005
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 7
+    }
+  },
+  "work": "/tmp/bench-nolean-csvimport-sojr0e2a/repo"
+}

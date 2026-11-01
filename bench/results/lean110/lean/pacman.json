@@ -1,0 +1,54 @@
+{
+  "task": "pacman",
+  "config": "lean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 15,
+  "exit": 0,
+  "success": false,
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "check": "score 0/44 rules 0/32 ui 0/8 replay 0/4 own-tests FAIL tests-added False failed=['no index.html']",
+  "score": [
+    0.0,
+    44.0
+  ],
+  "cost": 0.1256442,
+  "turns": 3,
+  "tokens": {
+    "inputTokens": 6,
+    "outputTokens": 825,
+    "cacheReadInputTokens": 31651,
+    "cacheCreationInputTokens": 20558
+  },
+  "totalTokens": 53040,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 6,
+      "outputTokens": 825,
+      "cacheReadInputTokens": 31651,
+      "cacheCreationInputTokens": 20558,
+      "costUSD": 0.1256442
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 3
+    }
+  },
+  "work": "/tmp/bench-lean-pacman-l26b84qo/repo"
+}
