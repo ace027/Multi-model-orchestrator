@@ -1,0 +1,66 @@
+{
+  "task": "csvimport",
+  "config": "clean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 127,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 248,
+  "linesRemoved": 2,
+  "check": "score 30/30 own-tests pass tests-added True failed=[]",
+  "score": [
+    30.0,
+    30.0
+  ],
+  "cost": 0.4537312,
+  "turns": 2,
+  "tokens": {
+    "inputTokens": 42,
+    "outputTokens": 15114,
+    "cacheReadInputTokens": 358035,
+    "cacheCreationInputTokens": 47603
+  },
+  "totalTokens": 420794,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 24,
+      "outputTokens": 5214,
+      "cacheReadInputTokens": 232057,
+      "cacheCreationInputTokens": 28921,
+      "costUSD": 0.2953924
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 18,
+      "outputTokens": 9900,
+      "cacheReadInputTokens": 125978,
+      "cacheCreationInputTokens": 18682,
+      "costUSD": 0.15833879999999995
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 11
+    },
+    "a31f1efee6a55b91b": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 8
+    }
+  },
+  "work": "/tmp/bench-clean-csvimport-17i0vour/repo"
+}

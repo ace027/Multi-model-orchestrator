@@ -42,7 +42,14 @@ CONFIGS = {
     # Lean rules off and on (option lean), everything else at the defaults.
     "nolean": {"lean": "off"},
     "lean": {"lean": "full"},
+    # The same, with the prompt telling the orchestrator to hand the implementation to coders
+    # (left alone it builds these tasks itself, so the coder rules never run).
+    "cnolean": {"lean": "off"},
+    "clean": {"lean": "full"},
 }
+CODER_PROMPT = (PROMPT + " Do not write the implementation or the tests yourself: brief Triad coders"
+                " (triad:triad-coder, or triad:triad-opus-coder for open-ended parts) to do it, then check their work.")
+PROMPTS = {"cnolean": CODER_PROMPT, "clean": CODER_PROMPT}
 LEGION_PROMPT = ("/legion:quick Do the task described in TASK.md. This is a non-interactive run: "
                  "wherever the workflow would ask the user, take the recommended option.")
 LEGION_HOME = None
@@ -75,7 +82,7 @@ def run(task: str, config: str, out_dir: str) -> dict:
     else:
         cmd += ["--plugin-dir", os.path.join(ROOT, "triad"), "--allowedTools=" + TOOLS,
                 "--settings", json.dumps({"pluginConfigs": {"triad@inline": {"options": opts}}})]
-    cmd.append(LEGION_PROMPT if opts == "legion" else PROMPT)
+    cmd.append(LEGION_PROMPT if opts == "legion" else PROMPTS.get(config, PROMPT))
     t0 = time.time()
     p = subprocess.run(cmd, cwd=repo, stdin=subprocess.DEVNULL, capture_output=True, text=True, env={**os.environ, "HOME": home})
     secs = round(time.time() - t0)

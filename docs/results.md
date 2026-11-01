@@ -401,3 +401,24 @@ Findings:
 - On Tron, lean cost 63% less and wrote 57% fewer lines, but the orchestrator built it alone instead of briefing two coders, so the coder rules themselves were not exercised in this run; part of the gap is that choice. The earlier normal-session Tron run (`games1`, two coders, no lean rules) cost $0.87, so the lean-off run here was on the expensive side; one run each is a small sample.
 - Pac-Man was dropped: the model now declines to build a faithful copy of it, in both configurations, before writing anything ($0.13 each). Snake replaces it in the games set (see Browser games). On Snake (run afterwards, `results/lean110snake`) both configs got 36/36, all three replays included; lean cost 30% less and wrote 45% fewer lines, again with the orchestrator working alone.
 - `lean: full` is the default from 1.1.0. Total spend for this bench: about $4.65, Snake included.
+
+### With coders (`bench/results/lean110coders`)
+
+In the runs above the orchestrator built every task alone, so the coder rules never ran. Configs `cnolean` and `clean` (lean off and full) add one line to the prompt: brief Triad coders to write the implementation and the tests, then check their work. Every run then used coders (one Sonnet coder; on Tron also an Opus coder for the AI).
+
+| Task | lean | Checks | Cost | Opus / Sonnet | Tokens | +lines | Agents |
+|---|---|---|---|---|---|---|---|
+| CSV import | off | 30/30 | $0.51 | $0.31 / $0.20 | 405k | 511 | 1 coder |
+| CSV import | full | 30/30 | $0.45 | $0.30 / $0.16 | 421k | 248 | 1 coder |
+| Refunds | off | 18/18 | $0.25 | $0.19 / $0.07 | 137k | 126 | 1 coder |
+| Refunds | full | 18/18 | $0.27 | $0.18 / $0.09 | 166k | 105 | 1 coder |
+| Snake | off | 36/36 | $0.39 | $0.24 / $0.15 | 390k | 394 | 1 coder |
+| Snake | full | 36/36 | $0.29 | $0.20 / $0.10 | 247k | 342 | 1 coder |
+| Tron | off | 52/52 | $1.89 | $1.67 / $0.21 | 1.61M | 1,603 | 2 coders |
+| Tron | full | 52/52 | $2.18 | $2.02 / $0.17 | 2.41M | 971 | 2 coders |
+
+Findings:
+- Every check passed in both configs, with coders doing the work.
+- **Lines:** lean cut what the coders wrote on every task: 52% fewer on CSV import, 17% on Refunds, 13% on Snake, 39% on Tron. The coder rules do reach the coders.
+- **Cost:** mixed. Lean was 10% cheaper on CSV import and 25% on Snake, about even on Refunds, and 16% dearer on Tron. On Tron the Opus coder tuning the AI made 45 requests against 30 and ran 38 minutes against 26; tuning within a budget varies from run to run, and fewer lines did not make it shorter. Total $6.22 against $3.04 for the same four tasks with no coders.
+- Against the orchestrator working alone (lean full, the table above), delegating cost more on CSV import ($0.45 against $0.30), Refunds ($0.27 against $0.16) and Tron ($2.18 against $0.70), and about the same on Snake ($0.29 against $0.31). So the default, letting the orchestrator decide, stays. One run each; the Tron cost gap is within the spread seen before ($0.87 to $1.86 for the same task).

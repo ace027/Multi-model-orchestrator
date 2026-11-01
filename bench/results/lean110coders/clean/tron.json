@@ -1,0 +1,71 @@
+{
+  "task": "tron",
+  "config": "clean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 2310,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 971,
+  "linesRemoved": 0,
+  "check": "score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']",
+  "score": [
+    52.0,
+    52.0
+  ],
+  "cost": 2.181875,
+  "turns": 13,
+  "tokens": {
+    "inputTokens": 138,
+    "outputTokens": 56193,
+    "cacheReadInputTokens": 2194275,
+    "cacheCreationInputTokens": 156792
+  },
+  "totalTokens": 2407398,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 118,
+      "outputTokens": 45654,
+      "cacheReadInputTokens": 2031730,
+      "cacheCreationInputTokens": 139325,
+      "costUSD": 2.016523
+    },
+    "claude-sonnet-5-5": {
+      "inputTokens": 20,
+      "outputTokens": 10539,
+      "cacheReadInputTokens": 162545,
+      "cacheCreationInputTokens": 17467,
+      "costUSD": 0.165352
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 11
+    },
+    "a3a742880aeae08aa": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 10
+    },
+    "aa798fd134c7112d0": {
+      "role": "coder",
+      "depth": 1,
+      "requests": 45
+    }
+  },
+  "work": "/tmp/bench-clean-tron-y3sd_63o/repo"
+}
