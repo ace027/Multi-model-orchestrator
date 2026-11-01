@@ -10,7 +10,7 @@ An INI dialect with sections, continuation lines, quoted values and interpolatio
 - `Config.keys(section) -> list[str]`: the section's keys in order of appearance. `KeyError` if there is no such section.
 - `Config.get(section, key, default=<none>) -> str`: the value after interpolation. A missing section or key returns `default` if one was given, else raises `KeyError`. Keys are case-insensitive here (they are stored lowercased); section names are case-sensitive.
 - `Config.getint(section, key, default=<none>) -> int`: the value as a decimal integer (optional sign, surrounding whitespace allowed); `ValueError` if it is not one. A given default is returned as is for a missing key.
-- `Config.getbool(...)`: `true`, `yes`, `on`, `1` are `True`; `false`, `no`, `off`, `0` are `False` (case-insensitive); anything else is `ValueError`.
+- `Config.getbool(...)`: `true`, `yes`, `on`, `1` are `True`; `false`, `no`, `off`, `0` are `False` (case-insensitive, surrounding whitespace ignored); anything else is `ValueError`.
 - `Config.getlist(...) -> list[str]`: the value split on commas, each item stripped, empty items dropped (`"a, b,,c "` is `["a", "b", "c"]`; `""` is `[]`).
 
 ## Syntax
@@ -19,7 +19,7 @@ Lines are separated by `\n` (a `\r` before it is ignored). Each line is one of:
 
 - **Blank** (only whitespace): ignored, and it ends any continuation.
 - **Comment**: the first non-whitespace character is `;` or `#`. Ignored; it does not end a continuation (the continuation goes on after it). Comments are only whole lines: `a = 1 ; x` has the value `1 ; x`.
-- **Section header**: `[name]`, with optional whitespace around and inside the brackets (the name is stripped). An empty name, or anything after the `]`, is an error. A section that appears twice is one section; keys from both parts are merged in order.
+- **Section header**: `[name]` at the start of the line, with optional whitespace inside the brackets (the name is stripped) and after them. An indented `[name]` is a continuation line, not a header. An empty name, or anything after the `]`, is an error. A section that appears twice is one section; keys from both parts are merged in order.
 - **Continuation**: a line that starts with whitespace and follows a key line, its continuations, or comments between them. Its stripped text is appended to the value with a `\n` before it. A line starting with whitespace with no key to continue (at the start of the file, or after a header or a blank line) is an error.
 - **Key line**: `key = value` or `key: value`, split at the first `=` or `:`, whichever comes first. The key is stripped and lowercased and must not be empty. The value is stripped. Keys before the first header go into the section `""`. A key that appears twice in the same section is an error, on the second line.
 - Anything else (a line without `=` or `:`) is an error.
