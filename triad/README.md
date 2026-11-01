@@ -48,13 +48,24 @@ For a structured project, use the Legion workflow:
 | `/triad:build`, `/triad:review`, `/triad:ship` | Execute the plans, review the result and fix findings, ship it behind six gates. |
 | `/triad:auto` | The whole project hands-off: start if needed, then plan, build and review each phase with no questions. Run it again to resume. `--estimate` plans every phase and shows the expected cost per phase without building; the rates scale to what your own past steps cost. Pair it with `maxProjectSpend`. Sends a push notification when it finishes or stops (option `notify`). |
 | `/triad:quick` | One small task outside the plan. |
-| `/triad status`, `/triad validate` | Where the project is and what to run next; schema checks. No model calls. |
+| `/triad:audit` | A read-only audit of the repo or a folder: bugs, security, scale, missing tests, speed and what to delete, ranked in plain English. |
+| `/triad status`, `/triad validate`, `/triad debt` | Where the project is and what to run next; schema checks; the `shortcut:` comments in the code. No model calls. |
 
-[`../docs/commands.md`](../docs/commands.md) lists all 21 commands with their arguments. [`../docs/control-modes.md`](../docs/control-modes.md) explains how much freedom agents get during a build.
+[`../docs/commands.md`](../docs/commands.md) lists all 22 commands with their arguments. [`../docs/control-modes.md`](../docs/control-modes.md) explains how much freedom agents get during a build.
 
 ### Legion projects
 
 Triad reads and writes Legion's `.planning/` layout without migration: `PROJECT.md`, `ROADMAP.md`, `STATE.md`, `phases/NN-slug/` with its `CONTEXT`, `PLAN`, `SUMMARY` and `REVIEW` files, and Legion's root `settings.json`. Older forms (both STATE field styles, legacy plan frontmatter, `<verify><automated>` task checks) are read as they are. Existing projects keep their `commit_prefix`; new ones get `triad`. `PARITY.md` at the repository root maps every Legion feature to its Triad equivalent. The Legion material Triad derives from, and its MIT notice, are in `LEGION-NOTICE.md`.
+
+## Lean
+
+The option `lean` (default `full`) adds rules adapted from [Ponytail](https://github.com/DietrichGebert/ponytail) for the smallest complete change:
+
+- **Coders** (and the orchestrator when it codes) take the first option that fully works: skip what nobody asked for, then reuse what the codebase has, then the standard library, then an installed dependency, before writing new code. They never cut validation, error handling, security, accessibility or anything the brief asks for. New non-trivial logic gets one small test. A known limit is marked in the code: `shortcut: <the limit>, <when to upgrade>`. A coder's report may end with a `skipped:` line: what it chose not to build or check.
+- **Reviewers** must give a concrete failing case for every finding, treat a `shortcut:` comment as a decision, and report code that should not exist as a minor `lean` finding.
+- **`/triad debt`** lists the `shortcut:` comments and flags the ones that never say when to upgrade; retros and milestone summaries list those.
+
+`lite` only builds what was asked and names smaller options; `ultra` also cuts, while planning, the scope a phase goal does not justify (recorded as assumed decisions); `off` turns the rules off. Helpers and read-only reviewers' work is unchanged. The material taken from Ponytail and its MIT notice are in `PONYTAIL-NOTICE.md`.
 
 ## Cost
 
@@ -76,6 +87,7 @@ To keep it in check:
 - `/triad:auto --estimate` plans every phase and prints the expected cost per phase before anything is built. Its rates scale to what your own past steps cost.
 - `maxSpend` (per session) and `maxProjectSpend` (across sessions) stop new agents and workflow steps at a dollar limit, with a notice at 80%.
 - `lightPlans` sends small phases through the light process (two reviewers, no board, two review cycles plus a closing round).
+- `lean` (default `full`) keeps the code small: on the bench it cut cost by 21-26% on small tasks with every check still passing (`docs/results.md`).
 - `coderMinutes` tells a coder to wrap up after that many minutes, so a tuning loop can't run on.
 - `/triad` and the pane show the spend per agent and per tier as it happens.
 
@@ -102,6 +114,7 @@ Set them in `/plugin` settings, or for a headless run with `--settings '{"plugin
 | `lightPlans` | 2 | A phase with at most this many plans runs the light process: planning skips the board, spec, proposals, persona table and security and design passes, and review uses two reviewers for two cycles (plus a closing round when the last cycle only raised a few new findings). 0: always the full process. |
 | `fixMinor` | true | After a review passes, one coder round fixes its minor and medium-confidence findings; the checks run again and the round is undone if one fails. |
 | `notify` | true | When `/triad:auto` finishes or stops, send one push notification line: how far it got, why it stopped, the spend. Needs push notifications on in Claude Code. |
+| `lean` | full | The smallest complete change (see Lean): `off`, `lite`, `full` or `ultra`. |
 | `openPane` | false | Open the Triad pane at session start. A pane opened this way seats from 144 terminal columns; `/triad pane` opens it at any width. |
 
 A helper brief over 40k tokens is refused at spawn: give the job to a coder, or split it.
@@ -133,4 +146,4 @@ The ledger prices every request per tier, including Haiku's rate above 100k prom
 
 `claude plugin test triad` runs the test suites; [`../CONTRIBUTING.md`](../CONTRIBUTING.md) has the other checks and the conventions. The test kit drops `agentId` from a plugin's own `$.agent.spawn`, so the `delegate_menial` round trip is covered by the live run in `bench/run_accept.sh` instead.
 
-Version 1.0.0.
+Version 1.1.0.

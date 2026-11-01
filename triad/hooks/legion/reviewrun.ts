@@ -10,6 +10,7 @@ import type { Persona } from './personas.ts'
 import { REVIEWER_RULES, parseReport, passed, reviewed, renderReview, signature, triage, MUST_FIX, type Finding, type ReviewerReport } from './review.ts'
 import { runVerification, dirtyFiles, type Agents } from './build.ts'
 import { parseReply } from '../policy.ts'
+import { leanReviewRules, type LeanLevel } from '../lean.ts'
 import { phaseNumbers } from './status.ts'
 import type { Mode } from './settings.ts'
 import { filterReview } from './authority.ts'
@@ -18,7 +19,7 @@ import { coverageChecks, coverageFindings, readCoverage, renderCoverage } from '
 import { findingErrors, intentFilter } from './review.ts'
 import { loadIntentConfig, resolveTeam } from './intents.ts'
 
-export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void; intent?: string; lightPlans?: number; fixMinor?: boolean }
+export type ReviewOptions = { phase?: number; mode?: 'panel' | 'classic'; maxCycles?: number; log?: (s: string) => void; intent?: string; lightPlans?: number; fixMinor?: boolean; lean?: LeanLevel }
 // A reply's issues: lines (the findings a fix agent did not fix, with why).
 function issuesOf(answer: string): string[] {
   const lines = answer.replace(/```[a-z]*\n?/gi, '').split('\n')
@@ -36,7 +37,7 @@ const CLOSING_CAP = 3
 
 export type ReviewResult = { ok: boolean; result?: 'PASSED' | 'ESCALATED' | 'STALE LOOP ABORTED'; error?: string; cycles: number; text: string; open: Finding[] }
 
-function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; name: string; goal: string; criteria: string[]; files: string[]; open: Finding[]; cycle: number; checks: string[]; closing?: boolean }): string {
+function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; name: string; goal: string; criteria: string[]; files: string[]; open: Finding[]; cycle: number; checks: string[]; closing?: boolean; lean?: LeanLevel }): string {
   const r = rubricOf(o.persona)
   const list = o.open.map(f => `- ${f.id} [${f.severity}] ${f.file}${f.line_range ? `:${f.line_range[0]}` : ''}: ${f.description}`)
   if (o.closing) return [
@@ -51,6 +52,7 @@ function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; nam
     '',
     'You are a reviewer. Do not modify any file.',
     REVIEWER_RULES,
+    ...(o.lean && o.lean !== 'off' ? ['', leanReviewRules(o.lean)] : []),
   ].join('\n')
   return [
     personaBrief(o.persona),
@@ -67,6 +69,7 @@ function reviewerBrief(o: { persona: Persona; panel: boolean; phase: number; nam
     '',
     'You are a reviewer. Do not modify any file.',
     REVIEWER_RULES,
+    ...(o.lean && o.lean !== 'off' ? ['', leanReviewRules(o.lean)] : []),
   ].join('\n')
 }
 
@@ -162,7 +165,7 @@ export async function review(io: Io, agents: Agents, opts: ReviewOptions = {}): 
   for (cycle = 1; cycle <= limit; cycle++) {
     const asked = closing ? reviewers.filter(r => open.some(f => f.agent === r.id)) : reviewers
     const reports: ReviewerReport[] = await Promise.all(asked.map(async persona => {
-      const brief = reviewerBrief({ persona, panel: panelMode && !light, phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles, open, cycle, checks, closing })
+      const brief = reviewerBrief({ persona, panel: panelMode && !light, phase: n, name, goal: info?.goal ?? '', criteria: info?.criteria ?? [], files: reviewFiles, open, cycle, checks, closing, lean: opts.lean })
       const r = await agents.run({ persona, brief, scope: { planId: `review-${pad2(n)}`, mode: 'surgical', files_modified: [], files_forbidden: [], active: reviewers.map(x => x.id) }, label: `review ${persona.id}` })
       const report = parseReport(persona.id, r.answer ?? '', cycle)
       // Reviewers sometimes give absolute paths; findings are keyed by the project-relative one.

@@ -1,4 +1,5 @@
 // Pure policy helpers: tiers, the return schema, write scoping. No `$` here.
+import type { LeanLevel } from './lean.ts'
 
 export type Tier = 'opus' | 'sonnet' | 'haiku'
 export type Role = 'orchestrator' | 'coder' | 'helper'
@@ -22,13 +23,14 @@ export type Options = {
   lightPlans: number
   fixMinor: boolean
   notify: boolean
+  lean: LeanLevel
 }
 
 export const DEFAULTS: Options = {
   maxDepth: 2, maxCoders: 4, maxHelpers: 6, maxRetries: 1, strictMenu: true,
   compress: true, compressThreshold: 4_000, deferTools: true,
   haikuCeiling: 95_000, haikuWrapAt: 80_000, openPane: false, coderMinutes: 20, allOpus: false,
-  maxSpend: 0, maxProjectSpend: 0, lightPlans: 2, fixMinor: true, notify: true,
+  maxSpend: 0, maxProjectSpend: 0, lightPlans: 2, fixMinor: true, notify: true, lean: 'full',
 }
 
 // Plugin agent types are namespaced (`triad:triad-coder`); match the suffix.
@@ -116,7 +118,8 @@ export function schemaProblems(text: string): string[] {
   const r = parseReply(text)
   const out: string[] = []
   if (!r.status) out.push('no "status: done|blocked|partial" line')
-  const deferral = r.status === 'blocked' || r.status === 'partial' ? undefined : deferralIn(text)
+  // The skipped: line names work the brief did not ask for, so it is not a deferral.
+  const deferral = r.status === 'blocked' || r.status === 'partial' ? undefined : deferralIn(text.replace(/^\s*skipped:.*$/gim, ''))
   if (deferral) out.push(`reply defers work back ("${deferral}"); finish it, or return status blocked with a blocked_reason, or partial naming what is left`)
   if (!r.summary.length) out.push('no "summary:"')
   else if (r.summary.length > 5) out.push(`summary is ${r.summary.length} lines (max 5)`)

@@ -1,0 +1,54 @@
+{
+  "task": "csvimport",
+  "config": "lean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 79,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 235,
+  "linesRemoved": 1,
+  "check": "score 30/30 own-tests pass tests-added True failed=[]",
+  "score": [
+    30.0,
+    30.0
+  ],
+  "cost": 0.29875000000000007,
+  "turns": 8,
+  "tokens": {
+    "inputTokens": 12,
+    "outputTokens": 8556,
+    "cacheReadInputTokens": 114560,
+    "cacheCreationInputTokens": 20934
+  },
+  "totalTokens": 144062,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 8556,
+      "cacheReadInputTokens": 114560,
+      "cacheCreationInputTokens": 20934,
+      "costUSD": 0.29875000000000007
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 6
+    }
+  },
+  "work": "/tmp/bench-lean-csvimport-taplfw22/repo"
+}

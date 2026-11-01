@@ -1,0 +1,54 @@
+{
+  "task": "tron",
+  "config": "lean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 330,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 674,
+  "linesRemoved": 0,
+  "check": "score 52/52 rules 20/20 ui 8/8 ai 24/24 own-tests pass tests-added True failed=['ai/by-bot straight 6/6, random 6/6, area 6/6, voronoi 6/6']",
+  "score": [
+    52.0,
+    52.0
+  ],
+  "cost": 0.6975178,
+  "turns": 19,
+  "tokens": {
+    "inputTokens": 32,
+    "outputTokens": 20743,
+    "cacheReadInputTokens": 505124,
+    "cacheCreationInputTokens": 36301
+  },
+  "totalTokens": 562200,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 32,
+      "outputTokens": 20743,
+      "cacheReadInputTokens": 505124,
+      "cacheCreationInputTokens": 36301,
+      "costUSD": 0.6975178
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 16
+    }
+  },
+  "work": "/tmp/bench-lean-tron-3hq1mbpw/repo"
+}
