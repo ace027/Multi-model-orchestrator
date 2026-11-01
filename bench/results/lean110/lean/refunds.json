@@ -1,0 +1,54 @@
+{
+  "task": "refunds",
+  "config": "lean",
+  "options": {
+    "lean": "full"
+  },
+  "seconds": 37,
+  "exit": 0,
+  "success": true,
+  "linesAdded": 84,
+  "linesRemoved": 11,
+  "check": "score 18/18 own-tests pass tests-added True failed=[]",
+  "score": [
+    18.0,
+    18.0
+  ],
+  "cost": 0.1645158,
+  "turns": 4,
+  "tokens": {
+    "inputTokens": 8,
+    "outputTokens": 3847,
+    "cacheReadInputTokens": 60394,
+    "cacheCreationInputTokens": 15093
+  },
+  "totalTokens": 79342,
+  "byModel": {
+    "claude-opus-5-5": {
+      "inputTokens": 8,
+      "outputTokens": 3847,
+      "cacheReadInputTokens": 60394,
+      "cacheCreationInputTokens": 15093,
+      "costUSD": 0.1645158
+    }
+  },
+  "compression": {
+    "calls": 0,
+    "rawTokens": 0,
+    "outTokens": 0
+  },
+  "deferredTools": [
+    "ListAgents",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "Workflow"
+  ],
+  "agents": {
+    "main": {
+      "role": "orchestrator",
+      "depth": 0,
+      "requests": 4
+    }
+  },
+  "work": "/tmp/bench-lean-refunds-d52i3h4u/repo"
+}
